@@ -30,7 +30,6 @@ async function boot() {
   $('#who').innerHTML = `<span>Signed in as <b>${esc(me.name)}</b></span><button class="btn sm" id="logout">Sign out</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
   if (!me.approved) { $('#denied').hidden = false; return; }
-  $('#tabs').hidden = false;
   $('#adminLink').hidden = !me.admin;
   $('#qwrap').hidden = false;
   $('#layout').hidden = false;

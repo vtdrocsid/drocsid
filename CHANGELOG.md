@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-11-22
+- Top strip shows only the Admin link (admins only); Libraries / Live TV live in the center tabs
+- Wordmark is just DROCSID (no "(.TV)")
+
 ## 0.2.0 — 2026-11-22
 - New look: light gray / white with navy strips, two-tone headers, slanted navy tabs and azure accents
   (Browse and Admin). Roll back with `update.sh 0.1.22` if needed.
