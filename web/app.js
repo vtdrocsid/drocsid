@@ -220,12 +220,14 @@ function renderGuide() {
   const keepLeft = $('.g-body', box)?.scrollLeft;
   const keepTop = $('.g-body', box)?.scrollTop;
   box.innerHTML = `
-    <div class="g-headwrap">
-      <div class="g-row g-head">
-        <div class="g-ch muted small">Channel<button class="g-nav prev" title="Earlier">◀</button></div>
-        <div class="g-track" style="width:${width}px;height:34px"></div>
+    <div class="g-top">
+      <div class="g-headwrap">
+        <div class="g-row g-head">
+          <div class="g-ch muted small">Channel<button class="g-nav prev" title="Earlier">◀</button></div>
+          <div class="g-track" style="width:${width}px;height:34px"></div>
+        </div>
       </div>
-      <button class="g-nav next" title="Later">▶</button>
+      <div class="g-endcol"><button class="g-nav next" title="Later">▶</button></div>
     </div>
     <div class="g-body"></div>`;
   const headwrap = $('.g-headwrap', box), body = $('.g-body', box);

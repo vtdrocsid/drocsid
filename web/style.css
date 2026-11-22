@@ -65,14 +65,22 @@ dialog::backdrop { background: rgba(0,0,0,.65); }
 .row { display: flex; gap: 8px; align-items: center; } .end { justify-content: flex-end; }
 
 /* Live TV guide */
-.guide { --ch: 190px; border: 1px solid var(--line); border-radius: var(--radius); max-height: calc(100vh - 230px); position: relative; display: flex; flex-direction: column; overflow: hidden; }
-.g-headwrap { position: relative; flex: none; overflow: hidden; background: var(--panel); }
-.g-body { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.guide { --ch: 190px; --sb: 36px; border: 1px solid var(--line); border-radius: var(--radius); max-height: calc(100vh - 230px); position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.g-top { display: flex; flex: none; background: var(--panel); border-bottom: 1px solid var(--line); }
+.g-headwrap { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.g-head { border-bottom: 0; }
+/* Right-hand column: the ▶ button above, the vertical scrollbar below, same width so they line up. */
+.g-endcol { flex: none; width: var(--sb); display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--line); }
+.g-body { position: relative; flex: 1; min-height: 0; overflow-y: scroll; overflow-x: hidden; scrollbar-color: #3a4050 var(--panel); }
+.g-body::-webkit-scrollbar { width: var(--sb); }
+.g-body::-webkit-scrollbar-track { background: var(--panel); border-left: 1px solid var(--line); }
+.g-body::-webkit-scrollbar-thumb { background: #3a4050; border: 12px solid transparent; background-clip: padding-box; border-radius: 999px; min-height: 48px; }
+.g-body::-webkit-scrollbar-thumb:hover { background-color: #4b5263; }
 .g-nav { width: 30px; height: 26px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); cursor: pointer; font-size: 12px; z-index: 5; }
 .g-nav:hover:not([disabled]) { border-color: var(--accent); }
 .g-nav[disabled] { opacity: .3; cursor: default; }
 .g-nav.prev { margin-left: auto; }
-.g-nav.next { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.g-nav.next { width: 26px; }
 .g-row { display: flex; border-bottom: 1px solid var(--line); min-height: 56px; }
 .g-head { background: var(--panel); }
 .g-ch { position: sticky; left: 0; z-index: 2; width: var(--ch); flex: none; background: var(--panel); border-right: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 6px 8px; }

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.18 — 2026-11-21
+- Guide: ▶ sits in its own fixed right-hand column above the vertical scrollbar; it no longer moves with the timeline
+
 ## 0.1.17 — 2026-11-21
 - Guide: no horizontal scrollbar; ◀ ▶ buttons at the ends of the timeline row move one hour at a time
 - Guide: timeline header stays fixed; the vertical scrollbar covers only the channel rows
