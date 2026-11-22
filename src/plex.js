@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import { config } from './config.js';
 import { settings } from './settings.js';
+import * as xmltv from './xmltv.js';
 
 const CLIENT_ID = 'drocsid-' + crypto.createHash('sha1').update(config.clientId).digest('hex').slice(0, 12);
 
@@ -199,14 +200,16 @@ async function liveSetup() {
   return liveCache;
 }
 
-export function clearLiveCache() { liveCache = { at: 0, dvr: null, provider: null, channels: [] }; guideCache.clear(); }
+export function clearLiveCache() { liveCache = { at: 0, dvr: null, provider: null, channels: [] }; guideCache.clear(); xmltv.clear(); }
 
 export async function liveChannels() { return (await liveSetup()).channels; }
 
 export async function liveStatus() {
   try {
     const s = await liveSetup();
-    return { available: true, provider: s.provider, channels: s.channels.length };
+    const url = xmltv.sourceUrl(s.dvr?.lineup);
+    if (url) await xmltv.ensure(url).catch(() => {});
+    return { available: true, provider: s.provider, channels: s.channels.length, guideFile: url ? xmltv.status() : null };
   } catch (e) { return { available: false, error: e.message }; }
 }
 
@@ -318,7 +321,26 @@ export async function guide(from, to, onlyIds = null) {
     const seen = new Set();
     return lists.flat().filter((p) => p.stop > from && p.start < to && !seen.has(p.start) && seen.add(p.start));
   });
-  return channels.map((c, i) => ({ ...c, programmes: rows[i] || [] }));
+  // Plex merges airings that share a title and date, so take each airing's own details from the XMLTV file.
+  const hasXml = await xmltv.ensure(xmltv.sourceUrl(liveCache.dvr?.lineup)).catch(() => false);
+  return channels.map((c, i) => ({
+    ...c,
+    programmes: (rows[i] || []).map((p) => {
+      const x = hasXml && xmltv.airing(c, p.start);
+      if (!x) return p;
+      return {
+        ...p,
+        subtitle: x.subtitle || p.subtitle,
+        desc: x.desc || p.desc,
+        thumb: x.thumb || p.thumb,
+        episodeLabel: x.episodeLabel || '',
+        contentRating: x.contentRating || p.contentRating,
+        genres: x.genres.length ? x.genres : p.genres,
+        premiere: x.premiere || p.premiere,
+        live: x.live,
+      };
+    }),
+  }));
 }
 
 /** Tune a channel on the DVR. Returns the live session's metadata key, which the transcoder plays. */

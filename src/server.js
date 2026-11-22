@@ -72,8 +72,8 @@ const needApproved = wrap(async (req, res, next) => {
 const needAdmin = (req, res, next) => (auth.isAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Admins only' }));
 const needSuper = (req, res, next) => (auth.isSuperAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Super admins only' }));
 // Settings only super admins may change.
-const SUPER_KEYS = ['superAdminUserIds', 'librarySections', 'libraryOrder', 'librarySort'];
-const LIB_KEYS = ['librarySections', 'libraryOrder', 'librarySort'];
+const SUPER_KEYS = ['superAdminUserIds', 'librarySections', 'libraryOrder', 'librarySort', 'guideXmltvUrl'];
+const LIB_KEYS = ['librarySections', 'libraryOrder', 'librarySort', 'guideXmltvUrl'];
 /** Settings as a given admin may see them: regular admins don't get library settings. */
 const settingsFor = (userId, s = settings()) => ({
   ...(auth.isSuperAdmin(userId) ? s : Object.fromEntries(Object.entries(s).filter(([k]) => !LIB_KEYS.includes(k)))),

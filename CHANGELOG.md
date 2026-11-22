@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.23 — 2026-11-22
+- Live TV details now come from the XMLTV guide file itself. Plex merges airings with the same title and
+  date (every "NFL Football" game showed one description); each airing now gets its own matchup
+  (sub-title), description, poster, episode number, rating, and New/Live flags. Used by Discord posts,
+  the TV guide and Watching Now.
+- The guide file URL is read from Plex's DVR; super admins can set it under Admin → Live TV.
+  The Live TV panel shows how many programmes were loaded. Refreshed every 30 minutes.
+
 ## 0.2.22 — 2026-11-22
 - Fix: Live TV guide/posts could show a programme at the wrong time (e.g. 3 hours late). Plex lists
   every airing of a programme, including on other channels/feeds; we now keep only this channel's airing.

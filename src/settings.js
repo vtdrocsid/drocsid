@@ -34,6 +34,7 @@ const defaults = {
   libraryOrder: [],            // library ids in Browse-page order; libraries not listed follow in Plex's order
   librarySort: {},             // library id -> default sort: title | added | released
 
+  guideXmltvUrl: '',           // optional: XMLTV guide URL (default: the one Plex's DVR uses)
   quality: '1080-8000',        // default for new streams = last quality picked in the player bar
 };
 
@@ -67,6 +68,10 @@ export function update(patch) {
   }
   if ('viewRequiresApproval' in patch) next.viewRequiresApproval = !!patch.viewRequiresApproval;
   if ('announceInVoiceChat' in patch) next.announceInVoiceChat = !!patch.announceInVoiceChat;
+  if ('guideXmltvUrl' in patch) {
+    const u = String(patch.guideXmltvUrl || '').trim();
+    next.guideXmltvUrl = /^https?:\/\/\S+$/i.test(u) ? u : '';
+  }
   if (VALID.quality.includes(patch.quality)) next.quality = patch.quality;
   fs.mkdirSync(config.dataDir, { recursive: true });
   fs.writeFileSync(file + '.tmp', JSON.stringify(next, null, 2));
