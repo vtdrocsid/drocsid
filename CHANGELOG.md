@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.16 — 2026-11-22
+- Live TV guide: channel column is mid grey (#595959) with white call signs so light station logos show up
+
 ## 0.2.15 — 2026-11-22
 - Library tabs sit flush on the navy strip (no light gap under them) and all have the same height
 - Tabs have squarer corners
