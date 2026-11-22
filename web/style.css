@@ -34,7 +34,9 @@ a { color: var(--link); }
   background: linear-gradient(#ffffff, #eef0f2); border-bottom: 1px solid var(--line2); }
 .wordmark { text-decoration: none; display: inline-flex; align-items: center; user-select: none; }
 .wm-main, .wm-tv { font-family: Arial, Helvetica, sans-serif; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; line-height: 1; }
-.wm-main { font-size: 50px; color: var(--azure); }
+.wm-main { font-size: 50px; color: var(--azure);
+  /* dark header-bar navy at the top fading to the azure at the bottom */
+  background: linear-gradient(180deg, var(--navy) 0%, var(--azure) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; padding: 0 2px; }
 .wm-tv { font-size: 44px; color: #4d5258; margin-left: 2px; }
 .wm-tv::before { content: "("; } .wm-tv::after { content: ")"; }
 .who { margin-left: auto; display: flex; gap: 10px; align-items: center; color: var(--muted); }
@@ -209,6 +211,7 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
   font: bold 11px/1.6 var(--tiny); letter-spacing: 1.5px; text-transform: uppercase; color: #fff; }
 .panel .desc { color: var(--muted); font-size: 11px; margin: 0 0 10px; }
 .list { display: flex; flex-direction: column; margin: 8px 0; border: 1px solid var(--line2); background: #fff; }
+.list > p { margin: 0; padding: 10px 12px; }
 .li { display: flex; gap: 10px; align-items: center; padding: 5px 8px; border-bottom: 1px solid #e3e6ea; }
 .li:last-child { border-bottom: 0; }
 .li img { width: 28px; height: 28px; border: 1px solid #9aa2ab; }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4 — 2026-11-22
+- Admin page: top link is "Back to Home"
+- DROCSID wordmark: navy-to-azure gradient (dark at top)
+- Admin lists: padding around "Nothing playing." / "None yet."
+
 ## 0.2.3 — 2026-11-22
 - Sort menu on the right of the library panel; ▸▸ title stays on the left
 
