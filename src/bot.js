@@ -27,7 +27,7 @@ client.on(Events.VoiceStateUpdate, (oldState) => {
   if (!chId || !rooms.get(chId)) return;
   setTimeout(() => {
     const ch = oldState.guild.channels.cache.get(chId);
-    if (ch && ch.members.filter((m) => !m.user.bot).size === 0) rooms.stop(chId);
+    if (ch && ch.members.filter((m) => !m.user.bot).size === 0) rooms.stop(chId, true, 'voice channel empty for 1 minute');
   }, 60_000);
 });
 

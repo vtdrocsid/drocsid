@@ -83,7 +83,7 @@ async function load(room, seconds) {
 }
 
 export async function start(roomId, guildId, item, user, quality) {
-  await stop(roomId, false);
+  await stop(roomId, false, 'replaced by a new title');
   const room = {
     id: roomId, guildId, item, startedBy: user.name, startedById: user.id, quality: findPreset(quality).id,
     playing: true, anchorPos: 0, anchorTime: now(),
@@ -149,9 +149,10 @@ export async function reload(roomId) {
   return room;
 }
 
-export async function stop(roomId, announce = true) {
+export async function stop(roomId, announce = true, reason = 'stopped') {
   const room = rooms.get(roomId);
   if (!room) return false;
+  console.log(`[room] ${room.item.title} in ${roomId} ended: ${reason} (at ${Math.floor(position(room))}s, ${room.viewers} watching)`);
   rooms.delete(roomId);
   await releasePlex(room);
   if (announce) events.emit('end', roomId);
@@ -161,6 +162,7 @@ export async function stop(roomId, announce = true) {
 export function setViewers(roomId, count) {
   const room = rooms.get(roomId);
   if (!room) return;
+  if (room.viewers !== count) console.log(`[room] ${room.item.title}: ${count} watching`);
   room.viewers = count;
   if (count > 0) room.idleSince = null;
   else if (!room.idleSince) room.idleSince = now();
@@ -176,7 +178,7 @@ setInterval(() => {
         timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId: room.plexSession,
       });
     }
-    if (room.item.duration && position(room) >= room.item.duration - 1) { stop(room.id); continue; }
-    if (room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id);
+    if (room.item.duration && position(room) >= room.item.duration - 1) { stop(room.id, true, 'reached the end'); continue; }
+    if (room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id, true, 'nobody watching for 10 minutes');
   }
 }, 20_000).unref();

@@ -216,7 +216,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
   if (mine && mine.id !== voiceChannelId) {
     const where = channels.find((c) => c.id === mine.id)?.name || 'another channel';
     if (!stopMine) return res.status(409).json({ conflict: 'user', error: `You're already streaming “${mine.item.title}” in ${where}.` });
-    await rooms.stop(mine.id);
+    await rooms.stop(mine.id, true, `${me.name} started something in another channel`);
   }
 
   const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await plex.metadata(String(ratingKey).replace(/\D/g, ''));
@@ -232,7 +232,7 @@ async function control(roomId, action, seconds, quality) {
   if (action === 'pause') rooms.pause(roomId);
   else if (action === 'resume') await rooms.resume(roomId);
   else if (action === 'seek') await rooms.seek(roomId, Number(seconds) || 0);
-  else if (action === 'stop') await rooms.stop(roomId);
+  else if (action === 'stop') await rooms.stop(roomId, true, 'stopped from the player');
   else if (action === 'quality') {
     if (!VALID.quality.includes(quality)) throw Object.assign(new Error('Unknown quality'), { status: 400 });
     await rooms.setQuality(roomId, quality);
@@ -276,7 +276,7 @@ app.put('/api/admin/settings', needSession, needAdmin, wrap(async (req, res) => 
 }));
 
 app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
-  await rooms.stop(String(req.body.voiceChannelId));
+  await rooms.stop(String(req.body.voiceChannelId), true, 'stopped by an admin');
   res.json({ ok: true });
 }));
 
@@ -370,7 +370,8 @@ export function startServer() {
         try { await control(roomId, msg.action, msg.seconds, msg.quality); } catch (e) { send(ws, { type: 'error', error: e.message }); }
       }
     });
-    ws.on('close', () => {
+    ws.on('close', (code) => {
+      console.log(`[ws] ${session.username} disconnected from ${roomId} (${code})`);
       subs.get(roomId)?.delete(ws);
       rooms.setViewers(roomId, subs.get(roomId)?.size || 0);
     });
