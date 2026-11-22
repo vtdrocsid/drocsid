@@ -23,24 +23,26 @@ export async function isApproved(userId, guildId = config.guildId) {
   }
 }
 
-/** Roles and members of the server, for the Admin page pickers. */
+/** Roles and members of the server, for the Admin page pickers. Cached: Discord rate-limits full member fetches. */
+let dirCache = { at: 0, data: null };
 export async function guildDirectory(guildId = config.guildId) {
+  if (dirCache.data && Date.now() - dirCache.at < 5 * 60_000) return dirCache.data;
   const guild = await discordClient.guilds.fetch(guildId);
   const roles = (await guild.roles.fetch())
     .filter((r) => r.id !== guild.id && !r.managed)
     .sort((a, b) => b.position - a.position)
     .map((r) => ({ id: r.id, name: r.name, color: r.hexColor }));
-  let members = [];
+  let members = dirCache.data?.members || [];
   try {
-    // Needs the "Server Members Intent" toggle in the Developer Portal.
-    members = (await guild.members.fetch())
+    members = (await guild.members.fetch({ time: 15_000 }))
       .filter((m) => !m.user.bot)
       .map((m) => ({ id: m.id, name: m.displayName, username: m.user.username, avatar: m.displayAvatarURL({ size: 64 }) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (e) {
-    console.warn('Member list unavailable (enable Server Members Intent):', e.message);
+    console.warn('Member list unavailable:', e.message);
   }
-  return { roles, members };
+  dirCache = { at: Date.now(), data: { roles, members } };
+  return dirCache.data;
 }
 
 export async function lookupUser(userId) {

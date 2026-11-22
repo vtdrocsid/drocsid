@@ -19,6 +19,19 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(express.json({ limit: '32kb' }));
 
+// Log Activity sign-in and every playlist request (segments only when they fail).
+app.use((req, res, next) => {
+  const p = req.path;
+  if (!p.startsWith('/media/') && p !== '/api/token' && !p.startsWith('/activity')) return next();
+  const started = Date.now();
+  res.on('finish', () => {
+    const isSegment = !p.endsWith('.m3u8') && p.startsWith('/media/');
+    if (isSegment && res.statusCode < 400) return;
+    console.log(`[http] ${res.statusCode} ${req.method} ${p.replace(/\/media\/t\/[^/]+\//, '/media/t/<token>/')} ${Date.now() - started}ms`);
+  });
+  next();
+});
+
 const COOKIE = 'pc_session';
 const REDIRECT_URI = `${config.publicUrl}/auth/callback`;
 
@@ -172,6 +185,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
   const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await plex.metadata(String(ratingKey).replace(/\D/g, ''));
   if (item.source === 'plex' && !['movie', 'episode'].includes(item.kind)) return res.status(400).json({ error: 'Pick a movie or an episode' });
   await rooms.start(voiceChannelId, config.guildId, item, req.session.username);
+  rooms.setViewers(voiceChannelId, subs.get(voiceChannelId)?.size || 0);
   announce(voiceChannelId, `▶️ **${item.title}** started by ${req.session.username}. Open **Activities** (🚀) in this voice channel to watch.`);
   res.json({ ok: true, state: rooms.publicState(rooms.get(voiceChannelId)) });
 }));
@@ -269,10 +283,10 @@ app.use((err, req, res, _next) => {
 });
 
 // ---------- WebSocket sync for the Activity ----------
+const subs = new Map(); // roomId -> Set<ws>
 export function startServer() {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
-  const subs = new Map(); // roomId -> Set<ws>
 
   const send = (ws, msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
   const broadcast = (roomId, msg) => subs.get(roomId)?.forEach((ws) => send(ws, msg));
@@ -287,7 +301,8 @@ export function startServer() {
     const url = new URL(req.url, 'http://x');
     const session = auth.getSession(url.searchParams.get('token'));
     const roomId = url.searchParams.get('channel');
-    if (!session || !roomId) return ws.close(4001, 'unauthorized');
+    if (!session || !roomId) { console.warn('[ws] rejected: no session'); return ws.close(4001, 'unauthorized'); }
+    console.log(`[ws] ${session.username} connected to ${roomId}`);
     const isApproved = await approved(session);
     const inChannel = auth.voiceChannelOf(session.userId) === roomId;
     if (!inChannel && !isApproved) return ws.close(4003, 'join the voice channel first');
