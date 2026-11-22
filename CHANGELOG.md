@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.9 — 2026-11-22
+- The details window now matches the hover card: navy title bar (rating, year, runtime, Rotten Tomatoes),
+  poster beside the tagline, full synopsis, genres, director and up to 10 cast members with headshots
+- Buttons say "▶ Play" and "📅 Schedule" everywhere
+
 ## 0.2.8 — 2026-11-22
 - Hover card on movie and show posters: rest the mouse on a poster for about half a second to see
   the tagline, synopsis, genres, director, top 5 cast with headshots, and Play / Schedule / More details

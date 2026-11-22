@@ -151,7 +151,7 @@ export async function info(ratingKey) {
     studio: m.studio || '',
     genres: tags(m.Genre).slice(0, 4),
     directors: tags(m.Director).slice(0, 2),
-    cast: (m.Role || []).slice(0, 5).map((r) => ({ name: r.tag, role: r.role || '', face: faceId(r.thumb) })),
+    cast: (m.Role || []).slice(0, 10).map((r) => ({ name: r.tag, role: r.role || '', face: faceId(r.thumb) })),
   };
 }
 

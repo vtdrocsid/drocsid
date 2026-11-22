@@ -294,3 +294,26 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .hc-cast .ch { font-size: 9px; color: #6b7682; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .hc-foot { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid #e3e6ea; background: #f6f7f8; }
 .hc-foot .btn { white-space: nowrap; }
+
+/* ---------- details dialog (same look as the hover card) ---------- */
+#detail { max-width: min(820px, 94vw); }
+.dt .hc-head { padding: 12px 14px; align-items: center; }
+.dt .hc-head .t { font-size: 20px; white-space: normal; }
+.dt .hc-meta { font-size: 12px; margin-top: 4px; }
+.dt .hc-head .close { position: static; margin-left: 14px; background: transparent; border: 1px solid #5e86b0; color: #fff; width: 30px; height: 30px; cursor: pointer; font-size: 15px; flex: none; }
+.dt .hc-head .close:hover { background: rgba(255,255,255,.12); }
+.dt-main { display: flex; gap: 18px; padding: 16px; font-size: 13px; line-height: 1.5; }
+.dt-poster { width: 170px; flex: none; }
+.dt-poster img { width: 100%; display: block; border: 1px solid #b3b9c1; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.dt-info { flex: 1; min-width: 0; }
+.dt .hc-tag { font-size: 14px; }
+.hc-syn.full { display: block; overflow: visible; }
+.dt .hc-cast { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); row-gap: 10px; }
+.dt .hc-cast .ph { width: 64px; height: 64px; }
+.dt .hc-cast .nm { font-size: 11px; }
+.dt .hc-cast .ch { font-size: 10px; }
+.dt .detail-body { padding: 0 16px 16px; }
+.dt .hc-foot { padding: 10px 16px; }
+.dt .hc-foot .btn { font-size: 13px; padding: 7px 18px; }
+@media (max-width: 600px) { .dt-main { flex-direction: column; } .dt-poster { width: 120px; } }
+.dt .hc-head .hc-tt { flex: 1; }

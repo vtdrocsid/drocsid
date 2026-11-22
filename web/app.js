@@ -116,6 +116,36 @@ function hoverRuntime(i) {
   const m = Math.round(i.duration / 60);
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
 }
+
+// Shared by the hover card and the details dialog so both read the same way.
+function infoHead(i, extra = '') {
+  const rt = i.rt && Number.isFinite(i.rt.score)
+    ? `<div class="hc-rt"><small>${i.rt.kind === 'audience' ? 'AUDIENCE' : 'TOMATOMETER'}</small>${rtBadge(i.rt)}</div>` : '';
+  const meta = [i.contentRating ? `<span class="cr">${esc(i.contentRating)}</span>` : '',
+    esc([i.year, hoverRuntime(i)].filter(Boolean).join(' · '))].join('');
+  const name = i.kind === 'episode' ? i.title : i.shortTitle || i.title;
+  return `<div class="hc-head"><div class="hc-tt"><div class="t">${esc(name)}</div><div class="hc-meta">${meta}</div></div>${rt}${extra}</div>`;
+}
+function infoBody(i, castMax, clamp) {
+  const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('');
+  const cast = (i.cast || []).slice(0, castMax);
+  return `${i.tagline ? `<div class="hc-tag">${esc(i.tagline)}</div>` : ''}
+    ${i.summary ? `<div class="${clamp ? 'hc-syn' : 'hc-syn full'}">${esc(i.summary)}</div>` : '<div class="hc-syn muted">No synopsis available.</div>'}
+    ${i.genres?.length ? `<div class="hc-genres">${i.genres.map((g) => `<span>${esc(g)}</span>`).join('')}</div>` : ''}
+    ${i.directors?.length ? `<div class="hc-lbl">Directed by</div><div class="hc-dir">${esc(i.directors.join(', '))}</div>` : ''}
+    ${cast.length ? `<div class="hc-lbl">Starring</div><div class="hc-cast">${cast.map((c) => `
+      <div><div class="ph">${c.face ? `<img alt="" src="/api/face/${c.face}" onerror="this.remove()">` : ''}<span>${esc(initials(c.name))}</span></div>
+      <div class="nm">${esc(c.name)}</div>${c.role ? `<div class="ch">${esc(c.role)}</div>` : ''}</div>`).join('')}</div>` : ''}`;
+}
+function infoFoot(i, withMore) {
+  const playable = ['movie', 'episode'].includes(i.kind);
+  if (!playable && !withMore) return '';
+  return `<div class="hc-foot">
+    ${playable ? '<button class="btn primary sm" data-a="play">▶ Play</button><button class="btn sm" data-a="sched">📅 Schedule</button>'
+      : '<button class="btn primary sm" data-a="more">Episodes</button>'}
+    ${withMore ? '<button class="btn sm" data-a="more" style="margin-left:auto">More details</button>' : ''}
+  </div>`;
+}
 function showHover(el, i) {
   if (!hc) {
     hc = h('<div class="hc" hidden></div>');
@@ -128,27 +158,7 @@ function showHover(el, i) {
   if (hoverFor) hoverFor.classList.remove('hovering');
   hoverFor = el;
   el.classList.add('hovering');
-  const playable = i.kind === 'movie';
-  const rt = i.rt && Number.isFinite(i.rt.score)
-    ? `<div class="hc-rt"><small>${i.rt.kind === 'audience' ? 'AUDIENCE' : 'TOMATOMETER'}</small>${rtBadge(i.rt)}</div>` : '';
-  const meta = [i.contentRating ? `<span class="cr">${esc(i.contentRating)}</span>` : '',
-    esc([i.year, hoverRuntime(i)].filter(Boolean).join(' · '))].join('');
-  const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('');
-  hc.innerHTML = `
-    <div class="hc-head"><div class="hc-tt"><div class="t">${esc(i.shortTitle || i.title)}</div><div class="hc-meta">${meta}</div></div>${rt}</div>
-    <div class="hc-body">
-      ${i.tagline ? `<div class="hc-tag">${esc(i.tagline)}</div>` : ''}
-      ${i.summary ? `<div class="hc-syn">${esc(i.summary)}</div>` : '<div class="hc-syn muted">No synopsis available.</div>'}
-      ${i.genres?.length ? `<div class="hc-genres">${i.genres.map((g) => `<span>${esc(g)}</span>`).join('')}</div>` : ''}
-      ${i.directors?.length ? `<div class="hc-lbl">Directed by</div><div class="hc-dir">${esc(i.directors.join(', '))}</div>` : ''}
-      ${i.cast?.length ? `<div class="hc-lbl">Starring</div><div class="hc-cast">${i.cast.map((c) => `
-        <div><div class="ph">${c.face ? `<img alt="" src="/api/face/${c.face}" onerror="this.remove()">` : ''}<span>${esc(initials(c.name))}</span></div>
-        <div class="nm">${esc(c.name)}</div>${c.role ? `<div class="ch">${esc(c.role)}</div>` : ''}</div>`).join('')}</div>` : ''}
-    </div>
-    <div class="hc-foot">
-      ${playable ? '<button class="btn primary sm" data-a="play">▶ Play</button><button class="btn sm" data-a="sched">📅 Schedule</button>' : '<button class="btn primary sm" data-a="more">Episodes</button>'}
-      <button class="btn sm" data-a="more" style="margin-left:auto">More details</button>
-    </div>`;
+  hc.innerHTML = infoHead(i) + `<div class="hc-body">${infoBody(i, 5, true)}</div>` + infoFoot(i, true);
   hc.querySelectorAll('[data-a]').forEach((b) => {
     b.onclick = () => {
       hideHover(true);
@@ -319,32 +329,28 @@ $('#q').onblur = () => setTimeout(closeResults, 100);
 async function openDetail(ratingKey) {
   const dlg = $('#detail');
   const body = $('#detailBody');
-  body.innerHTML = '<p class="center muted">Loading…</p>';
+  body.innerHTML = '<p class="center muted" style="padding:20px">Loading…</p>';
   dlg.showModal();
-  const { item, children } = await api(`/api/item/${ratingKey}`);
-  const playable = ['movie', 'episode'].includes(item.kind);
-  const dur = item.duration ? `${Math.round(item.duration / 60)} min` : '';
-  body.innerHTML = `
-    <button class="close" aria-label="Close">✕</button>
-    <div class="detail-hero" style="--art:url('${thumb(item.art, 1280, 720)}')">
-      <div class="poster" style="background-image:url('${thumb(item.thumb)}')"></div>
-      <div>
-        <h2>${esc(item.title)}</h2>
-        <div class="muted">${esc([item.year, item.contentRating, dur].filter(Boolean).join(' · '))}</div>
-        <p>${esc(item.summary)}</p>
-        ${playable ? '<div class="row"><button class="btn primary" id="playThis">▶ Play in Discord</button><button class="btn" id="schedThis">📅 Schedule…</button></div>' : ''}
-      </div>
+  const [i, { children }] = await Promise.all([getInfo(ratingKey), api(`/api/item/${ratingKey}`)]);
+  const hasEps = ['show', 'season'].includes(i.kind);
+  body.innerHTML = `<div class="dt">
+    ${infoHead(i, '<button class="close" aria-label="Close">✕</button>')}
+    <div class="dt-main">
+      <div class="dt-poster">${i.thumb ? `<img alt="" src="${thumb(i.thumb)}">` : ''}</div>
+      <div class="dt-info">${infoBody(i, 10, false)}</div>
     </div>
-    <div class="detail-body"><div class="seasons"></div><div class="eps"></div></div>`;
+    ${hasEps ? '<div class="detail-body"><div class="seasons"></div><div class="eps"></div></div>' : ''}
+    ${infoFoot(i, false)}
+  </div>`;
   $('.close', body).onclick = () => dlg.close();
-  if (playable) {
-    $('#playThis').onclick = () => choosePlay({ source: 'plex', ratingKey: item.ratingKey, title: item.title });
-    $('#schedThis').onclick = () => openSchedule({ source: 'plex', ratingKey: item.ratingKey, title: item.title, thumb: item.thumb });
-  }
+  body.querySelectorAll('[data-a]').forEach((b) => {
+    const t = { source: 'plex', ratingKey: i.ratingKey, title: i.title, thumb: i.thumb };
+    b.onclick = () => (b.dataset.a === 'play' ? choosePlay(t) : openSchedule(t));
+  });
 
-  if (item.kind === 'show') {
+  if (i.kind === 'show') {
     const bar = $('.seasons', body);
-    children.forEach((s, i) => {
+    children.forEach((s, n) => {
       const b = h(`<button class="chip">${esc(s.shortTitle || s.title)}</button>`);
       b.onclick = async () => {
         bar.querySelectorAll('.chip').forEach((x) => x.classList.remove('active'));
@@ -352,9 +358,9 @@ async function openDetail(ratingKey) {
         showEpisodes((await api(`/api/item/${s.ratingKey}`)).children);
       };
       bar.append(b);
-      if (i === 0) b.click();
+      if (n === 0) b.click();
     });
-  } else if (item.kind === 'season') {
+  } else if (i.kind === 'season') {
     showEpisodes(children);
   }
 }
