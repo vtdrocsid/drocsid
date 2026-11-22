@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!-- Unraid Docker template. Copy to /boot/config/plugins/dockerMan/templates-user/my-plexcord.xml,
+     then Docker → Add Container → pick "plexcord". Replace GITHUB_OWNER with your GitHub username. -->
+<Container version="2">
+  <Name>plexcord</Name>
+  <Repository>ghcr.io/GITHUB_OWNER/plexcord:latest</Repository>
+  <Registry>https://github.com/GITHUB_OWNER/plexcord/pkgs/container/plexcord</Registry>
+  <Network>proxy-net</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Overview>Watch Plex movies, shows and live TV together in Discord voice channels. Web portal for browsing and admin.</Overview>
+  <Category>MediaServer:Video</Category>
+  <WebUI>https://discordtv.plunkett.cloud/admin</WebUI>
+  <Config Name="App data" Target="/data" Default="/mnt/user/appdata/plexcord" Mode="rw" Type="Path" Display="always" Required="true">/mnt/user/appdata/plexcord</Config>
+  <Config Name="Web port" Target="3000" Default="3000" Mode="tcp" Type="Port" Display="always" Required="false">3000</Config>
+  <Config Name="PUBLIC_URL" Target="PUBLIC_URL" Default="https://discordtv.plunkett.cloud" Type="Variable" Display="always" Required="true">https://discordtv.plunkett.cloud</Config>
+  <Config Name="DISCORD_CLIENT_ID" Target="DISCORD_CLIENT_ID" Type="Variable" Display="always" Required="true"/>
+  <Config Name="DISCORD_CLIENT_SECRET" Target="DISCORD_CLIENT_SECRET" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="DISCORD_BOT_TOKEN" Target="DISCORD_BOT_TOKEN" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="DISCORD_GUILD_ID" Target="DISCORD_GUILD_ID" Type="Variable" Display="always" Required="true"/>
+  <Config Name="OWNER_USER_IDS" Target="OWNER_USER_IDS" Type="Variable" Display="always" Required="true" Description="Your Discord user ID; owners are always admins"/>
+  <Config Name="PLEX_URL" Target="PLEX_URL" Default="http://192.168.16.10:32400" Type="Variable" Display="always" Required="true"/>
+  <Config Name="PLEX_TOKEN" Target="PLEX_TOKEN" Type="Variable" Display="always" Required="true" Mask="true"/>
+</Container>

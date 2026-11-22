@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plexcord</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span>Plexcord</div>
+    <nav id="tabs" hidden>
+      <button data-tab="libraries" class="active">Libraries</button>
+      <button data-tab="search">Search</button>
+      <button data-tab="live">Live TV</button>
+    </nav>
+    <div class="who" id="who"></div>
+  </header>
+
+  <main>
+    <section id="signin" class="center" hidden>
+      <h1>Watch together in Discord</h1>
+      <p>Sign in with Discord to browse the library and start a stream in a voice channel.</p>
+      <a class="btn primary big" href="/auth/login">Sign in with Discord</a>
+    </section>
+
+    <section id="denied" class="center" hidden>
+      <h1>Waiting for approval</h1>
+      <p>You're signed in, but you haven't been approved to browse yet. Ask an admin to add you.</p>
+    </section>
+
+    <section id="tab-libraries" class="tab" hidden>
+      <div class="toolbar">
+        <div id="libs" class="chips"></div>
+        <select id="sort">
+          <option value="title">A–Z</option>
+          <option value="added">Recently added</option>
+          <option value="released">Release date</option>
+        </select>
+      </div>
+      <div id="grid" class="grid"></div>
+      <div class="center"><button id="more" class="btn" hidden>Load more</button></div>
+    </section>
+
+    <section id="tab-search" class="tab" hidden>
+      <div class="toolbar"><input id="q" type="search" placeholder="Search movies, shows and episodes…" autocomplete="off" /></div>
+      <div id="results" class="grid"></div>
+    </section>
+
+    <section id="tab-live" class="tab" hidden>
+      <div class="toolbar">
+        <input id="chfilter" type="search" placeholder="Filter channels…" autocomplete="off" />
+        <span class="muted" id="guiderange"></span>
+      </div>
+      <div id="guide" class="guide"></div>
+    </section>
+  </main>
+
+  <footer id="np" class="np" hidden></footer>
+
+  <dialog id="detail"><div id="detailBody"></div></dialog>
+  <dialog id="playDlg">
+    <form method="dialog" class="play-form">
+      <h3 id="playTitle"></h3>
+      <label>Voice channel
+        <select id="voiceSel"></select>
+      </label>
+      <p class="muted small" id="voiceHint"></p>
+      <p class="error" id="playErr"></p>
+      <div class="row end">
+        <button value="cancel" class="btn">Cancel</button>
+        <button id="playGo" value="default" class="btn primary">Play</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plexcord · Admin</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span>Plexcord <span class="muted">Admin</span></div>
+    <div class="who"><a class="btn sm" href="/browse/">← Browse</a><span id="who"></span></div>
+  </header>
+  <main>
+    <p id="msg" class="center muted">Loading…</p>
+    <div id="admin" class="admin" hidden>
+      <section class="panel" style="grid-column: 1 / -1">
+        <h2>Active streams</h2>
+        <p class="desc">Everything playing right now, by voice channel.</p>
+        <div id="streams" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Approved roles</h2>
+        <p class="desc">Anyone with one of these Discord roles can browse and start streams.</p>
+        <div id="roles" class="checks"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Approved users</h2>
+        <p class="desc">Individual people approved regardless of role.</p>
+        <div class="row"><input id="userAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="userAddBtn">Add</button></div>
+        <div id="users" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Admins</h2>
+        <p class="desc">Admins can open this page. Owners are set in the container's environment and can't be removed here.</p>
+        <div class="row"><input id="adminAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="adminAddBtn">Add</button></div>
+        <div id="admins" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Libraries</h2>
+        <p class="desc">Which Plex libraries appear on the Browse page. Leave all unchecked to show every movie and TV library.</p>
+        <div id="libraries" class="checks"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Plex source quality</h2>
+        <p class="desc">Which version of a title Plex reads when it has more than one (for example a 4K remux and a 1080p copy).</p>
+        <div class="field"><span>Source version</span><select id="sourceMaxResolution"></select></div>
+      </section>
+
+      <section class="panel">
+        <h2>Activity output quality</h2>
+        <p class="desc">What Plex transcodes to for everyone watching in a voice channel. “Original” streams the file untouched when the browser can play it.</p>
+        <div class="field"><span>Resolution</span><select id="outputResolution"></select></div>
+        <div class="field"><span>Bitrate (kbps)</span>
+          <select id="outputBitrate">
+            <option>40000</option><option>20000</option><option>12000</option><option>8000</option>
+            <option>4000</option><option>3000</option><option>2000</option><option>1500</option><option>720</option>
+          </select></div>
+        <div class="field"><span>Apply to streams already playing</span><button class="btn sm" id="applyNow">Restart streams now</button></div>
+      </section>
+
+      <section class="panel">
+        <h2>Access &amp; notices</h2>
+        <div class="field"><span>Viewers must be approved too</span><input id="viewRequiresApproval" type="checkbox"></div>
+        <div class="field"><span>Post “now playing” in voice chat</span><input id="announceInVoiceChat" type="checkbox"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Live TV</h2>
+        <p class="desc">Channels, guide and tuning come from your Plex DVR.</p>
+        <div id="live"></div>
+        <button class="btn" id="refreshLive">Reload channels &amp; guide</button>
+      </section>
+    </div>
+  </main>
+  <datalist id="memberList"></datalist>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

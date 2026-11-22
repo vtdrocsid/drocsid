@@ -1,0 +1,168 @@
+// A "room" is one voice channel's watch session: one shared Plex stream, one server-owned clock.
+import crypto from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import * as plex from './plex.js';
+
+export const events = new EventEmitter(); // 'update' (room), 'end' (roomId)
+const rooms = new Map(); // voiceChannelId -> room
+
+const now = () => Date.now();
+
+export function position(room) {
+  if (!room) return 0;
+  const p = room.playing ? room.anchorPos + (now() - room.anchorTime) / 1000 : room.anchorPos;
+  return room.item.duration ? Math.min(p, room.item.duration) : p;
+}
+
+export function publicState(room) {
+  if (!room) return { active: false };
+  return {
+    active: true,
+    title: room.item.title,
+    source: room.item.source,
+    duration: room.item.duration,
+    playlist: room.playlist,
+    playlistVersion: room.playlistVersion,
+    offsetBase: room.offsetBase, // stream time 0 == this many seconds into the title
+    playing: room.playing,
+    position: position(room),
+    serverTime: now(),
+    startedBy: room.startedBy,
+  };
+}
+
+export const get = (roomId) => rooms.get(roomId);
+export const all = () => [...rooms.values()];
+const emit = (room) => events.emit('update', room);
+
+async function releasePlex(room) {
+  if (!room.plexSession) return;
+  const sessionId = room.plexSession;
+  room.plexSession = null;
+  await plex.stopTranscode(sessionId);
+  if (room.plexKey) {
+    // "stopped" tells Plex the playback ended; for live TV this frees the tuner.
+    await plex.timeline({ key: room.plexKey, ratingKey: room.plexRatingKey, state: 'stopped', timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId });
+  }
+}
+
+/** (Re)start the shared Plex stream at `seconds` into the title (ignored for live TV). */
+async function load(room, seconds) {
+  await releasePlex(room);
+  const sessionId = crypto.randomUUID();
+  if (room.item.source === 'live') {
+    const tuned = await plex.tune(room.item, sessionId);
+    room.plexKey = tuned.key;
+    room.plexRatingKey = tuned.ratingKey;
+    room.masterPlaylist = await plex.startTranscode({ path: tuned.key, sessionId });
+    room.offsetBase = 0;
+  } else {
+    room.plexKey = `/library/metadata/${room.item.ratingKey}`;
+    room.plexRatingKey = room.item.ratingKey;
+    const mediaIndex = await plex.pickMediaIndex(room.item.ratingKey);
+    room.masterPlaylist = await plex.startTranscode({ path: room.plexKey, offset: seconds, mediaIndex, sessionId });
+    room.offsetBase = Math.max(0, Math.floor(seconds));
+  }
+  room.plexSession = sessionId;
+  room.playlistVersion++;
+  room.playlist = `room/${room.id}/master.m3u8?v=${room.playlistVersion}`; // client prefixes /media/t/<token>/
+}
+
+export async function start(roomId, guildId, item, userName) {
+  await stop(roomId, false);
+  const room = {
+    id: roomId, guildId, item, startedBy: userName,
+    playing: true, anchorPos: 0, anchorTime: now(),
+    offsetBase: 0, playlistVersion: 0, playlist: null,
+    plexSession: null, plexKey: null, plexRatingKey: null,
+    viewers: 0, idleSince: now(),
+  };
+  rooms.set(roomId, room);
+  try {
+    await load(room, 0);
+  } catch (e) {
+    rooms.delete(roomId);
+    throw e;
+  }
+  room.anchorTime = now();
+  emit(room);
+  return room;
+}
+
+export function pause(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || !room.playing) return room;
+  room.anchorPos = position(room);
+  room.anchorTime = now();
+  room.playing = false;
+  emit(room);
+  return room;
+}
+
+export async function resume(roomId) {
+  const room = rooms.get(roomId);
+  if (!room || room.playing) return room;
+  // Live TV resumes at the live edge; a fresh tune avoids a stale session after a long pause.
+  if (room.item.source === 'live') await load(room, 0);
+  room.anchorTime = now();
+  room.playing = true;
+  emit(room);
+  return room;
+}
+
+export async function seek(roomId, seconds) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  if (room.item.source !== 'plex') throw new Error("You can't seek live TV.");
+  const target = Math.max(0, Math.min(seconds, (room.item.duration || seconds) - 5));
+  await load(room, target); // restart Plex's transcode at the new point so every viewer lands together
+  room.anchorPos = target;
+  room.anchorTime = now();
+  emit(room);
+  return room;
+}
+
+/** Restart the stream at the current position (used after the admin changes quality settings). */
+export async function reload(roomId) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  const isLive = room.item.source === 'live';
+  const pos = isLive ? 0 : position(room);
+  await load(room, pos);
+  room.anchorPos = pos;
+  room.anchorTime = now();
+  emit(room);
+  return room;
+}
+
+export async function stop(roomId, announce = true) {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  rooms.delete(roomId);
+  await releasePlex(room);
+  if (announce) events.emit('end', roomId);
+  return true;
+}
+
+export function setViewers(roomId, count) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  room.viewers = count;
+  if (count > 0) room.idleSince = null;
+  else if (!room.idleSince) room.idleSince = now();
+}
+
+// Housekeeping: keep Plex sessions alive, report progress, end finished titles, clean up empty rooms.
+setInterval(() => {
+  for (const room of rooms.values()) {
+    if (room.plexSession) {
+      plex.pingTranscode(room.plexSession);
+      plex.timeline({
+        key: room.plexKey, ratingKey: room.plexRatingKey, state: room.playing ? 'playing' : 'paused',
+        timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId: room.plexSession,
+      });
+    }
+    if (room.item.duration && position(room) >= room.item.duration - 1) { stop(room.id); continue; }
+    if (room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id);
+  }
+}, 20_000).unref();

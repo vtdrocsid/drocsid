@@ -1,0 +1,24 @@
+{
+  "name": "plexcord",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watch Plex movies, shows and live TV together in Discord voice channels",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "esbuild activity/main.js --bundle --minify --format=esm --target=es2020 --outfile=public/activity/app.js && cp activity/index.html activity/style.css public/activity/",
+    "start": "node src/index.js",
+    "dev": "npm run build && node --env-file=.env src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@discord/embedded-app-sdk": "^2.0.0",
+    "esbuild": "^0.24.0",
+    "hls.js": "^1.5.17"
+  }
+}
