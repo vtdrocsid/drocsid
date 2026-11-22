@@ -213,14 +213,39 @@ export async function guide(from, to) {
 /** Tune a channel on the DVR. Returns the live session's metadata key, which the transcoder plays. */
 export async function tune(channel, sessionId) {
   const { dvr } = await liveSetup();
-  const res = await plexFetch(`/livetv/dvrs/${dvr.key}/channels/${encodeURIComponent(channel.number || channel.channelId)}/tune`, {
+  const id = channel.number || channel.channelId;
+  console.log(`[live] tuning DVR ${dvr.key} channel ${id}`);
+  const res = await plexFetch(`/livetv/dvrs/${dvr.key}/channels/${encodeURIComponent(id)}/tune`, {
     method: 'POST',
     headers: { 'X-Plex-Session-Identifier': sessionId },
   });
   const data = await res.json();
-  const m = data.MediaContainer?.Metadata?.[0] || data.MediaContainer?.MediaSubscription?.[0]?.Video;
-  if (!m?.key) throw new Error('Plex could not tune that channel (all tuners may be busy).');
-  return { key: m.key, ratingKey: m.ratingKey };
+  // Plex nests the live session differently across versions (Metadata, or
+  // MediaSubscription > MediaGrabOperation > Metadata/Video). Search the whole reply for it.
+  const session = findLiveSession(data);
+  if (!session) {
+    console.warn('[live] tune reply had no live session:', JSON.stringify(data).slice(0, 1500));
+    throw new Error('Plex accepted the tune but returned no stream. Check the container log for details.');
+  }
+  return session;
+}
+
+/** Find { key: "/livetv/sessions/<id>", ratingKey } anywhere in a tune reply. */
+function findLiveSession(node) {
+  let best = null, partKey = null;
+  const walk = (v) => {
+    if (!v || typeof v !== 'object' || best) return;
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (typeof v.key === 'string') {
+      if (/^\/livetv\/sessions\/[^/]+$/.test(v.key)) { best = { key: v.key, ratingKey: v.ratingKey }; return; }
+      if (!partKey && v.key.startsWith('/livetv/sessions/')) partKey = v.key; // a Part like /livetv/sessions/<id>/<n>/index.m3u8
+    }
+    Object.values(v).forEach(walk);
+  };
+  walk(node);
+  if (best) return best;
+  if (partKey) return { key: partKey.split('/').slice(0, 4).join('/'), ratingKey: undefined };
+  return null;
 }
 
 // ---------------- transcoder ----------------

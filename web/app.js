@@ -230,11 +230,14 @@ function renderGuide() {
         <div class="g-track" style="width:${width}px"></div></div>`);
       $('.g-ch button', row).onclick = () => choosePlay({ source: 'live', channelId: c.id, title: c.name });
       const track = $('.g-track', row);
-      if (!c.programmes.length) track.append(h(`<div class="g-prog" style="left:0;width:${width - 4}px"><div class="ps">No guide data</div></div>`));
+      if (!c.programmes.length) track.append(h(`<div class="g-prog" style="left:0;width:${width - 4}px;--w:${width - 4}px"><div class="g-in"><div class="ps">No guide data</div></div></div>`));
       c.programmes.forEach((p) => {
         const isNow = p.start <= now && p.stop > now;
-        const el = h(`<div class="g-prog${isNow ? ' now' : ''}" style="left:${x(p.start)}px;width:${Math.max(8, x(p.stop) - x(p.start) - 3)}px" title="${esc(p.desc)}">
-          <div class="pt">${esc(p.title)}</div><div class="ps">${clock(p.start)}${p.subtitle ? ' · ' + esc(p.subtitle) : ''}</div></div>`);
+        const w = Math.max(8, x(p.stop) - x(p.start) - 3);
+        const el = h(`<div class="g-prog${isNow ? ' now' : ''}" style="left:${x(p.start)}px;width:${w}px;--w:${w}px">
+          <div class="g-in"><div class="pt">${esc(p.title)}</div>
+          <div class="ps">${clock(p.start)}–${clock(p.stop)}${p.subtitle ? ' · ' + esc(p.subtitle) : ''}</div>
+          ${p.desc ? `<div class="pd">${esc(p.desc)}</div>` : ''}</div></div>`);
         el.onclick = () => choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` });
         track.append(el);
       });

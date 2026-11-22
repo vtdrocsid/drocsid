@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12 — 2026-11-21
+- Live TV: find Plex's live session anywhere in the tune reply (fixes "could not tune" with free tuners);
+  logs the raw reply if it still can't
+- Guide: show titles stick beside the channel column while scrolling instead of sliding under it
+- Guide: hovering a show expands it with full title, time range, episode and description
+
 ## 0.1.11 — 2026-11-21
 - Admin › Libraries: default sort per library (A–Z, Recently added, Release date)
 - Admin › Libraries: ↑ ↓ to set the order of library tabs on the Browse page (top one opens first)
