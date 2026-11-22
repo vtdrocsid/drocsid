@@ -107,9 +107,11 @@ main { padding: 14px; min-width: 0; }
 /* Browse page: the banner uses the same three columns as the page below, so the search box
    is centred over the library tabs rather than between the logo and the sign-in. */
 .banner.tabs-below { display: grid; grid-template-columns: calc(280px - 22px) minmax(0, 1fr) calc(300px - 22px); gap: 0; }
-.banner.tabs-below .wordmark { grid-column: 1; }
+.banner.tabs-below { grid-template-rows: minmax(89px, auto) 52px; padding-top: 0; padding-bottom: 0; align-items: center; }
+.banner.tabs-below .wordmark { grid-column: 1; grid-row: 1 / span 2; }
 .banner.tabs-below .qwrap { grid-column: 2; width: 100%; justify-self: center; padding: 0 14px; box-sizing: border-box; max-width: 548px; }
-.banner.tabs-below .who { grid-column: 3; justify-self: end; margin-left: 0; }
+.banner.tabs-below .qwrap { grid-row: 1; }
+.banner.tabs-below .who { grid-column: 3; grid-row: 1 / span 2; justify-self: end; margin-left: 0; }
 main { padding-top: 0; }
 .libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 3px 3px 0 0; cursor: pointer; padding: 7px 18px 6px;
   font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #021529;

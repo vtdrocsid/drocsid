@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.13 — 2026-11-22
+- Logo and Signed in / Sign out are vertically centred in the header (search above the tabs is unchanged)
+
 ## 0.2.12 — 2026-11-22
 - Search box is centred over the library tabs
 - Live TV tab text is white like the other tabs
