@@ -121,15 +121,9 @@ function render() {
   $('#announceInVoiceChat').checked = s.announceInVoiceChat;
 
   // live
-  const gf = state.live.guideFile;
-  const gfLine = !state.live.available ? '' : !gf
-    ? '<br><span class="small error">Guide file not found: per-airing details (e.g. which game) may be wrong. Set the XMLTV URL below.</span>'
-    : gf.error ? `<br><span class="small error">Guide file error: ${esc(gf.error)}</span>`
-    : `<br><span class="muted small">Guide file: ${gf.programmes.toLocaleString()} programmes · ${esc(gf.url)}</span>`;
   $('#live').innerHTML = state.live.available
-    ? `<p>DVR found · <b>${state.live.channels}</b> channels<br><span class="muted small">${esc(state.live.provider)}</span>${gfLine}</p>`
+    ? `<p>DVR found · <b>${state.live.channels}</b> channels<br><span class="muted small">${esc(state.live.provider)}</span></p>`
     : `<p class="error">${esc(state.live.error || 'Live TV unavailable')}</p>`;
-  if (document.activeElement !== $('#guideXmltvUrl')) $('#guideXmltvUrl').value = s.guideXmltvUrl || '';
 }
 
 const addUser = (input, key) => {
@@ -148,7 +142,6 @@ $('#adminAddBtn').onclick = () => {
 $('#superAddBtn').onclick = () => addUser('#superAdd', 'superAdminUserIds');
 $('#viewRequiresApproval').onchange = (e) => save({ viewRequiresApproval: e.target.checked });
 $('#announceInVoiceChat').onchange = (e) => save({ announceInVoiceChat: e.target.checked });
-$('#guideXmltvUrl').onchange = (e) => save({ guideXmltvUrl: e.target.value.trim() });
 $('#refreshLive').onclick = async () => {
   try {
     const r = await api('/api/admin/refresh-live', { method: 'POST' });

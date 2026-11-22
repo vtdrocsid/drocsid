@@ -369,4 +369,3 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .wn-paused { margin-left: auto; flex: none; font-size: 9px; color: #b7791f; border: 1px solid #e8c27a; background: #fff7e6; padding: 0 4px; }
 
 .panel .sub-h { margin: 12px 0 6px; font: bold 10px var(--tiny); letter-spacing: 1.5px; text-transform: uppercase; color: var(--azure); }
-.field.col { flex-direction: column; align-items: stretch; gap: 5px; margin-top: 8px; } .field.col input { width: 100%; box-sizing: border-box; }

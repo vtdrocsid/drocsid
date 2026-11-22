@@ -86,9 +86,9 @@ async function liveCard(item) {
   const s = Math.floor(p.start / 1000), e = Math.floor(p.stop / 1000);
   const left = Math.max(0, Math.round((p.stop - Date.now()) / 60_000));
   const leftTxt = left >= 60 ? `${Math.floor(left / 60)}h ${left % 60}m` : `${left}m`;
-  const ep = p.episodeLabel || (p.season != null && p.episode != null ? `S${String(p.season).padStart(2, '0')}E${String(p.episode).padStart(2, '0')}` : '');
+  const ep = p.season != null && p.episode != null ? `S${String(p.season).padStart(2, '0')}E${String(p.episode).padStart(2, '0')}` : '';
   const sub = [ep, p.subtitle].filter(Boolean).join(' · ');
-  const facts = [p.live ? '🔴 Live' : '', p.premiere ? '🆕 New' : '', p.contentRating, p.year, p.genres.join(', ')].filter(Boolean).join(' · ');
+  const facts = [p.premiere ? '🆕 New' : '', p.contentRating, p.year, p.genres.join(', ')].filter(Boolean).join(' · ');
   return {
     embeds: [{
       color: 0xe0261b,
