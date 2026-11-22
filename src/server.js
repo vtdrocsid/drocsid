@@ -172,6 +172,27 @@ app.get('/api/thumb', needSession, needApproved, wrap(async (req, res) => {
   Readable.fromWeb(upstream.body).pipe(res);
 }));
 
+// Hover card: compact details for one poster, cached briefly so sweeping the mouse over the grid is cheap.
+const infoCache = new Map(); // key -> { at, data }
+app.get('/api/info/:key', needSession, needApproved, wrap(async (req, res) => {
+  const key = req.params.key.replace(/\D/g, '');
+  const hit = infoCache.get(key);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return res.json(hit.data);
+  const data = await plex.info(key);
+  if (infoCache.size > 1000) infoCache.clear();
+  infoCache.set(key, { at: Date.now(), data });
+  res.json(data);
+}));
+app.get('/api/face/:id', needSession, needApproved, wrap(async (req, res) => {
+  const url = plex.faceUrl(String(req.params.id));
+  if (!url) return res.status(404).end();
+  const upstream = await fetch(plex.photoUrl(url, 120, 120));
+  if (!upstream.ok) return res.status(upstream.status).end();
+  res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
+  res.set('Cache-Control', 'private, max-age=86400');
+  Readable.fromWeb(upstream.body).pipe(res);
+}));
+
 app.get('/api/livetv/guide', needSession, needApproved, wrap(async (req, res) => {
   const hours = Math.min(12, Math.max(1, Number(req.query.hours) || 4));
   const from = Number(req.query.from) || Date.now() - 30 * 60_000;

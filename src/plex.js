@@ -126,6 +126,35 @@ export async function metadata(ratingKey) {
 }
 
 /** Resized image from Plex (posters, art, channel logos). */
+/**
+ * Hover-card details: tagline, genres, director(s) and top-billed cast.
+ * Actor photos are usually hosted by Plex's metadata service, so callers get an opaque face id
+ * (see faceUrl) instead of a raw URL; only photos Plex actually returned can be fetched.
+ */
+const faces = new Map(); // id -> photo url
+export function faceUrl(id) { return faces.get(id) || null; }
+function faceId(url) {
+  if (!url) return null;
+  const id = crypto.createHash('sha1').update(url).digest('hex').slice(0, 16);
+  if (faces.size > 5000) faces.clear();
+  faces.set(id, url);
+  return id;
+}
+export async function info(ratingKey) {
+  const data = await plexGet(`/library/metadata/${ratingKey}`);
+  const m = data.MediaContainer?.Metadata?.[0];
+  if (!m) throw new Error('Item not found in Plex');
+  const tags = (arr) => (arr || []).map((t) => t.tag).filter(Boolean);
+  return {
+    ...toItem(m),
+    tagline: m.tagline || '',
+    studio: m.studio || '',
+    genres: tags(m.Genre).slice(0, 4),
+    directors: tags(m.Director).slice(0, 2),
+    cast: (m.Role || []).slice(0, 5).map((r) => ({ name: r.tag, role: r.role || '', face: faceId(r.thumb) })),
+  };
+}
+
 export function photoUrl(path, width = 300, height = 450) {
   const url = new URL(config.plexUrl + '/photo/:/transcode');
   url.search = new URLSearchParams({ width, height, minSize: 1, upscale: 1, url: path, 'X-Plex-Token': config.plexToken }).toString();

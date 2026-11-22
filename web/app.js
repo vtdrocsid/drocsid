@@ -70,8 +70,104 @@ function card(item) {
     <div class="poster">${item.thumb ? `<img loading="lazy" alt="" src="${thumb(item.thumb)}">` : ''}${item.kind === 'show' ? '<span class="badge">TV</span>' : ''}</div>
     <div class="t" title="${esc(item.title)}">${esc(item.kind === 'episode' ? item.title : item.shortTitle || item.title)}</div>
     <div class="s"><span>${esc(sub)}</span>${rtBadge(item.rt)}</div></div>`);
-  el.onclick = () => openDetail(item.ratingKey);
+  el.onclick = () => { hideHover(true); openDetail(item.ratingKey); };
+  if (['movie', 'show'].includes(item.kind)) {
+    el.onmouseenter = () => scheduleHover(el, item);
+    el.onmouseleave = () => leaveHover();
+  }
   return el;
+}
+
+// ---------- hover card ----------
+// Rest on a poster for a moment and a one-sheet pops out beside it: tagline, synopsis,
+// genres, director and top cast. Details are fetched once per title and cached.
+const infoCache = new Map();
+const canHover = matchMedia('(hover: hover) and (pointer: fine)').matches;
+let hoverTimer = null, hideTimer = null, hoverFor = null, hc = null;
+const getInfo = (key) => {
+  if (!infoCache.has(key)) infoCache.set(key, api(`/api/info/${key}`).catch((e) => { infoCache.delete(key); throw e; }));
+  return infoCache.get(key);
+};
+function scheduleHover(el, item) {
+  if (!canHover) return;
+  clearTimeout(hideTimer); clearTimeout(hoverTimer);
+  if (hoverFor === el) return;
+  hoverTimer = setTimeout(async () => {
+    let info;
+    try { info = await getInfo(item.ratingKey); } catch { return; }
+    if (!el.matches(':hover')) return; // pointer moved on while loading
+    showHover(el, info);
+  }, hc && !hc.hidden ? 150 : 450); // already browsing cards: switch quickly
+}
+function leaveHover() {
+  clearTimeout(hoverTimer);
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => hideHover(), 180); // grace period to move onto the card itself
+}
+function hideHover(now) {
+  clearTimeout(hoverTimer); clearTimeout(hideTimer);
+  if (hc) hc.hidden = true;
+  if (hoverFor) hoverFor.classList.remove('hovering');
+  hoverFor = null;
+}
+function hoverRuntime(i) {
+  if (i.kind === 'show') return i.childCount ? `${i.childCount} season${i.childCount === 1 ? '' : 's'}` : '';
+  if (!i.duration) return '';
+  const m = Math.round(i.duration / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+}
+function showHover(el, i) {
+  if (!hc) {
+    hc = h('<div class="hc" hidden></div>');
+    hc.onmouseenter = () => clearTimeout(hideTimer);
+    hc.onmouseleave = () => leaveHover();
+    document.body.append(hc);
+    addEventListener('scroll', () => hideHover(), true);
+    addEventListener('resize', () => hideHover());
+  }
+  if (hoverFor) hoverFor.classList.remove('hovering');
+  hoverFor = el;
+  el.classList.add('hovering');
+  const playable = i.kind === 'movie';
+  const rt = i.rt && Number.isFinite(i.rt.score)
+    ? `<div class="hc-rt"><small>${i.rt.kind === 'audience' ? 'AUDIENCE' : 'TOMATOMETER'}</small>${rtBadge(i.rt)}</div>` : '';
+  const meta = [i.contentRating ? `<span class="cr">${esc(i.contentRating)}</span>` : '',
+    esc([i.year, hoverRuntime(i)].filter(Boolean).join(' · '))].join('');
+  const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('');
+  hc.innerHTML = `
+    <div class="hc-head"><div class="hc-tt"><div class="t">${esc(i.shortTitle || i.title)}</div><div class="hc-meta">${meta}</div></div>${rt}</div>
+    <div class="hc-body">
+      ${i.tagline ? `<div class="hc-tag">${esc(i.tagline)}</div>` : ''}
+      ${i.summary ? `<div class="hc-syn">${esc(i.summary)}</div>` : '<div class="hc-syn muted">No synopsis available.</div>'}
+      ${i.genres?.length ? `<div class="hc-genres">${i.genres.map((g) => `<span>${esc(g)}</span>`).join('')}</div>` : ''}
+      ${i.directors?.length ? `<div class="hc-lbl">Directed by</div><div class="hc-dir">${esc(i.directors.join(', '))}</div>` : ''}
+      ${i.cast?.length ? `<div class="hc-lbl">Starring</div><div class="hc-cast">${i.cast.map((c) => `
+        <div><div class="ph">${c.face ? `<img alt="" src="/api/face/${c.face}" onerror="this.remove()">` : ''}<span>${esc(initials(c.name))}</span></div>
+        <div class="nm">${esc(c.name)}</div>${c.role ? `<div class="ch">${esc(c.role)}</div>` : ''}</div>`).join('')}</div>` : ''}
+    </div>
+    <div class="hc-foot">
+      ${playable ? '<button class="btn primary sm" data-a="play">▶ Play</button><button class="btn sm" data-a="sched">📅 Schedule</button>' : '<button class="btn primary sm" data-a="more">Episodes</button>'}
+      <button class="btn sm" data-a="more" style="margin-left:auto">More details</button>
+    </div>`;
+  hc.querySelectorAll('[data-a]').forEach((b) => {
+    b.onclick = () => {
+      hideHover(true);
+      const t = { source: 'plex', ratingKey: i.ratingKey, title: i.title, thumb: i.thumb };
+      if (b.dataset.a === 'play') choosePlay(t);
+      else if (b.dataset.a === 'sched') openSchedule(t);
+      else openDetail(i.ratingKey);
+    };
+  });
+  // Place beside the poster; flip to the left near the right edge; keep it on screen vertically.
+  hc.hidden = false;
+  const r = el.getBoundingClientRect(), w = hc.offsetWidth, hh = hc.offsetHeight, gap = 12;
+  const right = r.right + gap + w <= innerWidth - 8;
+  const left = right ? r.right + gap : Math.max(8, r.left - gap - w);
+  const top = Math.min(Math.max(8, r.top - 10), innerHeight - hh - 8);
+  hc.classList.toggle('flip', !right);
+  hc.style.left = `${left}px`;
+  hc.style.top = `${top}px`;
+  hc.style.setProperty('--ay', `${Math.min(Math.max(16, r.top + Math.min(70, r.height / 3) - top), hh - 30)}px`);
 }
 
 // ---------- libraries ----------

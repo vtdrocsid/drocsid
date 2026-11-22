@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.8 — 2026-11-22
+- Hover card on movie and show posters: rest the mouse on a poster for about half a second to see
+  the tagline, synopsis, genres, director, top 5 cast with headshots, and Play / Schedule / More details
+  buttons. It flips to the left near the right edge; details are cached so repeat hovers are instant.
+
 ## 0.2.7 — 2026-11-22
 - Libraries load more titles automatically as you scroll (no Load more button); posters lazy-load
 - A–Z jump bar on the right of the library when sorted A–Z; greyed letters have no titles
