@@ -98,6 +98,8 @@ dialog::backdrop { background: rgba(0,0,0,.65); }
 .li { display: flex; gap: 10px; align-items: center; padding: 6px 8px; background: var(--panel2); border-radius: 8px; }
 .li img { width: 28px; height: 28px; border-radius: 50%; }
 .li .grow { flex: 1; min-width: 0; }
+.li select { padding: 4px 8px; font-size: 13px; }
+.li .btn[disabled] { opacity: .35; cursor: default; }
 .li .sub { color: var(--muted); font-size: 12px; }
 .field { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .field:last-child { border-bottom: 0; }

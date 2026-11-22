@@ -56,11 +56,14 @@ function toItem(m) {
 
 export async function libraries({ all = false } = {}) {
   const data = await plexGet('/library/sections');
-  const allowed = settings().librarySections;
+  const { librarySections: allowed, libraryOrder: order, librarySort: sorts } = settings();
+  const rank = (id) => { const i = order.indexOf(id); return i === -1 ? 1e6 : i; };
   return (data.MediaContainer?.Directory || [])
     .filter((d) => ['movie', 'show'].includes(d.type))
     .filter((d) => all || !allowed.length || allowed.includes(String(d.key)))
-    .map((d) => ({ id: String(d.key), title: d.title, type: d.type }));
+    .map((d, i) => ({ id: String(d.key), title: d.title, type: d.type, defaultSort: sorts[String(d.key)] || 'title', plexIndex: i }))
+    .sort((a, b) => rank(a.id) - rank(b.id) || a.plexIndex - b.plexIndex)
+    .map(({ plexIndex, ...l }) => l);
 }
 
 const SORTS = { title: 'titleSort', added: 'addedAt:desc', year: 'year:desc', released: 'originallyAvailableAt:desc' };

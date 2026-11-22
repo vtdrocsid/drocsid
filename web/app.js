@@ -67,7 +67,13 @@ async function loadLibraries() {
   box.innerHTML = '';
   libs.forEach((l, i) => {
     const c = h(`<button class="chip">${esc(l.title)}</button>`);
-    c.onclick = () => { box.querySelectorAll('.chip').forEach((x) => x.classList.remove('active')); c.classList.add('active'); curLib = l.id; loadItems(true); };
+    c.onclick = () => {
+      box.querySelectorAll('.chip').forEach((x) => x.classList.remove('active'));
+      c.classList.add('active');
+      curLib = l.id;
+      $('#sort').value = l.defaultSort || 'title'; // admin's default for this library; viewers can still change it
+      loadItems(true);
+    };
     box.append(c);
     if (i === 0) c.click();
   });

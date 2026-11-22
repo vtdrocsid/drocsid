@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11 — 2026-11-21
+- Admin › Libraries: default sort per library (A–Z, Recently added, Release date)
+- Admin › Libraries: ↑ ↓ to set the order of library tabs on the Browse page (top one opens first)
+
 ## 0.1.10 — 2026-11-21
 - Only the person who started a stream can pause/resume, scrub, change quality or stop it
   (Activity and Browse player bar; enforced on the server). Admins can still stop any stream from Admin.

@@ -21,7 +21,7 @@ export const QUALITY_PRESETS = [
   { id: '480-1500', label: '480p · 1.5 Mbps', height: 480, resolution: '720x480', bitrate: 1500 },
   { id: '320-720', label: '320p · 720 kbps', height: 320, resolution: '576x320', bitrate: 720 },
 ];
-export const VALID = { quality: QUALITY_PRESETS.map((p) => p.id) };
+export const VALID = { quality: QUALITY_PRESETS.map((p) => p.id), librarySort: ['title', 'added', 'released'] };
 
 const defaults = {
   adminUserIds: [],            // in addition to OWNER_USER_IDS
@@ -30,6 +30,8 @@ const defaults = {
   viewRequiresApproval: false,
   announceInVoiceChat: true,
   librarySections: [],         // empty = all movie/show libraries
+  libraryOrder: [],            // library ids in Browse-page order; libraries not listed follow in Plex's order
+  librarySort: {},             // library id -> default sort: title | added | released
 
   quality: '1080-8000',        // default for new streams = last quality picked in the player bar
 };
@@ -52,6 +54,13 @@ export function update(patch) {
   if ('approvedUserIds' in patch) next.approvedUserIds = ids(patch.approvedUserIds);
   if ('approvedRoleIds' in patch) next.approvedRoleIds = ids(patch.approvedRoleIds);
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);
+  if ('libraryOrder' in patch) next.libraryOrder = (patch.libraryOrder || []).map(String).filter((id) => /^\d+$/.test(id));
+  if (patch.librarySort && typeof patch.librarySort === 'object') {
+    next.librarySort = { ...current.librarySort };
+    for (const [id, sort] of Object.entries(patch.librarySort)) {
+      if (/^\d+$/.test(id) && VALID.librarySort.includes(sort)) next.librarySort[id] = sort;
+    }
+  }
   if ('viewRequiresApproval' in patch) next.viewRequiresApproval = !!patch.viewRequiresApproval;
   if ('announceInVoiceChat' in patch) next.announceInVoiceChat = !!patch.announceInVoiceChat;
   if (VALID.quality.includes(patch.quality)) next.quality = patch.quality;

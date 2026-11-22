@@ -81,10 +81,30 @@ function render() {
   state.owners.forEach((u) => admins.append(person(u, false)));
   state.admins.forEach((u) => admins.append(person(u, true, () => save({ adminUserIds: s.adminUserIds.filter((id) => id !== u.id) }))));
 
-  // libraries
-  $('#libraries').innerHTML = state.libraries.map((l) => `<label class="row"><input type="checkbox" value="${l.id}" ${s.librarySections.includes(l.id) ? 'checked' : ''}>
-    ${esc(l.title)} <span class="muted small">${l.type === 'show' ? 'TV' : 'Movies'}</span></label>`).join('') || '<p class="muted">Could not reach Plex.</p>';
-  $('#libraries').onchange = () => save({ librarySections: [...document.querySelectorAll('#libraries input:checked')].map((i) => i.value) });
+  // libraries: shown on Browse, default sort, and order
+  const sortNames = { title: 'A–Z', added: 'Recently added', released: 'Release date' };
+  const libBox = $('#libraries');
+  libBox.innerHTML = '';
+  state.libraries.forEach((l, i) => {
+    const row = document.createElement('div');
+    row.className = 'li';
+    row.innerHTML = `<input type="checkbox" ${s.librarySections.includes(l.id) ? 'checked' : ''} title="Show on Browse page">
+      <div class="grow"><div>${esc(l.title)}</div><div class="sub">${l.type === 'show' ? 'TV' : 'Movies'}</div></div>
+      <select title="Default sort">${valid.librarySort.map((v) => `<option value="${v}" ${v === (s.librarySort[l.id] || 'title') ? 'selected' : ''}>${sortNames[v]}</option>`).join('')}</select>
+      <button class="btn sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
+      <button class="btn sm" data-move="1" ${i === state.libraries.length - 1 ? 'disabled' : ''} title="Move down">↓</button>`;
+    $('input', row).onchange = () => save({ librarySections: state.libraries.filter((x, j) => libBox.children[j].querySelector('input').checked).map((x) => x.id) });
+    $('select', row).onchange = (e) => save({ librarySort: { [l.id]: e.target.value } });
+    row.querySelectorAll('[data-move]').forEach((b) => {
+      b.onclick = () => {
+        const ids = state.libraries.map((x) => x.id);
+        const j = i + Number(b.dataset.move);
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+        save({ libraryOrder: ids });
+      };
+    });
+    libBox.append(row);
+  });
 
   $('#viewRequiresApproval').checked = s.viewRequiresApproval;
   $('#announceInVoiceChat').checked = s.announceInVoiceChat;
