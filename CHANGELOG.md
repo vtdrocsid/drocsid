@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.15 — 2026-11-22
+- Library tabs sit flush on the navy strip (no light gap under them) and all have the same height
+- Tabs have squarer corners
+
 ## 0.2.14 — 2026-11-22
 - Search box is vertically centred in the header, level with the logo and sign-in
 

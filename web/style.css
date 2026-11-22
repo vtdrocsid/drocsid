@@ -102,7 +102,7 @@ main { padding: 14px; min-width: 0; }
 /* ---------- center: slanted navy tabs ---------- */
 .tabbar { position: relative; margin: 0 -14px 14px; }
 /* Library tabs stand on top of a navy strip that lines up with the rails' "Upcoming Lineup" / "Play History" strips. */
-.libtabs { position: absolute; left: 0; right: 0; bottom: 100%; display: flex; gap: 3px; flex-wrap: wrap-reverse; justify-content: center; align-items: flex-end; padding: 0 14px; }
+.libtabs { position: absolute; left: 0; right: 0; bottom: 100%; display: flex; gap: 3px; flex-wrap: wrap-reverse; justify-content: center; align-items: flex-start; /* wrap-reverse: flex-start = bottom */ padding: 0 14px; }
 .banner.tabs-below { padding-bottom: 52px; }
 /* Browse page: the banner uses the same three columns as the page below, so the search box
    is centred over the library tabs rather than between the logo and the sign-in. */
@@ -113,7 +113,7 @@ main { padding: 14px; min-width: 0; }
 .banner.tabs-below .qwrap { grid-row: 1 / span 2; }
 .banner.tabs-below .who { grid-column: 3; grid-row: 1 / span 2; justify-self: end; margin-left: 0; }
 main { padding-top: 0; }
-.libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 3px 3px 0 0; cursor: pointer; padding: 7px 18px 6px;
+.libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 1px 1px 0 0; cursor: pointer; padding: 7px 18px 6px; line-height: 18px; height: 31px; box-sizing: border-box;
   font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #021529;
   background: linear-gradient(#1a5a99, var(--navy2)); }
 .libtabs button:hover { background: linear-gradient(#2472b8, #0b3a6b); }
