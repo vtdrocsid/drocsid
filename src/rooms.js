@@ -6,6 +6,9 @@ import { findPreset } from './settings.js';
 
 export const events = new EventEmitter(); // 'update' (room), 'end' (roomId)
 const rooms = new Map(); // voiceChannelId -> room
+// Global, never-repeating stream version: a new title in the same channel must never reuse a number,
+// or players would think nothing changed and keep the old stream.
+let streamVersion = 0;
 
 const now = () => Date.now();
 
@@ -80,7 +83,7 @@ async function load(room, seconds) {
     room.offsetBase = 0;
   }
   room.plexSession = sessionId;
-  room.playlistVersion++;
+  room.playlistVersion = ++streamVersion;
   room.playlist = `room/${room.id}/master.m3u8?v=${room.playlistVersion}`; // client prefixes /media/t/<token>/
 }
 

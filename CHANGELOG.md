@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.22 — 2026-11-21
+- Fix switching titles in a channel (e.g. live TV → movie): stream versions are now unique across titles,
+  so the player always loads the new stream instead of freezing on the old one
+
 ## 0.1.21 — 2026-11-21
 - Fix seeking: Plex's playlist after a seek still spans the whole title (filler before the seek point),
   so the player now seeks to the real title time instead of the playlist start

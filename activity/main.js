@@ -91,7 +91,7 @@ function bufferedAhead() {
 }
 
 function loadStream() {
-  loadedVersion = state.playlistVersion;
+  loadedVersion = `${state.source}:${state.playlistVersion}`;
   if (hls) { hls.destroy(); hls = null; }
   const src = `/media/t/${encodeURIComponent(token)}/${state.playlist}`;
   if (Hls.isSupported()) {
@@ -215,7 +215,8 @@ function applyState(s) {
   $('#liveTag').hidden = !isLive(); // takes the progress bar's place so the controls line up the same
   if (!isLive()) $('#seek').max = Math.floor(s.duration);
 
-  if (loadedVersion !== s.playlistVersion) return loadStream();
+  // Reload whenever the stream changes: new title, seek, quality change or live retune.
+  if (loadedVersion !== `${s.source}:${s.playlistVersion}`) return loadStream();
   sync(wasPlaying !== s.playing);
 }
 
