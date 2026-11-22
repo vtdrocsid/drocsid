@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.22 — 2026-11-22
+- Fix: Live TV guide/posts could show a programme at the wrong time (e.g. 3 hours late). Plex lists
+  every airing of a programme, including on other channels/feeds; we now keep only this channel's airing.
+- Super-admin diagnostic: /api/admin/guide-debug?id=<channel number> shows the raw guide airings.
+
 ## 0.2.21 — 2026-11-22
 - Live TV "now playing" posts use the guide: channel number, call sign and logo; the programme on now
   (episode/subtitle, new/rating/year/genres, description, poster); start and end times, time left with a

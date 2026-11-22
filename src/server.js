@@ -439,6 +439,11 @@ app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Super-admin diagnostics for guide times: /api/admin/guide-debug?id=<channel id>
+app.get('/api/admin/guide-debug', needSession, needSuper, wrap(async (req, res) => {
+  res.json(await plex.guideDebug(String(req.query.id || '')));
+}));
+
 app.post('/api/admin/refresh-live', needSession, needSuper, wrap(async (req, res) => {
   plex.clearLiveCache();
   res.json(await plex.liveStatus());

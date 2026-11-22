@@ -190,6 +190,7 @@ async function liveSetup() {
     number: c.vcn || '',
     name: c.title || c.callSign || c.vcn,
     callSign: c.callSign || '',
+    identifier: c.identifier || c.channelIdentifier || '',
     hd: !!c.isHd,
     thumb: c.thumb || '',
   })).sort((a, b) => (parseFloat(a.number) || 9e9) - (parseFloat(b.number) || 9e9));
@@ -220,6 +221,27 @@ export async function liveNow(id) {
   return { channel: ch, now: i >= 0 ? progs[i] : null, next: i >= 0 ? progs[i + 1] || null : progs.find((p) => p.start > t) || null };
 }
 
+/** Admin diagnostics: the raw airings Plex's guide returns for one channel around now. */
+export async function guideDebug(id) {
+  const { provider, channels } = await liveSetup();
+  const ch = channels.find((c) => c.id === id || c.number === id);
+  if (!ch) throw new Error('Channel not found');
+  const t = Date.now();
+  const out = [];
+  for (const date of [...new Set([ymd(t - 12 * 3600_000), ymd(t), ymd(t + 12 * 3600_000)])]) {
+    const data = await plexGet(`/${provider}/grid`, { channelGridKey: ch.gridKey, date });
+    for (const m of data.MediaContainer?.Metadata || []) {
+      for (const media of m.Media || []) {
+        const start = (media.beginsAt || 0) * 1000, stop = (media.endsAt || 0) * 1000;
+        if (stop < t - 6 * 3600_000 || start > t + 6 * 3600_000) continue;
+        const { Part, ...fields } = media;
+        out.push({ title: m.grandparentTitle || m.title, start: new Date(start).toISOString(), stop: new Date(stop).toISOString(), kept: onChannel(media, ch), media: fields });
+      }
+    }
+  }
+  return { channel: ch, provider, now: new Date(t).toISOString(), airings: out.sort((a, b) => a.start.localeCompare(b.start)) };
+}
+
 export async function liveChannel(id) {
   const c = (await liveChannels()).find((ch) => ch.id === id);
   if (!c) throw new Error('Channel not found');
@@ -228,7 +250,24 @@ export async function liveChannel(id) {
 
 const ymd = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-async function gridFor(provider, gridKey, date) {
+/**
+ * Does this airing (a Media entry) belong to our channel? A programme can list airings on several
+ * channels (e.g. other affiliates or a West-coast feed of the same network, hours later), so only
+ * keep the airings that name this channel. Airings that don't say which channel they're on are kept.
+ */
+function onChannel(media, ch) {
+  const checks = [
+    [media.gridKey, ch.gridKey],
+    [media.channelIdentifier, ch.identifier],
+    [media.channelVcn, ch.number],
+    [media.channelCallSign, ch.callSign],
+  ].filter(([a, b]) => a != null && a !== '' && b != null && b !== '');
+  if (!checks.length) return true;
+  return checks.some(([a, b]) => String(a).toLowerCase() === String(b).toLowerCase());
+}
+
+async function gridFor(provider, ch, date) {
+  const gridKey = ch.gridKey;
   const key = `${gridKey}|${date}`;
   const hit = guideCache.get(key);
   if (hit && Date.now() - hit.at < 15 * 60_000) return hit.programmes;
@@ -236,7 +275,7 @@ async function gridFor(provider, gridKey, date) {
   const programmes = [];
   for (const m of data.MediaContainer?.Metadata || []) {
     for (const media of m.Media || []) {
-      if (media.gridKey && media.gridKey !== gridKey) continue;
+      if (!onChannel(media, ch)) continue;
       programmes.push({
         start: (media.beginsAt || 0) * 1000,
         stop: (media.endsAt || 0) * 1000,
@@ -275,7 +314,7 @@ export async function guide(from, to, onlyIds = null) {
   const dates = [...new Set([ymd(from), ymd(to)])];
   const rows = await mapLimit(channels, 8, async (c) => {
     if (!c.gridKey) return [];
-    const lists = await Promise.all(dates.map((d) => gridFor(provider, c.gridKey, d)));
+    const lists = await Promise.all(dates.map((d) => gridFor(provider, c, d)));
     const seen = new Set();
     return lists.flat().filter((p) => p.stop > from && p.start < to && !seen.has(p.start) && seen.add(p.start));
   });
