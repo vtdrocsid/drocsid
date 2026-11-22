@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — 2026-11-22
+- New look: light gray / white with navy strips, two-tone headers, slanted navy tabs and azure accents
+  (Browse and Admin). Roll back with `update.sh 0.1.22` if needed.
+- Three columns: Upcoming Lineup (left), library browsing + Live TV guide (center, as tabs), Play History (right)
+- Lineup: schedule a movie, episode or future live TV show for a voice channel at a date/time
+  (📅 Schedule… in a title's details, on each episode, by clicking a future show in the guide, or
+  "+ Schedule a showing"). Reminder posted 10 min before; starts automatically on time. Owner/admin can remove.
+- Play history: every stream with who started it, when, voice channel, and who watched in the Activity
+- Stored in /data/schedule.json and /data/history.json
+
 ## 0.1.22 — 2026-11-21
 - Fix switching titles in a channel (e.g. live TV → movie): stream versions are now unique across titles,
   so the player always loads the new stream instead of freezing on the old one

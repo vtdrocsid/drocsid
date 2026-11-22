@@ -3,71 +3,122 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Drocsid</title>
+  <title>drocsid.tv</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="top">
-    <div class="brand"><span class="dot"></span>Drocsid</div>
-    <nav id="tabs" hidden>
-      <button data-tab="libraries" class="active">Libraries</button>
-      <button data-tab="live">Live TV</button>
-    </nav>
-    <div class="qwrap" id="qwrap" hidden>
-      <input id="q" type="search" placeholder="Search movies, shows and episodes…" autocomplete="off" />
-      <div id="qres" class="qres" hidden></div>
+  <div class="frame">
+    <!-- Thin navy strip: links left, date right -->
+    <div class="utilbar">
+      <nav id="tabs" hidden>
+        <button data-tab="libraries" class="active">Libraries</button>
+        <button data-tab="live">Live TV</button>
+        <a id="adminLink" href="/browse/admin.html" hidden>Admin</a>
+      </nav>
+      <span class="today" id="today"></span>
     </div>
-    <div class="who" id="who"></div>
-  </header>
 
-  <main>
-    <section id="signin" class="center" hidden>
+    <!-- Banner: wordmark, search, account -->
+    <header class="banner">
+      <a class="wordmark" href="/browse/"><span class="wm-main">drocsid</span><span class="wm-tv">.tv</span></a>
+      <div class="qwrap" id="qwrap" hidden>
+        <input id="q" type="search" placeholder="Search movies, shows and episodes…" autocomplete="off" />
+        <div id="qres" class="qres" hidden></div>
+      </div>
+      <div class="who" id="who"></div>
+    </header>
+
+    <section id="signin" class="center gate" hidden>
       <h1>Watch together in Discord</h1>
       <p>Sign in with Discord to browse the library and start a stream in a voice channel.</p>
       <a class="btn primary big" href="/auth/login">Sign in with Discord</a>
     </section>
 
-    <section id="denied" class="center" hidden>
+    <section id="denied" class="center gate" hidden>
       <h1>Waiting for approval</h1>
       <p>You're signed in, but you haven't been approved to browse yet. Ask an admin to add you.</p>
     </section>
 
-    <section id="tab-libraries" class="tab" hidden>
-      <div class="toolbar">
-        <div id="libs" class="chips"></div>
-        <select id="sort">
-          <option value="title">A–Z</option>
-          <option value="added">Recently added</option>
-          <option value="released">Release date</option>
-        </select>
-      </div>
-      <div id="grid" class="grid"></div>
-      <div class="center"><button id="more" class="btn" hidden>Load more</button></div>
-    </section>
+    <div class="layout" id="layout" hidden>
+      <!-- Left: upcoming lineup -->
+      <aside class="rail left">
+        <div class="strip"><span class="lo">Upcoming</span>Lineup</div>
+        <div id="lineup" class="rail-list"></div>
+        <div class="rail-foot"><button class="btn sm primary" id="schedNew">+ Schedule a showing</button></div>
+      </aside>
 
-    <section id="tab-live" class="tab" hidden>
-      <div class="toolbar">
-        <input id="chfilter" type="search" placeholder="Filter channels…" autocomplete="off" />
-        <span class="muted" id="guiderange"></span>
-      </div>
-      <div id="guide" class="guide"></div>
-    </section>
-  </main>
+      <!-- Center: browse libraries / live TV -->
+      <main>
+        <div class="tabbar">
+          <div id="libs" class="libtabs"></div>
+          <select id="sort" title="Sort">
+            <option value="title">A–Z</option>
+            <option value="added">Recently added</option>
+            <option value="released">Release date</option>
+          </select>
+        </div>
+        <section id="tab-libraries" class="tab secbody" hidden>
+          <div class="sec-title" id="secTitle">Library</div>
+          <div id="grid" class="grid"></div>
+          <div class="center"><button id="more" class="btn" hidden>Load more</button></div>
+        </section>
+        <section id="tab-live" class="tab secbody" hidden>
+          <div class="sec-row">
+            <div class="sec-title">Live TV Guide</div>
+            <span class="range" id="guiderange"></span>
+          </div>
+          <div class="toolbar"><input id="chfilter" type="search" placeholder="Filter channels…" autocomplete="off" /></div>
+          <div id="guide" class="guide"></div>
+        </section>
+      </main>
+
+      <!-- Right: play history -->
+      <aside class="rail right">
+        <div class="strip"><span class="lo">Play</span>History</div>
+        <div id="history" class="rail-list"></div>
+      </aside>
+    </div>
+  </div>
 
   <footer id="np" class="np" hidden></footer>
 
   <dialog id="detail"><div id="detailBody"></div></dialog>
+
   <dialog id="playDlg">
     <form method="dialog" class="play-form">
-      <h3 id="playTitle"></h3>
-      <label>Voice channel
-        <select id="voiceSel"></select>
-      </label>
-      <p class="muted small" id="voiceHint"></p>
-      <p class="error" id="playErr"></p>
-      <div class="row end">
-        <button value="cancel" class="btn">Cancel</button>
-        <button id="playGo" value="default" class="btn primary">Play</button>
+      <div class="dlg-head" id="playTitle"></div>
+      <div class="dlg-body">
+        <label>Voice channel
+          <select id="voiceSel"></select>
+        </label>
+        <p class="muted small" id="voiceHint"></p>
+        <p class="error" id="playErr"></p>
+        <div class="row end">
+          <button value="cancel" class="btn">Cancel</button>
+          <button id="playGo" value="default" class="btn primary">Play</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="schedDlg">
+    <form method="dialog" class="play-form">
+      <div class="dlg-head">Schedule a showing</div>
+      <div class="dlg-body">
+        <label>Title
+          <div class="pick" id="schedPick">
+            <input id="schedQ" type="search" placeholder="Search for a movie or episode…" autocomplete="off" />
+            <div id="schedRes" class="qres" hidden></div>
+          </div>
+          <div class="chosen" id="schedChosen" hidden></div>
+        </label>
+        <label>Voice channel <select id="schedVoice"></select></label>
+        <label>Date and time <input id="schedAt" type="datetime-local" /></label>
+        <p class="error" id="schedErr"></p>
+        <div class="row end">
+          <button value="cancel" class="btn">Cancel</button>
+          <button id="schedGo" value="default" class="btn primary">Add to lineup</button>
+        </div>
       </div>
     </form>
   </dialog>

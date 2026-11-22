@@ -160,7 +160,7 @@ export async function liveStatus() {
 export async function liveChannel(id) {
   const c = (await liveChannels()).find((ch) => ch.id === id);
   if (!c) throw new Error('Channel not found');
-  return { source: 'live', kind: 'channel', channelId: c.id, number: c.number, title: `${c.number ? c.number + ' ' : ''}${c.name}`, duration: 0 };
+  return { source: 'live', kind: 'channel', channelId: c.id, number: c.number, title: `${c.number ? c.number + ' ' : ''}${c.name}`, duration: 0, thumb: null };
 }
 
 const ymd = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };

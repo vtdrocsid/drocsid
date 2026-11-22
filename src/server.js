@@ -13,6 +13,8 @@ import * as plex from './plex.js';
 import * as rooms from './rooms.js';
 import { announce } from './bot.js';
 import { groupPlaylist, parseGroup, GROUP } from './hlsgroup.js';
+import * as history from './history.js';
+import * as schedule from './schedule.js';
 import { readFileSync } from 'node:fs';
 
 const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -220,13 +222,89 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
     await rooms.stop(mine.id, true, `${me.name} started something in another channel`);
   }
 
-  const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await plex.metadata(String(ratingKey).replace(/\D/g, ''));
-  if (item.source === 'plex' && !['movie', 'episode'].includes(item.kind)) return res.status(400).json({ error: 'Pick a movie or an episode' });
-  await rooms.start(voiceChannelId, config.guildId, item, me, settings().quality);
-  rooms.setViewers(voiceChannelId, subs.get(voiceChannelId)?.size || 0);
-  announce(voiceChannelId, `▶️ **${item.title}** started by ${me.name}. Open **Activities** (🚀) in this voice channel to watch.`);
+  const item = await resolveItem(source, ratingKey, liveId);
+  await startStream(channel, item, me);
   res.json({ ok: true, state: rooms.publicState(rooms.get(voiceChannelId)) });
 }));
+
+/** Look up a playable item from the client's request (library title or live channel). */
+async function resolveItem(source, ratingKey, liveId) {
+  const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await plex.metadata(String(ratingKey).replace(/\D/g, ''));
+  if (item.source === 'plex' && !['movie', 'episode'].includes(item.kind)) throw Object.assign(new Error('Pick a movie or an episode'), { status: 400 });
+  return item;
+}
+
+/** Start a stream in a voice channel, record it in play history, and announce it. */
+async function startStream(channel, item, user, { scheduled = false } = {}) {
+  await rooms.start(channel.id, config.guildId, item, user, settings().quality);
+  const room = rooms.get(channel.id);
+  room.historyId = history.begin({ item, voiceChannelId: channel.id, voiceChannelName: channel.name, startedBy: user.name, startedById: user.id, scheduled });
+  // Anyone already watching in the Activity counts as a watcher of the new title.
+  subs.get(channel.id)?.forEach((ws) => history.addWatcher(room.historyId, ws.username));
+  rooms.setViewers(channel.id, subs.get(channel.id)?.size || 0);
+  announce(channel.id, scheduled
+    ? `📅 Scheduled showing: **${item.title}** (scheduled by ${user.name}) is starting now. Open **Activities** (🚀) in this voice channel to watch.`
+    : `▶️ **${item.title}** started by ${user.name}. Open **Activities** (🚀) in this voice channel to watch.`);
+}
+
+// ---------- play history & lineup API ----------
+app.get('/api/history', needSession, needApproved, (req, res) => {
+  const live = new Set(rooms.all().map((r) => r.historyId));
+  res.json(history.list(Math.min(100, Number(req.query.limit) || 30)).map((e) => ({ ...e, playing: live.has(e.id) })));
+});
+
+app.get('/api/schedule', needSession, needApproved, (req, res) => {
+  res.json(schedule.upcoming().map((x) => ({ ...x, mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
+});
+
+app.post('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
+  const { source, ratingKey, channelId: liveId, voiceChannelId, at } = req.body || {};
+  const channel = auth.voiceChannels().find((c) => c.id === voiceChannelId);
+  if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
+  const when = Number(at);
+  if (!when || when < Date.now() + 60_000) return res.status(400).json({ error: 'Pick a time at least a minute from now' });
+  if (when > Date.now() + 60 * 86400_000) return res.status(400).json({ error: 'Pick a time within the next 60 days' });
+  const item = await resolveItem(source, ratingKey, liveId);
+  const clash = schedule.upcoming().find((x) => x.voiceChannelId === channel.id && Math.abs(x.at - when) < 15 * 60_000);
+  if (clash) return res.status(409).json({ error: `“${clash.title}” is already scheduled in ${channel.name} at that time.` });
+  const entry = schedule.add({
+    at: when, source: item.source, ratingKey: item.ratingKey || null, channelId: item.channelId || null,
+    title: item.title, thumb: item.thumb || null, duration: item.duration || 0,
+    voiceChannelId: channel.id, voiceChannelName: channel.name, by: req.session.username, byId: req.session.userId,
+  });
+  console.log(`[lineup] ${entry.by} scheduled ${entry.title} in ${entry.voiceChannelName} for ${new Date(entry.at).toISOString()}`);
+  res.json(entry);
+}));
+
+app.delete('/api/schedule/:id', needSession, needApproved, (req, res) => {
+  const x = schedule.get(req.params.id);
+  if (!x) return res.status(404).json({ error: 'Not found' });
+  if (x.byId !== req.session.userId && !auth.isAdmin(req.session.userId)) return res.status(403).json({ error: 'Only whoever scheduled it, or an admin, can remove it' });
+  schedule.remove(x.id);
+  res.json({ ok: true });
+});
+
+// Runner: 10-minute reminder, then start scheduled showings on time.
+setInterval(async () => {
+  for (const x of schedule.needReminder(10 * 60_000)) {
+    schedule.markReminded(x.id);
+    announce(x.voiceChannelId, `⏰ Coming up in ${Math.max(1, Math.round((x.at - Date.now()) / 60_000))} min: **${x.title}** (scheduled by ${x.by}).`);
+  }
+  for (const x of schedule.due()) {
+    schedule.remove(x.id);
+    try {
+      const channel = auth.voiceChannels().find((c) => c.id === x.voiceChannelId) || { id: x.voiceChannelId, name: x.voiceChannelName };
+      const item = await resolveItem(x.source, x.ratingKey, x.channelId);
+      const current = rooms.get(channel.id);
+      if (current) await rooms.stop(channel.id, false, `replaced by scheduled showing of ${item.title}`);
+      await startStream(channel, item, { id: x.byId, name: x.by }, { scheduled: true });
+      console.log(`[lineup] started ${item.title} in ${channel.name}`);
+    } catch (e) {
+      console.warn(`[lineup] could not start ${x.title}: ${e.message}`);
+      announce(x.voiceChannelId, `⚠️ Couldn't start the scheduled showing of **${x.title}**: ${e.message}`);
+    }
+  }
+}, 20_000).unref();
 
 async function control(roomId, action, seconds, quality, userId) {
   const room = rooms.get(roomId);
@@ -423,6 +501,7 @@ export function startServer() {
     const roomId = url.searchParams.get('channel');
     if (!session || !roomId) { console.warn('[ws] rejected: no session'); return ws.close(4001, 'unauthorized'); }
     console.log(`[ws] ${session.username} connected to ${roomId}`);
+    ws.username = session.username;
     const isApproved = await approved(session);
     const inChannel = auth.voiceChannelOf(session.userId) === roomId;
     if (!inChannel && !isApproved) return ws.close(4003, 'join the voice channel first');
@@ -431,6 +510,7 @@ export function startServer() {
     if (!subs.has(roomId)) subs.set(roomId, new Set());
     subs.get(roomId).add(ws);
     rooms.setViewers(roomId, subs.get(roomId).size);
+    history.addWatcher(rooms.get(roomId)?.historyId, session.username);
     send(ws, { type: 'hello', userId: session.userId });
     send(ws, { type: 'state', state: rooms.publicState(rooms.get(roomId)) });
 

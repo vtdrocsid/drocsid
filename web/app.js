@@ -25,20 +25,27 @@ function toast(msg) {
 // ---------- boot ----------
 let me = null;
 async function boot() {
+  $('#today').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).replace(/,/g, '');
   try { me = await api('/api/me'); } catch { $('#signin').hidden = false; return; }
-  $('#who').innerHTML = `${me.admin ? '<a href="/browse/admin.html" class="btn sm">Admin</a>' : ''}
-    <span>${esc(me.name)}</span><button class="btn sm" id="logout">Sign out</button>`;
+  $('#who').innerHTML = `<span>Signed in as <b>${esc(me.name)}</b></span><button class="btn sm" id="logout">Sign out</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
   if (!me.approved) { $('#denied').hidden = false; return; }
   $('#tabs').hidden = false;
+  $('#adminLink').hidden = !me.admin;
   $('#qwrap').hidden = false;
+  $('#layout').hidden = false;
+  loadLibraries();
   showTab(location.hash.slice(1) || 'libraries');
   pollNowPlaying();
+  refreshRails();
+  setInterval(refreshRails, 30_000);
 }
 
 function showTab(name) {
   if (!['libraries', 'live'].includes(name)) name = 'libraries';
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('#libs button').forEach((b) => b.classList.toggle('active', name === 'live' ? b.dataset.live === '1' : b === curLibEl));
+  $('#sort').hidden = name === 'live';
   document.querySelectorAll('.tab').forEach((s) => { s.hidden = s.id !== `tab-${name}`; });
   history.replaceState(null, '', `#${name}`);
   if (name === 'libraries' && !libsLoaded) loadLibraries();
@@ -59,25 +66,30 @@ function card(item) {
 }
 
 // ---------- libraries ----------
-let libsLoaded = false, curLib = null, libStart = 0;
+let libsLoaded = false, curLib = null, curLibEl = null, libStart = 0;
 async function loadLibraries() {
   libsLoaded = true;
   const libs = await api('/api/libraries');
   const box = $('#libs');
   box.innerHTML = '';
   libs.forEach((l, i) => {
-    const c = h(`<button class="chip">${esc(l.title)}</button>`);
-    c.onclick = () => {
-      box.querySelectorAll('.chip').forEach((x) => x.classList.remove('active'));
-      c.classList.add('active');
+    const c = h(`<button>${esc(l.title)}</button>`);
+    c.onclick = (ev) => {
       curLib = l.id;
+      curLibEl = c;
+      $('#secTitle').textContent = l.title;
       $('#sort').value = l.defaultSort || 'title'; // admin's default for this library; viewers can still change it
+      if (ev?.isTrusted || $('#tab-live').hidden) showTab('libraries');
       loadItems(true);
     };
     box.append(c);
     if (i === 0) c.click();
   });
-  if (!libs.length) box.textContent = 'No libraries available.';
+  const live = h('<button class="live" data-live="1">📡 Live TV</button>');
+  live.onclick = () => showTab('live');
+  box.append(live);
+  if (!libs.length) box.prepend(h('<span class="muted small">No libraries available.</span>'));
+  showTab(location.hash.slice(1) || 'libraries');
 }
 async function loadItems(reset) {
   if (reset) { libStart = 0; $('#grid').innerHTML = ''; }
@@ -152,12 +164,15 @@ async function openDetail(ratingKey) {
         <h2>${esc(item.title)}</h2>
         <div class="muted">${esc([item.year, item.contentRating, dur].filter(Boolean).join(' · '))}</div>
         <p>${esc(item.summary)}</p>
-        ${playable ? '<button class="btn primary" id="playThis">▶ Play in Discord</button>' : ''}
+        ${playable ? '<div class="row"><button class="btn primary" id="playThis">▶ Play in Discord</button><button class="btn" id="schedThis">📅 Schedule…</button></div>' : ''}
       </div>
     </div>
     <div class="detail-body"><div class="seasons"></div><div class="eps"></div></div>`;
   $('.close', body).onclick = () => dlg.close();
-  if (playable) $('#playThis').onclick = () => choosePlay({ source: 'plex', ratingKey: item.ratingKey, title: item.title });
+  if (playable) {
+    $('#playThis').onclick = () => choosePlay({ source: 'plex', ratingKey: item.ratingKey, title: item.title });
+    $('#schedThis').onclick = () => openSchedule({ source: 'plex', ratingKey: item.ratingKey, title: item.title, thumb: item.thumb });
+  }
 
   if (item.kind === 'show') {
     const bar = $('.seasons', body);
@@ -182,8 +197,10 @@ function showEpisodes(eps) {
     const row = h(`<div class="ep"><div class="n">${e.index ?? ''}</div>
       <div class="info"><div>${esc(e.shortTitle || e.title)}</div><div class="sum">${esc(e.summary)}</div></div>
       <span class="muted small">${e.duration ? Math.round(e.duration / 60) + 'm' : ''}</span>
-      <button class="btn sm primary">▶ Play</button></div>`);
-    $('button', row).onclick = () => choosePlay({ source: 'plex', ratingKey: e.ratingKey, title: e.title });
+      <button class="btn sm" title="Schedule">📅</button><button class="btn sm primary">▶ Play</button></div>`);
+    const [schedBtn, playBtn] = row.querySelectorAll('button');
+    playBtn.onclick = () => choosePlay({ source: 'plex', ratingKey: e.ratingKey, title: e.title });
+    schedBtn.onclick = () => openSchedule({ source: 'plex', ratingKey: e.ratingKey, title: e.title, thumb: e.thumb });
     box.append(row);
   });
 }
@@ -191,7 +208,7 @@ function showEpisodes(eps) {
 // ---------- play dialog ----------
 async function choosePlay(target) {
   const dlg = $('#playDlg');
-  $('#playTitle').textContent = `Play “${target.title}”`;
+  $('#playTitle').textContent = `Play: ${target.title}`;
   $('#playErr').textContent = '';
   const { current, channels } = await api('/api/voice');
   const sel = $('#voiceSel');
@@ -292,7 +309,10 @@ function renderGuide() {
           if (Number(el.dataset.shift) > 0 && t && t.scrollWidth > t.clientWidth + 1) el.classList.add('expand');
         };
         el.onmouseleave = () => el.classList.remove('expand');
-        el.onclick = () => choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` });
+        // Now/past: watch the channel. Future: schedule that channel for the programme's start.
+        el.onclick = () => (p.start > Date.now() + 60_000
+          ? openSchedule({ source: 'live', channelId: c.id, title: `${c.name} — ${p.title}`, logo: c.thumb ? c.id : null }, p.start)
+          : choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` }));
         track.append(el);
       });
       body.append(row);
@@ -391,5 +411,120 @@ function renderNowPlaying(active) {
     bar.append(el);
   });
 }
+
+// ---------- side rails: upcoming lineup (left) and play history (right) ----------
+const timeOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+function dayOf(ms, past = false) {
+  const d = new Date(ms), today = new Date();
+  const days = Math.round((new Date(d.toDateString()) - new Date(today.toDateString())) / 86400_000);
+  if (days === 0) return past ? 'Today' : (d.getHours() >= 17 ? 'Tonight' : 'Today');
+  if (days === 1) return 'Tomorrow';
+  if (days === -1) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+const railThumb = (x) => (x.source === 'live'
+  ? `<div class="r-thumb logo" style="background-image:url('/api/logo?id=${encodeURIComponent(x.channelId)}')"></div>`
+  : `<div class="r-thumb" style="background-image:url('${thumb(x.thumb, 80, 120)}')"></div>`);
+
+async function refreshRails() {
+  await Promise.all([loadLineup().catch(() => {}), loadHistory().catch(() => {})]);
+}
+
+async function loadLineup() {
+  const items = await api('/api/schedule');
+  const box = $('#lineup');
+  box.innerHTML = items.length ? '' : '<div class="rail-empty">Nothing scheduled yet. Open a title (or a future show in the TV guide) and choose 📅 Schedule.</div>';
+  let day = null;
+  items.forEach((x) => {
+    const d = dayOf(x.at);
+    if (d !== day) { box.append(h(`<div class="r-day">${esc(d)}</div>`)); day = d; }
+    const row = h(`<div class="r-item">${railThumb(x)}
+      <div class="r-text"><div class="r-time">${timeOf(x.at)}${x.source === 'live' ? ' <span class="tag-live">LIVE TV</span>' : ''}</div>
+        <div class="r-title" title="${esc(x.title)}">${esc(x.title)}</div>
+        <div class="r-meta">🔊 ${esc(x.voiceChannelName)} · by ${esc(x.by)}</div></div>
+      ${x.canDelete ? '<button class="r-del" title="Remove from lineup">✕</button>' : ''}</div>`);
+    const del = $('.r-del', row);
+    if (del) del.onclick = async () => {
+      if (!confirm(`Remove “${x.title}” from the lineup?`)) return;
+      try { await api(`/api/schedule/${x.id}`, { method: 'DELETE' }); toast('Removed from lineup'); loadLineup(); } catch (e) { toast(e.message); }
+    };
+    box.append(row);
+  });
+}
+
+async function loadHistory() {
+  const items = await api('/api/history?limit=25');
+  const box = $('#history');
+  box.innerHTML = items.length ? '' : '<div class="rail-empty">Nothing has been played yet.</div>';
+  items.forEach((x) => {
+    const when = x.playing ? 'Now playing' : `${dayOf(x.startedAt, true)} ${timeOf(x.startedAt)}`;
+    box.append(h(`<div class="r-item">${railThumb(x)}
+      <div class="r-text"><div class="r-title" title="${esc(x.title)}">${esc(x.title)}${x.playing ? ' <span class="tag-now">● NOW</span>' : ''}</div>
+        <div class="r-meta">${esc(when)} · started by <b>${esc(x.startedBy)}</b>${x.scheduled ? ' 📅' : ''}</div>
+        <div class="r-meta">🔊 ${esc(x.voiceChannelName || '')}</div>
+        ${x.watchers?.length ? `<div class="r-who">👥 ${esc(x.watchers.join(', '))}</div>` : ''}</div></div>`));
+  });
+}
+
+// ---------- schedule dialog ----------
+let schedTarget = null, schedTimer;
+const localInput = (ms) => { const d = new Date(ms); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+function setSchedTarget(t) {
+  schedTarget = t;
+  $('#schedPick').hidden = !!t;
+  $('#schedChosen').hidden = !t;
+  if (t) {
+    const img = t.source === 'live' ? (t.logo ? `/api/logo?id=${encodeURIComponent(t.channelId)}` : '') : thumb(t.thumb, 80, 120);
+    $('#schedChosen').innerHTML = `<div class="qthumb" style="background-image:url('${img}')"></div><div><b>${esc(t.title)}</b></div><button type="button" class="btn sm">Change</button>`;
+    $('#schedChosen button').onclick = () => { setSchedTarget(null); $('#schedQ').value = ''; $('#schedQ').focus(); };
+  }
+}
+async function openSchedule(target = null, at = null) {
+  $('#detail').open && $('#detail').close();
+  setSchedTarget(target);
+  $('#schedErr').textContent = '';
+  $('#schedRes').hidden = true;
+  const { current, channels } = await api('/api/voice');
+  $('#schedVoice').innerHTML = channels.map((c) => `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>🔊 ${esc(c.name)}</option>`).join('');
+  const nextHalfHour = Math.ceil((Date.now() + 5 * 60_000) / 1_800_000) * 1_800_000;
+  $('#schedAt').value = localInput(at || nextHalfHour);
+  $('#schedAt').min = localInput(Date.now() + 60_000);
+  $('#schedDlg').showModal();
+  if (!target) $('#schedQ').focus();
+}
+$('#schedNew').onclick = () => openSchedule();
+$('#schedQ').oninput = () => {
+  clearTimeout(schedTimer);
+  const q = $('#schedQ').value.trim();
+  if (!q) { $('#schedRes').hidden = true; return; }
+  schedTimer = setTimeout(async () => {
+    const items = (await api(`/api/search?q=${encodeURIComponent(q)}`).catch(() => [])).filter((it) => ['movie', 'episode'].includes(it.kind)).slice(0, 7);
+    const box = $('#schedRes');
+    box.innerHTML = items.length ? '' : '<div class="qempty">No movies or episodes match</div>';
+    items.forEach((it) => {
+      const row = h(`<div class="qrow"><div class="qthumb" style="background-image:url('${thumb(it.thumb, 80, 120)}')"></div>
+        <div class="qtext"><div class="qt">${esc(it.title)}</div><div class="qs">${it.kind === 'episode' ? 'Episode' : 'Movie'}${it.year ? ' · ' + it.year : ''}</div></div></div>`);
+      row.onmousedown = (e) => { e.preventDefault(); box.hidden = true; setSchedTarget({ source: 'plex', ratingKey: it.ratingKey, title: it.title, thumb: it.thumb }); };
+      box.append(row);
+    });
+    box.hidden = false;
+  }, 250);
+};
+$('#schedGo').onclick = async (e) => {
+  e.preventDefault();
+  $('#schedErr').textContent = '';
+  if (!schedTarget) { $('#schedErr').textContent = 'Pick a movie or episode first.'; return; }
+  const at = new Date($('#schedAt').value).getTime();
+  if (!at) { $('#schedErr').textContent = 'Pick a date and time.'; return; }
+  $('#schedGo').disabled = true;
+  try {
+    await api('/api/schedule', { method: 'POST', body: JSON.stringify({ ...schedTarget, voiceChannelId: $('#schedVoice').value, at }) });
+    $('#schedDlg').close();
+    toast(`Added to the lineup for ${dayOf(at)} at ${timeOf(at)}`);
+    loadLineup();
+  } catch (err) {
+    $('#schedErr').textContent = err.message;
+  } finally { $('#schedGo').disabled = false; }
+};
 
 boot();

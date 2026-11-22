@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import * as plex from './plex.js';
 import { findPreset } from './settings.js';
+import * as history from './history.js';
 
 export const events = new EventEmitter(); // 'update' (room), 'end' (roomId)
 const rooms = new Map(); // voiceChannelId -> room
@@ -159,6 +160,7 @@ export async function stop(roomId, announce = true, reason = 'stopped') {
   if (!room) return false;
   console.log(`[room] ${room.item.title} in ${roomId} ended: ${reason} (at ${Math.floor(position(room))}s, ${room.viewers} watching)`);
   rooms.delete(roomId);
+  history.end(room.historyId);
   await releasePlex(room);
   if (announce) events.emit('end', roomId);
   return true;

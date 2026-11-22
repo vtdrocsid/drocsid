@@ -137,7 +137,8 @@ $('#refreshLive').onclick = async () => {
 async function load() {
   try {
     const me = await api('/api/me');
-    $('#who').textContent = me.name;
+    $('#who').innerHTML = `Signed in as <b>${esc(me.name)}</b>`;
+    $('#today').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).replace(/,/g, '');
     state = await api('/api/admin/state');
     $('#msg').hidden = true;
     $('#admin').hidden = false;
