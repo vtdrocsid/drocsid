@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.11 — 2026-11-22
+- Library tabs now sit on a navy strip that is the same height as, and level with, the
+  Upcoming Lineup and Play History strips, so the bar runs across the whole page
+
 ## 0.2.10 — 2026-11-22
 - Play dialog: optional "📣 Announce it in a text channel" with a channel drop-down. The bot posts a
   now-playing card (poster, year/rating/runtime, synopsis, link to the voice channel). The choice is

@@ -100,8 +100,11 @@ main { padding: 14px; min-width: 0; }
 .tag-now { color: var(--red); font-weight: bold; font-size: 10px; }
 
 /* ---------- center: slanted navy tabs ---------- */
-.tabbar { display: flex; justify-content: center; }
-.libtabs { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.tabbar { position: relative; margin: 0 -14px 14px; }
+/* Library tabs stand on top of a navy strip that lines up with the rails' "Upcoming Lineup" / "Play History" strips. */
+.libtabs { position: absolute; left: 0; right: 0; bottom: 100%; display: flex; gap: 3px; flex-wrap: wrap-reverse; justify-content: center; align-items: flex-end; padding: 0 14px; }
+.banner.tabs-below { padding-bottom: 52px; }
+main { padding-top: 0; }
 .libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 3px 3px 0 0; cursor: pointer; padding: 7px 18px 6px;
   font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #021529;
   background: linear-gradient(#1a5a99, var(--navy2)); }
@@ -109,7 +112,7 @@ main { padding: 14px; min-width: 0; }
 .libtabs button.active { background: linear-gradient(#2a8fe0, #135ea8); }
 .libtabs button.live { color: #ffd1cd; }
 .sec-row select { font-size: 11px; padding: 3px 6px; }
-.secbody { background: var(--panel); border: 1px solid var(--line2); border-top: 3px solid var(--navy); border-radius: 0 0 6px 6px; padding: 14px; }
+.secbody { background: var(--panel); border: 1px solid var(--line2); border-radius: 0 0 6px 6px; padding: 14px; }
 .sec-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .sec-title { color: var(--azure); font: bold 17px Verdana, sans-serif; margin: 0 0 12px; }
 .sec-row .sec-title { margin: 0; flex: 1; }
@@ -252,6 +255,8 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
   .rail.left, .rail.right { border: 0; border-top: 1px solid #c9ced4; }
   .rail.left { order: 2; } main { order: 1; } .rail.right { order: 3; }
   .wm-main { font-size: 40px; } .wm-tv { font-size: 34px; }
+  .banner.tabs-below { padding-bottom: 16px; }
+  .tabbar { margin-top: 14px; } .libtabs { position: static; }
 }
 @media (max-width: 600px) { .admin { grid-template-columns: 1fr; } .guide { --ch: 120px; } .g-ch img { display: none; } }
 /* Inside the schedule dialog the results list pushes the form down instead of floating. */
