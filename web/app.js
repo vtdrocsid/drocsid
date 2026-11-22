@@ -31,18 +31,18 @@ async function boot() {
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
   if (!me.approved) { $('#denied').hidden = false; return; }
   $('#tabs').hidden = false;
+  $('#qwrap').hidden = false;
   showTab(location.hash.slice(1) || 'libraries');
   pollNowPlaying();
 }
 
 function showTab(name) {
-  if (!['libraries', 'search', 'live'].includes(name)) name = 'libraries';
+  if (!['libraries', 'live'].includes(name)) name = 'libraries';
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab').forEach((s) => { s.hidden = s.id !== `tab-${name}`; });
   history.replaceState(null, '', `#${name}`);
   if (name === 'libraries' && !libsLoaded) loadLibraries();
   if (name === 'live') loadGuide();
-  if (name === 'search') $('#q').focus();
 }
 $('#tabs').onclick = (e) => { if (e.target.dataset.tab) showTab(e.target.dataset.tab); };
 
@@ -89,20 +89,51 @@ async function loadItems(reset) {
 $('#sort').onchange = () => curLib && loadItems(true);
 $('#more').onclick = () => loadItems(false);
 
-// ---------- search ----------
-let qTimer;
+// ---------- search (top bar, live results, max 7) ----------
+const MAX_RESULTS = 7;
+let qTimer, qSeq = 0, qActive = -1;
+const qres = $('#qres');
+function closeResults() { qres.hidden = true; qActive = -1; }
+function highlight(i) {
+  const rows = [...qres.querySelectorAll('.qrow')];
+  if (!rows.length) return;
+  qActive = (i + rows.length) % rows.length;
+  rows.forEach((r, j) => r.classList.toggle('active', j === qActive));
+  rows[qActive].scrollIntoView({ block: 'nearest' });
+}
 $('#q').oninput = () => {
   clearTimeout(qTimer);
+  const q = $('#q').value.trim();
+  if (!q) return closeResults();
   qTimer = setTimeout(async () => {
-    const q = $('#q').value.trim();
-    const box = $('#results');
-    box.innerHTML = q ? '<p class="muted">Searching…</p>' : '';
-    if (!q) return;
-    const items = await api(`/api/search?q=${encodeURIComponent(q)}`);
-    box.innerHTML = items.length ? '' : '<p class="muted">No matches.</p>';
-    items.forEach((it) => box.append(card(it)));
-  }, 300);
+    const seq = ++qSeq;
+    let items = [];
+    try { items = await api(`/api/search?q=${encodeURIComponent(q)}`); } catch { /* ignore */ }
+    if (seq !== qSeq) return; // a newer search is already running
+    qres.innerHTML = '';
+    qActive = -1;
+    if (!items.length) qres.append(h('<div class="qempty">No matches</div>'));
+    items.slice(0, MAX_RESULTS).forEach((it) => {
+      const kind = { movie: 'Movie', show: 'TV show', season: 'Season', episode: 'Episode' }[it.kind] || '';
+      const row = h(`<div class="qrow">
+        <div class="qthumb" style="background-image:url('${thumb(it.thumb, 80, 120)}')"></div>
+        <div class="qtext"><div class="qt">${esc(it.kind === 'episode' ? it.title : it.shortTitle || it.title)}</div>
+        <div class="qs">${esc([kind, it.year].filter(Boolean).join(' · '))}</div></div></div>`);
+      row.onmousedown = (e) => { e.preventDefault(); closeResults(); openDetail(it.ratingKey); };
+      qres.append(row);
+    });
+    qres.hidden = false;
+  }, 250);
 };
+$('#q').onkeydown = (e) => {
+  if (qres.hidden) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); highlight(qActive + 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(qActive - 1); }
+  else if (e.key === 'Enter') { const r = qres.querySelectorAll('.qrow')[qActive < 0 ? 0 : qActive]; if (r) r.onmousedown(e); }
+  else if (e.key === 'Escape') closeResults();
+};
+$('#q').onfocus = () => { if ($('#q').value.trim() && qres.children.length) qres.hidden = false; };
+$('#q').onblur = () => setTimeout(closeResults, 100);
 
 // ---------- detail ----------
 async function openDetail(ratingKey) {

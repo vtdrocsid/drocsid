@@ -11,9 +11,12 @@
     <div class="brand"><span class="dot"></span>Drocsid</div>
     <nav id="tabs" hidden>
       <button data-tab="libraries" class="active">Libraries</button>
-      <button data-tab="search">Search</button>
       <button data-tab="live">Live TV</button>
     </nav>
+    <div class="qwrap" id="qwrap" hidden>
+      <input id="q" type="search" placeholder="Search movies, shows and episodes…" autocomplete="off" />
+      <div id="qres" class="qres" hidden></div>
+    </div>
     <div class="who" id="who"></div>
   </header>
 
@@ -40,11 +43,6 @@
       </div>
       <div id="grid" class="grid"></div>
       <div class="center"><button id="more" class="btn" hidden>Load more</button></div>
-    </section>
-
-    <section id="tab-search" class="tab" hidden>
-      <div class="toolbar"><input id="q" type="search" placeholder="Search movies, shows and episodes…" autocomplete="off" /></div>
-      <div id="results" class="grid"></div>
     </section>
 
     <section id="tab-live" class="tab" hidden>

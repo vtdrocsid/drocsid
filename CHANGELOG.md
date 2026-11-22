@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.19 — 2026-11-21
+- Browse: Search tab removed; search bar sits in the middle of the top navigation with a live drop-down
+  of up to 7 results (poster, title, type/year). Click, or ↑/↓ + Enter, opens the title. Esc closes.
+
 ## 0.1.18 — 2026-11-21
 - Guide: ▶ sits in its own fixed right-hand column above the vertical scrollbar; it no longer moves with the timeline
 
