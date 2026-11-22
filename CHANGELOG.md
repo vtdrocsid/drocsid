@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 — 2026-11-21
+- Fix black video: Plex now always transcodes to H.264/AAC unless Output = "Original" (Discord can't decode HEVC)
+- Activity page loads versioned player files so Discord never runs a stale cached copy
+- Activity signs itself back in after a container restart
+- Player reports its version, manifest, first segment and errors to the container log
+
 ## 0.1.3 — 2026-11-21
 - Admin page: cache the server member list (fixes "opcode 8 rate limited" warnings)
 - Log Activity sign-in, WebSocket connects and every playlist request

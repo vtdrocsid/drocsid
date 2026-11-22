@@ -21,11 +21,14 @@ function screen(title, html = '') {
 }
 
 // ---------- sign in ----------
+let sdk = null, cfg = null;
 async function signIn() {
-  const cfg = await fetch('/api/config').then((r) => r.json());
-  publicUrl = cfg.publicUrl;
-  const sdk = new DiscordSDK(cfg.clientId);
-  await sdk.ready();
+  if (!sdk) {
+    cfg = await fetch('/api/config').then((r) => r.json());
+    publicUrl = cfg.publicUrl;
+    sdk = new DiscordSDK(cfg.clientId);
+    await sdk.ready();
+  }
   const { code } = await sdk.commands.authorize({
     client_id: cfg.clientId, response_type: 'code', state: '', prompt: 'none', scope: ['identify'],
   });
@@ -40,6 +43,7 @@ async function signIn() {
 // ---------- server connection ----------
 function connect(channelId) {
   ws = new WebSocket(`wss://${location.host}/ws?token=${encodeURIComponent(token)}&channel=${encodeURIComponent(channelId)}`);
+  ws.onopen = () => { while (pending.length) send({ type: 'clientlog', text: pending.shift() }); report(`player v${__VERSION__} connected`); };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'hello') {
@@ -50,13 +54,22 @@ function connect(channelId) {
     if (msg.type === 'error') console.warn(msg.error);
   };
   ws.onclose = (e) => {
+    if (e.code === 4001) {
+      // Server restarted and forgot our login: sign in again silently.
+      screen('Reconnecting…');
+      return signIn().then(() => connect(channelId)).catch(() => setTimeout(() => connect(channelId), 3000));
+    }
     if (e.code === 4003) return screen("Can't watch here", e.reason === 'not approved' ? 'An admin needs to approve you before you can watch.' : 'Join the voice channel first.');
     screen('Reconnecting…');
     setTimeout(() => connect(channelId), 2000);
   };
 }
 const send = (msg) => ws?.readyState === 1 && ws.send(JSON.stringify(msg));
-const report = (text) => { console.warn(text); send({ type: 'clientlog', text }); };
+const pending = [];
+const report = (text) => {
+  console.warn(text);
+  if (ws?.readyState === 1) send({ type: 'clientlog', text }); else pending.push(text);
+};
 const control = (action, seconds) => canControl && send({ type: 'control', action, seconds });
 
 // ---------- playback ----------

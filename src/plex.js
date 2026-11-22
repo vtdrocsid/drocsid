@@ -249,7 +249,9 @@ export async function startTranscode({ path, offset, mediaIndex = 0, sessionId }
     fastSeek: 1,
     copyts: 1,
     directPlay: 0,
-    directStream: 1, // Plex copies the video untouched when it already fits the limits below
+    // Browsers in Discord can't reliably decode HEVC/AV1/10-bit, so always transcode to H.264
+    // unless the admin picked "Original" (then Plex may pass compatible video through).
+    directStream: original ? 1 : 0,
     directStreamAudio: 0, // AAC audio so every browser can play it
     videoQuality: 100,
     videoResolution: original ? '3840x2160' : s.outputResolution,
@@ -262,7 +264,12 @@ export async function startTranscode({ path, offset, mediaIndex = 0, sessionId }
   };
   const res = await plexFetch('/video/:/transcode/universal/start.m3u8', {
     params,
-    headers: { Accept: '*/*', 'X-Plex-Session-Identifier': sessionId },
+    headers: {
+      Accept: '*/*',
+      'X-Plex-Session-Identifier': sessionId,
+      // Tell Plex this client plays H.264 + AAC in HLS/MPEG-TS, so anything else gets transcoded.
+      'X-Plex-Client-Profile-Extra': 'add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac)',
+    },
   });
   const text = await res.text();
   // Variant URLs are relative ("session/<id>/base/index.m3u8"); route them through our proxy.

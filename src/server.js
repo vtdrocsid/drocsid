@@ -12,6 +12,9 @@ import * as auth from './auth.js';
 import * as plex from './plex.js';
 import * as rooms from './rooms.js';
 import { announce } from './bot.js';
+import { readFileSync } from 'node:fs';
+
+const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = express();
@@ -79,7 +82,14 @@ app.get('/', (req, res) => {
   res.redirect('/browse/');
 });
 app.get('/admin', (req, res) => res.redirect('/browse/admin.html'));
-app.use('/activity', express.static(path.join(root, 'public/activity')));
+// The Activity page is served with versioned asset URLs so Discord never runs a stale cached player.
+app.get(['/activity', '/activity/', '/activity/index.html'], (req, res) => {
+  const html = readFileSync(path.join(root, 'public/activity/index.html'), 'utf8')
+    .replace('/activity/style.css', `/activity/style.css?v=${VERSION}`)
+    .replace('/activity/app.js', `/activity/app.js?v=${VERSION}`);
+  res.set('Cache-Control', 'no-store').type('html').send(html);
+});
+app.use('/activity', express.static(path.join(root, 'public/activity'), { setHeaders: (r) => r.set('Cache-Control', 'no-cache') }));
 app.use('/browse', express.static(path.join(root, 'web')));
 
 // ---------- web login (Discord OAuth2) ----------
@@ -263,13 +273,20 @@ app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, r
   res.type('application/vnd.apple.mpegurl').set('Cache-Control', 'no-store').send(body);
 });
 
+const seenSegments = new Set();
 // Only the transcoder session paths are proxied; the rest of the Plex API stays private.
 app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) => {
   if (req.method !== 'GET' || !req.url.startsWith('/video/:/transcode/universal/session/')) return res.status(403).end();
   const upstream = await fetch(plex.plexProxyUrl(req.url));
   const shortPath = req.url.split('?')[0];
   if (!upstream.ok) console.warn(`[plex proxy] ${upstream.status} for ${shortPath}`);
-  else if (shortPath.endsWith('.m3u8')) console.log(`[plex proxy] 200 ${shortPath}`);
+  else if (!shortPath.endsWith('.m3u8')) {
+    const sess = (shortPath.match(/session\/([^/]+)/) || [])[1];
+    if (sess && !seenSegments.has(sess)) {
+      seenSegments.add(sess);
+      console.log(`[plex proxy] first segment for session ${sess.slice(0, 8)}: ${upstream.headers.get('content-type')} ${upstream.headers.get('content-length') || '?'} bytes`);
+    }
+  }
   res.status(upstream.status);
   for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
   res.set('Cache-Control', 'no-store');

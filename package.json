@@ -1,6 +1,6 @@
 {
   "name": "drocsid",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Watch Plex movies, shows and live TV together in Discord voice channels",
   "type": "module",
@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "esbuild activity/main.js --bundle --minify --format=esm --target=es2020 --outfile=public/activity/app.js && cp activity/index.html activity/style.css public/activity/",
+    "build": "esbuild activity/main.js --bundle --minify --format=esm --target=es2020 --define:__VERSION__=\\\"$npm_package_version\\\" --outfile=public/activity/app.js && cp activity/index.html activity/style.css public/activity/",
     "start": "node src/index.js",
     "dev": "npm run build && node --env-file=.env src/index.js"
   },
