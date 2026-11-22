@@ -57,7 +57,7 @@ $('#tabs').onclick = (e) => { if (e.target.dataset.tab) showTab(e.target.dataset
 function rtBadge(rt) {
   if (!rt || !Number.isFinite(rt.score)) return '';
   const icon = rt.kind === 'audience'
-    ? (rt.fresh ? '🍿' : '🫗')
+    ? `<span class="pop">${rt.fresh ? '🍿' : '🫗'}</span>`
     : (rt.fresh ? '<span class="rt-tomato" aria-hidden="true"></span>' : '<span class="rt-splat" aria-hidden="true"></span>');
   const label = `${rt.kind === 'audience' ? 'Audience score' : 'Tomatometer'} ${rt.score}%${rt.fresh ? '' : ' (rotten)'}`;
   return `<span class="rt ${rt.fresh ? 'fresh' : 'rotten'}" title="${label}">${icon}${rt.score}%</span>`;

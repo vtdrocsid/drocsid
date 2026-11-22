@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.6 — 2026-11-22
+- Smaller Rotten Tomatoes scores on poster cards
+
 ## 0.2.5 — 2026-11-22
 - Poster cards show the Rotten Tomatoes score bottom-right (tomato = fresh, splat = rotten; popcorn for
   audience score when there's no critic score). Needs the library's ratings source set to Rotten Tomatoes in Plex.
