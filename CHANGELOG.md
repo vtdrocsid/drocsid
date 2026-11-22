@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 — 2026-11-21
+- Fix 0.1.8 black screen: grouped segments now fetch Plex's pieces in order and wait for pieces
+  Plex is still writing (0.1.8 fetched them in parallel and got 404s / empty pieces)
+- Any click in the Activity starts playback / unmutes (no need to hit the button exactly)
+
 ## 0.1.8 — 2026-11-21
 - Fix periodic stutter: Plex's ~1 s segments are regrouped into ~6 s segments (fetched from Plex in
   parallel over the LAN), so far fewer requests go through Nginx and Discord's proxy

@@ -221,6 +221,11 @@ $('#stop').onclick = () => control('stop');
 $('#seek').oninput = () => { seeking = true; $('#time').textContent = `${fmt($('#seek').value)} / ${fmt(state.duration)}`; };
 $('#seek').onchange = () => { seeking = false; control('seek', Number($('#seek').value)); };
 $('#tapToPlay').onclick = () => { $('#tapToPlay').hidden = true; video.muted = false; tryPlay(); };
+// Any click or tap in the Activity counts as the "start watching" gesture browsers require.
+document.addEventListener('pointerdown', () => {
+  if (!$('#tapToPlay').hidden) { $('#tapToPlay').hidden = true; video.muted = false; tryPlay(); }
+  else if (!$('#unmute').hidden) { video.muted = false; $('#unmute').hidden = true; }
+}, true);
 $('#unmute').onclick = () => { video.muted = false; $('#unmute').hidden = true; };
 $('#volume').oninput = () => {
   video.volume = Number($('#volume').value);

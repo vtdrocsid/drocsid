@@ -305,6 +305,26 @@ app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, r
 });
 
 const seenSegments = new Set();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Fetch one Plex segment, retrying while Plex is still producing it (404 or empty). */
+async function fetchPiece(pathName, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  let wait = 250;
+  while (Date.now() < deadline) {
+    const up = await fetch(plex.plexProxyUrl(pathName)).catch(() => null);
+    if (up?.ok) {
+      const buf = Buffer.from(await up.arrayBuffer());
+      if (buf.length) return buf;
+    } else if (up && up.status !== 404) {
+      await up.arrayBuffer().catch(() => {});
+      console.warn(`[plex proxy] ${up.status} for ${pathName.split('/').pop()}`);
+    }
+    await sleep(wait);
+    wait = Math.min(wait * 1.5, 2000);
+  }
+  return null;
+}
 // Only the transcoder session paths are proxied; the rest of the Plex API stays private.
 app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) => {
   if (req.method !== 'GET' || !req.url.startsWith('/video/:/transcode/universal/session/')) return res.status(403).end();
@@ -313,26 +333,28 @@ app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) =
   const sess = ((shortPath.match(/session\/([^/]+)/) || [])[1] || '').slice(0, 8);
   res.set('Cache-Control', 'no-store');
 
-  // Grouped segment: fetch the pieces from Plex in parallel, stream them back in order.
+  // Grouped segment: fetch the pieces from Plex over the LAN and return them as one chunk.
   if (shortPath.endsWith('/grp.ts')) {
     const parts = parseGroup(new URLSearchParams(req.url.split('?')[1] || '').get('u'));
     if (!parts) return res.status(400).end();
     const started = Date.now();
-    const pieces = parts.map((name) => fetch(plex.plexProxyUrl(dir + name)));
     res.type('video/mp2t');
     let bytes = 0;
-    for (const p of pieces) {
-      const up = await p;
-      if (!up.ok) {
-        console.warn(`[plex proxy] ${up.status} for piece of ${sess} group ${parts[0]}`);
-        if (!res.headersSent) return res.status(up.status).end();
-        return res.end();
+    // Pieces in order, one at a time: Plex lists a piece slightly before it has finished writing it,
+    // and out-of-order requests can make it restart the transcode. Wait briefly for unfinished pieces.
+    for (const name of parts) {
+      const buf = await fetchPiece(dir + name);
+      if (!buf) {
+        console.warn(`[plex proxy] piece ${name} of ${sess} not ready after 30s`);
+        if (!bytes) return res.status(503).end(); // player retries the whole group
+        return res.end(); // send what we have; the player will refetch the rest
       }
-      for await (const chunk of up.body) { bytes += chunk.length; res.write(chunk); }
+      bytes += buf.length;
+      res.write(buf);
     }
     res.end();
     const ms = Date.now() - started;
-    if (!seenSegments.has(sess) || ms > 3000) {
+    if (!seenSegments.has(sess) || ms > 4000) {
       seenSegments.add(sess);
       console.log(`[plex proxy] group ${parts[0]}-${parts[parts.length - 1]} for ${sess}: ${(bytes / 1048576).toFixed(1)} MB from Plex in ${ms}ms`);
     }
