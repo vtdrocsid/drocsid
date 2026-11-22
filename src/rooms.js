@@ -75,7 +75,9 @@ async function load(room, seconds) {
     const preset = findPreset(room.quality);
     const mediaIndex = await plex.pickMediaIndex(room.item.ratingKey, preset);
     room.masterPlaylist = await plex.startTranscode({ path: room.plexKey, offset: seconds, mediaIndex, sessionId, preset });
-    room.offsetBase = Math.max(0, Math.floor(seconds));
+    // Plex's playlist always spans the whole title (EXT-X-START marks where this transcode begins),
+    // so stream time == title time; the player seeks straight to the position.
+    room.offsetBase = 0;
   }
   room.plexSession = sessionId;
   room.playlistVersion++;

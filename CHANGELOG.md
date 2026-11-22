@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.21 — 2026-11-21
+- Fix seeking: Plex's playlist after a seek still spans the whole title (filler before the seek point),
+  so the player now seeks to the real title time instead of the playlist start
+
 ## 0.1.20 — 2026-11-21
 - Fix black screen after seeking: only real MPEG-TS pieces from Plex are passed on; placeholder/empty
   replies during a transcode restart are retried instead of sent to the player
