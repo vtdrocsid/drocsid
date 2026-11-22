@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.7 — 2026-11-22
+- Libraries load more titles automatically as you scroll (no Load more button); posters lazy-load
+- A–Z jump bar on the right of the library when sorted A–Z; greyed letters have no titles
+
 ## 0.2.6 — 2026-11-22
 - Smaller Rotten Tomatoes scores on poster cards
 

@@ -42,6 +42,7 @@ function toItem(m) {
     ratingKey: m.ratingKey,
     title: label,
     shortTitle: m.title,
+    titleSort: m.titleSort || m.title,
     year: m.year,
     summary: m.summary || '',
     contentRating: m.contentRating || '',
@@ -92,6 +93,14 @@ export async function libraryItems(sectionId, { start = 0, size = 60, sort = 'ti
   });
   const mc = data.MediaContainer || {};
   return { total: mc.totalSize ?? mc.size ?? 0, items: (mc.Metadata || []).map(toItem) };
+}
+
+/** How many titles start with each character, in A–Z sort order (for the letter jump bar). */
+export async function libraryLetters(sectionId) {
+  const allowed = settings().librarySections;
+  if (allowed.length && !allowed.includes(String(sectionId))) throw new Error('Library not allowed');
+  const data = await plexGet(`/library/sections/${encodeURIComponent(sectionId)}/firstCharacter`);
+  return (data.MediaContainer?.Directory || []).map((d) => ({ key: String(d.key ?? d.title), title: String(d.title ?? d.key), size: Number(d.size) || 0 }));
 }
 
 export async function search(query) {

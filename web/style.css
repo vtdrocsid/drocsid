@@ -121,6 +121,19 @@ main { padding: 14px; min-width: 0; }
 .card { cursor: pointer; background: var(--card); border: 1px solid #cfd4da; padding: 5px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .card:hover { border-color: var(--azure); background: #f1f8ff; }
 .poster { aspect-ratio: 2/3; background: #dfe3e8 center/cover; border: 1px solid #8f98a2; display: grid; place-items: end start; overflow: hidden; }
+.poster > * { grid-area: 1 / 1; }
+.poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card.flash { border-color: var(--azure); box-shadow: 0 0 0 3px rgba(26,134,216,.45); transition: box-shadow .3s; }
+
+/* Grid with the A–Z bar on its right */
+.grid-wrap { display: flex; gap: 10px; align-items: flex-start; }
+.grid-col { flex: 1; min-width: 0; }
+.letters { position: sticky; top: 10px; flex: none; display: flex; flex-direction: column; gap: 1px; padding: 4px 3px;
+  background: linear-gradient(var(--navy3), var(--navy2)); border: 1px solid #041d38; border-radius: 3px; max-height: calc(100vh - 110px); overflow: auto; }
+.letters button { width: 24px; padding: 1px 0; border: 0; background: none; color: #fff; font: bold 11px var(--tiny); cursor: pointer; border-radius: 2px; }
+.letters button:hover:not([disabled]) { background: var(--azure); }
+.letters button.active { background: var(--azure2); color: #fff; }
+.letters button[disabled] { color: #5b7593; cursor: default; }
 .badge { margin: 5px; padding: 0 5px; background: var(--navy); color: #fff; font: bold 10px var(--tiny); letter-spacing: 1px; }
 .card .t { margin-top: 5px; font-weight: bold; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card .s { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 6px; }

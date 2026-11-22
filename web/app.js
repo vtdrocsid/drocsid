@@ -65,8 +65,9 @@ function rtBadge(rt) {
 function card(item) {
   const sub = item.kind === 'show' ? `${item.childCount || ''} season${item.childCount === 1 ? '' : 's'}`
     : item.kind === 'episode' ? 'Episode' : item.year || '';
-  const el = h(`<div class="card">
-    <div class="poster" style="background-image:url('${thumb(item.thumb)}')">${item.kind === 'show' ? '<span class="badge">TV</span>' : ''}</div>
+  // <img loading="lazy">: posters only download as they scroll into view, so long libraries stay fast.
+  const el = h(`<div class="card" data-letter="${esc(firstLetter(item))}">
+    <div class="poster">${item.thumb ? `<img loading="lazy" alt="" src="${thumb(item.thumb)}">` : ''}${item.kind === 'show' ? '<span class="badge">TV</span>' : ''}</div>
     <div class="t" title="${esc(item.title)}">${esc(item.kind === 'episode' ? item.title : item.shortTitle || item.title)}</div>
     <div class="s"><span>${esc(sub)}</span>${rtBadge(item.rt)}</div></div>`);
   el.onclick = () => openDetail(item.ratingKey);
@@ -99,15 +100,78 @@ async function loadLibraries() {
   if (!libs.length) box.prepend(h('<span class="muted small">No libraries available.</span>'));
   showTab(location.hash.slice(1) || 'libraries');
 }
-async function loadItems(reset) {
-  if (reset) { libStart = 0; $('#grid').innerHTML = ''; }
-  const { items, total } = await api(`/api/libraries/${curLib}/items?start=${libStart}&size=60&sort=${$('#sort').value}`);
-  items.forEach((it) => $('#grid').append(card(it)));
-  libStart += items.length;
-  $('#more').hidden = libStart >= total;
+// Infinite scroll: a sentinel under the grid loads the next page as it nears the screen.
+let libTotal = 0, loadGen = 0, loadingItems = null, letterCounts = [];
+const PAGE = 60;
+function firstLetter(item) {
+  const c = (item.titleSort || item.shortTitle || item.title || '').trim().charAt(0).toUpperCase();
+  return /[A-Z]/.test(c) ? c : '#';
+}
+async function loadItems(reset, size = PAGE) {
+  if (reset) {
+    loadGen++;
+    libStart = 0; libTotal = Infinity;
+    $('#grid').innerHTML = '';
+    loadingItems = null;
+    loadLetters();
+  }
+  if (loadingItems) return loadingItems;
+  if (libStart >= libTotal) return;
+  const gen = loadGen;
+  $('#more').hidden = false;
+  loadingItems = (async () => {
+    const { items, total } = await api(`/api/libraries/${curLib}/items?start=${libStart}&size=${size}&sort=${$('#sort').value}`);
+    if (gen !== loadGen) return; // a newer library/sort replaced this one
+    items.forEach((it) => $('#grid').append(card(it)));
+    libStart += items.length;
+    libTotal = total;
+  })();
+  try { await loadingItems; } catch (e) { toast(e.message); } finally { if (gen === loadGen) loadingItems = null; }
+  $('#more').hidden = libStart >= libTotal;
+  if (libStart < libTotal && nearBottom()) loadItems(false); // screen still not full
+}
+function nearBottom() {
+  const r = $('#more').getBoundingClientRect();
+  return !$('#more').hidden && r.top < window.innerHeight + 800;
+}
+new IntersectionObserver((entries) => {
+  if (entries.some((e) => e.isIntersecting) && curLib && !$('#tab-libraries').hidden) loadItems(false);
+}, { rootMargin: '800px 0px' }).observe($('#more'));
+
+// A–Z jump bar (only when sorted A–Z): Plex says how many titles start with each character,
+// so the first title for a letter sits at the sum of the counts before it.
+async function loadLetters() {
+  const bar = $('#letters');
+  bar.hidden = $('#sort').value !== 'title';
+  if (bar.hidden) return;
+  const lib = curLib;
+  try { letterCounts = await api(`/api/libraries/${lib}/letters`); } catch { letterCounts = []; }
+  if (lib !== curLib) return;
+  const have = new Map(letterCounts.map((l) => [l.title.toUpperCase(), l.size]));
+  const hasNum = letterCounts.some((l) => !/^[A-Z]$/i.test(l.title));
+  bar.innerHTML = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].map((L) => {
+    const n = L === '#' ? (hasNum ? 1 : 0) : (have.get(L) || 0);
+    return `<button data-l="${L}" ${n ? '' : 'disabled'}>${L}</button>`;
+  }).join('');
+  bar.querySelectorAll('button').forEach((b) => { b.onclick = () => jumpTo(b.dataset.l); });
+}
+async function jumpTo(L) {
+  // Offset of the first title for this letter = titles in all earlier characters.
+  let offset = 0;
+  for (const l of letterCounts) {
+    const key = /^[A-Z]$/i.test(l.title) ? l.title.toUpperCase() : '#';
+    if (key === L) break;
+    offset += l.size;
+  }
+  $('#letters').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.l === L));
+  while (libStart <= offset && libStart < libTotal) await loadItems(false, 300);
+  const target = $('#grid').children[offset] || [...$('#grid').children].find((c) => c.dataset.letter === L);
+  if (!target) return;
+  window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 12, behavior: 'smooth' });
+  target.classList.add('flash');
+  setTimeout(() => target.classList.remove('flash'), 1400);
 }
 $('#sort').onchange = () => curLib && loadItems(true);
-$('#more').onclick = () => loadItems(false);
 
 // ---------- search (top bar, live results, max 7) ----------
 const MAX_RESULTS = 7;

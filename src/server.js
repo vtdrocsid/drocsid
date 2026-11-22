@@ -139,9 +139,13 @@ app.get('/api/libraries', needSession, needApproved, wrap(async (req, res) => re
 app.get('/api/libraries/:id/items', needSession, needApproved, wrap(async (req, res) => {
   res.json(await plex.libraryItems(req.params.id, {
     start: Math.max(0, Number(req.query.start) || 0),
-    size: Math.min(100, Number(req.query.size) || 60),
+    size: Math.min(300, Number(req.query.size) || 60),
     sort: String(req.query.sort || 'title'),
   }));
+}));
+
+app.get('/api/libraries/:id/letters', needSession, needApproved, wrap(async (req, res) => {
+  res.json(await plex.libraryLetters(req.params.id));
 }));
 
 app.get('/api/search', needSession, needApproved, wrap(async (req, res) => {

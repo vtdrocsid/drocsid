@@ -57,8 +57,13 @@
               <option value="released">Release date</option>
             </select>
           </div>
-          <div id="grid" class="grid"></div>
-          <div class="center"><button id="more" class="btn" hidden>Load more</button></div>
+          <div class="grid-wrap">
+            <div class="grid-col">
+              <div id="grid" class="grid"></div>
+              <div id="more" class="center muted small" hidden>Loading more…</div>
+            </div>
+            <nav id="letters" class="letters" hidden aria-label="Jump to letter"></nav>
+          </div>
         </section>
         <section id="tab-live" class="tab secbody" hidden>
           <div class="sec-row">
