@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8 — 2026-11-21
+- Fix periodic stutter: Plex's ~1 s segments are regrouped into ~6 s segments (fetched from Plex in
+  parallel over the LAN), so far fewer requests go through Nginx and Discord's proxy
+- Player logs segment download times; server logs Plex fetch times for grouped segments
+
 ## 0.1.7 — 2026-11-21
 - Smoother playback: sync ignores drift under 1s, corrects with ±3% speed (was ±5% at 0.3s), seeks only past 4s
 - Stable server-clock estimate (no more target jitter from network latency)

@@ -109,7 +109,13 @@ function loadStream() {
       else { console.error(d); setTimeout(loadStream, 2000); }
     });
     hls.on(Hls.Events.MANIFEST_PARSED, (_, d) => report(`manifest ok: ${d.levels.length} level(s) ${d.levels.map((l) => `${l.width}x${l.height} ${l.videoCodec || ''}/${l.audioCodec || ''}`).join(', ')}`));
-    hls.on(Hls.Events.FRAG_BUFFERED, (_, d) => { if (d.frag.sn <= 1) report(`first segment buffered (sn ${d.frag.sn})`); });
+    let fragCount = 0;
+    hls.on(Hls.Events.FRAG_LOADED, (_, d) => {
+      const st = d.frag.stats, ms = Math.round(st.loading.end - st.loading.start);
+      if (fragCount++ < 3 || fragCount % 20 === 0 || ms > d.frag.duration * 1000) {
+        report(`segment ${d.frag.sn}: ${d.frag.duration.toFixed(1)}s of video, ${(st.total / 1048576).toFixed(1)} MB, downloaded in ${ms}ms, buffer ahead ${bufferedAhead().toFixed(1)}s`);
+      }
+    });
     hls.loadSource(src);
     hls.attachMedia(video);
   } else {

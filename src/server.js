@@ -12,6 +12,7 @@ import * as auth from './auth.js';
 import * as plex from './plex.js';
 import * as rooms from './rooms.js';
 import { announce } from './bot.js';
+import { groupPlaylist, parseGroup, GROUP } from './hlsgroup.js';
 import { readFileSync } from 'node:fs';
 
 const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -307,19 +308,48 @@ const seenSegments = new Set();
 // Only the transcoder session paths are proxied; the rest of the Plex API stays private.
 app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) => {
   if (req.method !== 'GET' || !req.url.startsWith('/video/:/transcode/universal/session/')) return res.status(403).end();
-  const upstream = await fetch(plex.plexProxyUrl(req.url));
   const shortPath = req.url.split('?')[0];
-  if (!upstream.ok) console.warn(`[plex proxy] ${upstream.status} for ${shortPath}`);
-  else if (!shortPath.endsWith('.m3u8')) {
-    const sess = (shortPath.match(/session\/([^/]+)/) || [])[1];
-    if (sess && !seenSegments.has(sess)) {
-      seenSegments.add(sess);
-      console.log(`[plex proxy] first segment for session ${sess.slice(0, 8)}: ${upstream.headers.get('content-type')} ${upstream.headers.get('content-length') || '?'} bytes`);
+  const dir = shortPath.slice(0, shortPath.lastIndexOf('/') + 1);
+  const sess = ((shortPath.match(/session\/([^/]+)/) || [])[1] || '').slice(0, 8);
+  res.set('Cache-Control', 'no-store');
+
+  // Grouped segment: fetch the pieces from Plex in parallel, stream them back in order.
+  if (shortPath.endsWith('/grp.ts')) {
+    const parts = parseGroup(new URLSearchParams(req.url.split('?')[1] || '').get('u'));
+    if (!parts) return res.status(400).end();
+    const started = Date.now();
+    const pieces = parts.map((name) => fetch(plex.plexProxyUrl(dir + name)));
+    res.type('video/mp2t');
+    let bytes = 0;
+    for (const p of pieces) {
+      const up = await p;
+      if (!up.ok) {
+        console.warn(`[plex proxy] ${up.status} for piece of ${sess} group ${parts[0]}`);
+        if (!res.headersSent) return res.status(up.status).end();
+        return res.end();
+      }
+      for await (const chunk of up.body) { bytes += chunk.length; res.write(chunk); }
     }
+    res.end();
+    const ms = Date.now() - started;
+    if (!seenSegments.has(sess) || ms > 3000) {
+      seenSegments.add(sess);
+      console.log(`[plex proxy] group ${parts[0]}-${parts[parts.length - 1]} for ${sess}: ${(bytes / 1048576).toFixed(1)} MB from Plex in ${ms}ms`);
+    }
+    return;
   }
+
+  const upstream = await fetch(plex.plexProxyUrl(req.url));
+  if (!upstream.ok) console.warn(`[plex proxy] ${upstream.status} for ${shortPath}`);
+
+  // Media playlist: regroup Plex's ~1 s segments into ~6 s ones.
+  if (upstream.ok && shortPath.endsWith('.m3u8')) {
+    const text = await upstream.text();
+    return res.type('application/vnd.apple.mpegurl').send(groupPlaylist(text, GROUP));
+  }
+
   res.status(upstream.status);
   for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
-  res.set('Cache-Control', 'no-store');
   if (upstream.body) Readable.fromWeb(upstream.body).pipe(res);
   else res.end();
 }));
