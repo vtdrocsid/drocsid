@@ -238,6 +238,8 @@ function renderGuide() {
           <div class="g-in"><div class="pt">${esc(p.title)}</div>
           <div class="ps">${clock(p.start)}–${clock(p.stop)}${p.subtitle ? ' · ' + esc(p.subtitle) : ''}</div>
           ${p.desc ? `<div class="pd">${esc(p.desc)}</div>` : ''}</div></div>`);
+        el.onmouseenter = () => { if (labelCutOff(el)) el.classList.add('expand'); };
+        el.onmouseleave = () => el.classList.remove('expand');
         el.onclick = () => choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` });
         track.append(el);
       });
@@ -250,6 +252,13 @@ function renderGuide() {
     box.append(line);
   }
   box.scrollLeft = Math.max(0, x(now) - 120);
+}
+/** True when a guide block's title/details are truncated, or the block is partly scrolled under the channel column. */
+function labelCutOff(el) {
+  const cut = (n) => n && n.scrollWidth > n.clientWidth + 1;
+  if (cut($('.pt', el)) || cut($('.ps', el))) return true;
+  const chEdge = $('.g-ch', el.closest('.g-row')).getBoundingClientRect().right;
+  return el.getBoundingClientRect().left < chEdge - 1;
 }
 $('#chfilter').oninput = () => guideData && renderGuide();
 setInterval(() => { if (!$('#tab-live').hidden) loadGuide(); }, 5 * 60_000);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13 — 2026-11-21
+- Guide: hover details only appear when a show's label is cut off (short block or scrolled under the channel column)
+- Activity: live TV control bar matches library titles (● LIVE in the progress bar's place; volume and stop on the right)
+
 ## 0.1.12 — 2026-11-21
 - Live TV: find Plex's live session anywhere in the tune reply (fixes "could not tune" with free tuners);
   logs the raw reply if it still can't

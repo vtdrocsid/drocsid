@@ -212,6 +212,7 @@ function applyState(s) {
   $('#badge').classList.toggle('live', isLive());
   $('#playPause').textContent = s.playing ? '⏸' : '▶';
   $('#seek').hidden = isLive();
+  $('#liveTag').hidden = !isLive(); // takes the progress bar's place so the controls line up the same
   if (!isLive()) $('#seek').max = Math.floor(s.duration);
 
   if (loadedVersion !== s.playlistVersion) return loadStream();

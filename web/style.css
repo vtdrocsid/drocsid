@@ -81,11 +81,11 @@ dialog::backdrop { background: rgba(0,0,0,.65); }
 .g-prog .pt { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .g-prog .ps { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .g-prog .pd { display: none; }
-/* Hover: expand over the guide with the full title, time, episode and description. */
-.g-prog:hover { z-index: 4; overflow: visible; bottom: auto; min-height: 48px; width: max-content !important; min-width: var(--w); max-width: 420px; border-color: var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.55); background: var(--panel); }
-.g-prog:hover .g-in { position: static; max-width: none; }
-.g-prog:hover .pt, .g-prog:hover .ps { white-space: normal; overflow: visible; }
-.g-prog:hover .pd { display: block; margin-top: 4px; color: var(--text); font-size: 12px; line-height: 1.4; max-height: 9em; overflow: hidden; }
+/* Hover: expand over the guide with full details, but only when the label is cut off (class set in app.js). */
+.g-prog.expand { z-index: 4; overflow: visible; bottom: auto; min-height: 48px; width: max-content !important; min-width: var(--w); max-width: 420px; border-color: var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.55); background: var(--panel); }
+.g-prog.expand .g-in { position: static; max-width: none; }
+.g-prog.expand .pt, .g-prog.expand .ps { white-space: normal; overflow: visible; }
+.g-prog.expand .pd { display: block; margin-top: 4px; color: var(--text); font-size: 12px; line-height: 1.4; max-height: 9em; overflow: hidden; }
 .g-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); padding: 8px 6px; font-size: 12px; color: var(--muted); }
 .g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 1; pointer-events: none; }
 
