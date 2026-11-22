@@ -384,13 +384,30 @@ async function choosePlay(target) {
   const dlg = $('#playDlg');
   $('#playTitle').textContent = `Play: ${target.title}`;
   $('#playErr').textContent = '';
-  const { current, channels } = await api('/api/voice');
+  const { current, channels, textChannels = [] } = await api('/api/voice');
   const sel = $('#voiceSel');
   sel.innerHTML = channels.map((c) => `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>🔊 ${esc(c.name)}${c.members.length ? ` (${c.members.length})` : ''}${c.nowPlaying.active ? ' — playing' : ''}</option>`).join('');
   $('#voiceHint').textContent = current ? 'Defaulted to the channel you are in.' : "Tip: join a voice channel in Discord first, then open Activities (🚀) to watch.";
+  // Optional "now playing" post in a text channel; the last choice is remembered on this browser.
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('drocsid.announce') || '{}'); } catch {}
+  const annOn = $('#annOn'), annSel = $('#annSel');
+  $('#annBox').hidden = !textChannels.length;
+  let lastCat = null;
+  annSel.innerHTML = textChannels.map((c) => {
+    const head = c.category !== lastCat ? `${lastCat !== null ? '</optgroup>' : ''}<optgroup label="${esc(c.category || 'Text channels')}">` : '';
+    lastCat = c.category;
+    return `${head}<option value="${c.id}">#${esc(c.name)}</option>`;
+  }).join('') + (textChannels.length ? '</optgroup>' : '');
+  if (textChannels.some((c) => c.id === saved.channel)) annSel.value = saved.channel;
+  annOn.checked = !!saved.on && textChannels.length > 0;
+  annSel.disabled = !annOn.checked;
+  annOn.onchange = () => { annSel.disabled = !annOn.checked; };
   dlg.showModal();
   const start = async (extra = {}) => {
-    await api('/api/play', { method: 'POST', body: JSON.stringify({ ...target, voiceChannelId: sel.value, ...extra }) });
+    const announceChannelId = annOn.checked ? annSel.value : undefined;
+    try { localStorage.setItem('drocsid.announce', JSON.stringify({ on: annOn.checked, channel: annSel.value })); } catch {}
+    await api('/api/play', { method: 'POST', body: JSON.stringify({ ...target, voiceChannelId: sel.value, announceChannelId, ...extra }) });
     dlg.close();
     $('#detail').close();
     toast('Started. Open Activities (🚀) in that voice channel to watch.');

@@ -62,6 +62,17 @@ export function voiceChannels(guildId = config.guildId) {
     .map((c) => ({ id: c.id, name: c.name, members: c.members.map((m) => m.displayName) }));
 }
 
+/** Text channels the bot can post in, for "now playing" announcements. */
+export function textChannels(guildId = config.guildId) {
+  const guild = discordClient?.guilds.cache.get(guildId);
+  const me = guild?.members.me;
+  if (!guild || !me) return [];
+  return guild.channels.cache
+    .filter((c) => (c.type === 0 || c.type === 5) && c.permissionsFor(me)?.has(['ViewChannel', 'SendMessages', 'EmbedLinks']))
+    .sort((a, b) => (a.parent?.rawPosition ?? -1) - (b.parent?.rawPosition ?? -1) || a.rawPosition - b.rawPosition)
+    .map((c) => ({ id: c.id, name: c.name, category: c.parent?.name || '' }));
+}
+
 export function logout(token) { sessions.delete(token); }
 
 /** The voice channel the user is currently sitting in, or null. */

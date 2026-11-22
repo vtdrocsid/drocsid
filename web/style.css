@@ -317,3 +317,9 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .dt .hc-foot .btn { font-size: 13px; padding: 7px 18px; }
 @media (max-width: 600px) { .dt-main { flex-direction: column; } .dt-poster { width: 120px; } }
 .dt .hc-head .hc-tt { flex: 1; }
+
+/* "Announce in a text channel" option in the Play dialog */
+.announce { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: #f1f8ff; border: 1px solid #b9d9f5; }
+.announce[hidden] { display: none; }
+.announce .chk { flex-direction: row; align-items: center; gap: 7px; cursor: pointer; }
+.announce select:disabled { opacity: .5; }

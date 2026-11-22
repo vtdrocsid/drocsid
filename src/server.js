@@ -11,7 +11,7 @@ import * as settingsMod from './settings.js';
 import * as auth from './auth.js';
 import * as plex from './plex.js';
 import * as rooms from './rooms.js';
-import { announce } from './bot.js';
+import { announce, announceNowPlaying } from './bot.js';
 import { groupPlaylist, parseGroup, GROUP } from './hlsgroup.js';
 import * as history from './history.js';
 import * as schedule from './schedule.js';
@@ -215,11 +215,12 @@ app.get('/api/voice', needSession, needApproved, (req, res) => {
     current: auth.voiceChannelOf(req.session.userId),
     qualities: QUALITY_PRESETS.map(({ id, label }) => ({ id, label })),
     channels: auth.voiceChannels().map((c) => ({ ...c, nowPlaying: rooms.publicState(rooms.get(c.id)) })),
+    textChannels: auth.textChannels(),
   });
 });
 
 app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
-  const { source, ratingKey, channelId: liveId, voiceChannelId, replace = false, stopMine = false } = req.body || {};
+  const { source, ratingKey, channelId: liveId, voiceChannelId, replace = false, stopMine = false, announceChannelId } = req.body || {};
   const channels = auth.voiceChannels();
   const channel = channels.find((c) => c.id === voiceChannelId);
   if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
@@ -249,6 +250,9 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
 
   const item = await resolveItem(source, ratingKey, liveId);
   await startStream(channel, item, me);
+  if (announceChannelId && auth.textChannels().some((c) => c.id === announceChannelId)) {
+    announceNowPlaying(announceChannelId, { item, voiceChannelId: channel.id, startedBy: me.name });
+  }
   res.json({ ok: true, state: rooms.publicState(rooms.get(voiceChannelId)) });
 }));
 

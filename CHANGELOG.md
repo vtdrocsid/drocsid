@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.10 — 2026-11-22
+- Play dialog: optional "📣 Announce it in a text channel" with a channel drop-down. The bot posts a
+  now-playing card (poster, year/rating/runtime, synopsis, link to the voice channel). The choice is
+  remembered for next time. Only channels the bot can post in are listed.
+
 ## 0.2.9 — 2026-11-22
 - The details window now matches the hover card: navy title bar (rating, year, runtime, Rotten Tomatoes),
   poster beside the tagline, full synopsis, genres, director and up to 10 cast members with headshots
