@@ -81,6 +81,12 @@ function expectedPosition() {
 }
 const mediaStart = () => (video.seekable.length ? video.seekable.start(0) : 0);
 const isLive = () => state.source === 'live';
+function bufferedAhead() {
+  for (let i = 0; i < video.buffered.length; i++) {
+    if (video.buffered.start(i) <= video.currentTime && video.buffered.end(i) >= video.currentTime) return video.buffered.end(i) - video.currentTime;
+  }
+  return 0;
+}
 
 function loadStream() {
   loadedVersion = state.playlistVersion;
@@ -89,7 +95,10 @@ function loadStream() {
   if (Hls.isSupported()) {
     hls = new Hls({
       maxBufferLength: 30,
-      liveSyncDuration: 6,
+      // Plex's playlist grows while it transcodes, so hls.js sees it as "live". For library titles,
+      // stop hls.js from jumping toward the live edge on its own; our sync handles position.
+      ...(isLive() ? { liveSyncDuration: 6 } : { liveMaxLatencyDurationCount: Infinity, liveSyncDurationCount: 3 }),
+      backBufferLength: 30,
       startPosition: isLive() ? -1 : Math.max(0, expectedPosition() - state.offsetBase),
     });
     hls.on(Hls.Events.ERROR, (_, d) => {
@@ -106,7 +115,18 @@ function loadStream() {
   } else {
     video.src = src; // Safari / iOS Discord: native HLS
   }
-  video.addEventListener('loadedmetadata', () => { report(`video metadata ${video.videoWidth}x${video.videoHeight}`); sync(true); tryPlay(); }, { once: true });
+  video.addEventListener('loadedmetadata', () => {
+    baseMediaStart = mediaStart();
+    report(`video metadata ${video.videoWidth}x${video.videoHeight}, media starts at ${baseMediaStart.toFixed(2)}s`);
+    sync(true);
+    tryPlay();
+  }, { once: true });
+  let stalledAt = 0;
+  video.onwaiting = () => { stalledAt = Date.now(); };
+  video.onplaying = () => {
+    if (stalledAt) report(`stall: buffered for ${((Date.now() - stalledAt) / 1000).toFixed(1)}s at ${video.currentTime.toFixed(0)}s (buffer ahead ${bufferedAhead().toFixed(1)}s)`);
+    stalledAt = 0;
+  };
   video.onerror = () => report(`video element error ${video.error?.code} ${video.error?.message || ''}`);
 }
 
@@ -123,26 +143,46 @@ async function tryPlay() {
   }
 }
 
+// Sync policy: leave small drift alone, nudge gently for medium drift, seek only for large drift.
+// Rate changes stay tiny (±3%) so they're inaudible, and nothing is corrected while buffering.
+let baseMediaStart = 0, correcting = false, settleUntil = 0;
 function sync(force = false) {
   if (!state.active || video.readyState < 1) return;
   if (state.playing && video.paused && $('#tapToPlay').hidden) tryPlay();
   if (!state.playing && !video.paused) video.pause();
   if (isLive()) return;
+  if (!force && (video.seeking || video.readyState < 3 || Date.now() < settleUntil)) return;
 
-  const target = expectedPosition() - state.offsetBase + mediaStart();
+  const target = expectedPosition() - state.offsetBase + baseMediaStart;
   const drift = video.currentTime - target;
-  if (force || Math.abs(drift) > 2) {
+  const abs = Math.abs(drift);
+  if (force || abs > 4) {
+    if (!force) report(`resync: was ${drift.toFixed(1)}s off`);
     video.currentTime = Math.max(0, target);
     video.playbackRate = 1;
-  } else if (Math.abs(drift) > 0.3) {
-    video.playbackRate = drift > 0 ? 0.95 : 1.05; // ease back into sync without a visible jump
-  } else {
+    correcting = false;
+    settleUntil = Date.now() + 5000; // give the decoder time before judging drift again
+  } else if (abs > 1 || (correcting && abs > 0.2)) {
+    correcting = true;
+    video.playbackRate = drift > 0 ? 0.97 : 1.03;
+  } else if (correcting || video.playbackRate !== 1) {
+    correcting = false;
     video.playbackRate = 1;
   }
 }
 
+// Clock offset to the server. Each sample = true offset minus network delay, so the largest recent
+// sample is the most accurate; using it keeps the target position from jittering with latency.
+const skewSamples = [];
+function updateSkew(serverTime) {
+  if (!serverTime) return;
+  skewSamples.push(serverTime - Date.now());
+  if (skewSamples.length > 12) skewSamples.shift();
+  clockSkew = Math.max(...skewSamples);
+}
+
 function applyState(s) {
-  clockSkew = s.serverTime ? s.serverTime - Date.now() : clockSkew;
+  updateSkew(s.serverTime);
   const wasPlaying = state.playing;
   state = s;
   stateAt = Date.now();

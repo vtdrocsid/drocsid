@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 — 2026-11-21
+- Smoother playback: sync ignores drift under 1s, corrects with ±3% speed (was ±5% at 0.3s), seeks only past 4s
+- Stable server-clock estimate (no more target jitter from network latency)
+- hls.js no longer jumps toward a "live edge" on library titles while Plex is still transcoding
+- No corrections while buffering or right after a seek
+- Real buffering stalls are logged to the container log
+
 ## 0.1.6 — 2026-11-21
 - Quality moved from the admin page to the player bar (per stream); changing it restarts that stream in place
 - New streams default to the last quality picked
