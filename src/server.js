@@ -228,8 +228,11 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
   res.json({ ok: true, state: rooms.publicState(rooms.get(voiceChannelId)) });
 }));
 
-async function control(roomId, action, seconds, quality) {
-  if (!rooms.get(roomId)) throw Object.assign(new Error('Nothing playing there'), { status: 404 });
+async function control(roomId, action, seconds, quality, userId) {
+  const room = rooms.get(roomId);
+  if (!room) throw Object.assign(new Error('Nothing playing there'), { status: 404 });
+  // Only the person who started the stream controls it (admins can still stop it from the admin page).
+  if (room.startedById !== userId) throw Object.assign(new Error(`Only ${room.startedBy} can control this stream.`), { status: 403 });
   if (action === 'pause') rooms.pause(roomId);
   else if (action === 'resume') await rooms.resume(roomId);
   else if (action === 'seek') await rooms.seek(roomId, Number(seconds) || 0);
@@ -243,7 +246,7 @@ async function control(roomId, action, seconds, quality) {
 }
 
 app.post('/api/control', needSession, needApproved, wrap(async (req, res) => {
-  await control(String(req.body.voiceChannelId), req.body.action, req.body.seconds, req.body.quality);
+  await control(String(req.body.voiceChannelId), req.body.action, req.body.seconds, req.body.quality, req.session.userId);
   res.json({ ok: true });
 }));
 
@@ -410,7 +413,7 @@ export function startServer() {
     if (!subs.has(roomId)) subs.set(roomId, new Set());
     subs.get(roomId).add(ws);
     rooms.setViewers(roomId, subs.get(roomId).size);
-    send(ws, { type: 'hello', canControl: isApproved });
+    send(ws, { type: 'hello', userId: session.userId });
     send(ws, { type: 'state', state: rooms.publicState(rooms.get(roomId)) });
 
     ws.on('message', async (raw) => {
@@ -418,8 +421,8 @@ export function startServer() {
       try { msg = JSON.parse(raw); } catch { return; }
       if (msg.type === 'clientlog') return console.warn(`[player ${session.username}] ${String(msg.text).slice(0, 500)}`);
       if (msg.type === 'sync') return send(ws, { type: 'state', state: rooms.publicState(rooms.get(roomId)) });
-      if (msg.type === 'control' && isApproved) {
-        try { await control(roomId, msg.action, msg.seconds, msg.quality); } catch (e) { send(ws, { type: 'error', error: e.message }); }
+      if (msg.type === 'control') {
+        try { await control(roomId, msg.action, msg.seconds, msg.quality, session.userId); } catch (e) { send(ws, { type: 'error', error: e.message }); }
       }
     });
     ws.on('close', (code) => {

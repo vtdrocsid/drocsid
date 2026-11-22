@@ -265,25 +265,26 @@ function renderNowPlaying(active) {
   bar.innerHTML = '';
   active.forEach((c) => {
     const s = c.nowPlaying;
+    const mine = me && s.startedById === me.id;
     const el = h(`<div class="np-item">
       <div class="meta"><div><b>${esc(s.title)}</b></div><div class="ch">🔊 ${esc(c.name)} · started by ${esc(s.startedBy)} · ${c.members.length} in channel</div></div>
-      <select class="quality" title="Stream quality">${qualities.map((q) => `<option value="${q.id}" ${q.id === s.quality ? 'selected' : ''}>${esc(q.label)}</option>`).join('')}</select>
-      <button class="btn sm" data-a="${s.playing ? 'pause' : 'resume'}">${s.playing ? '⏸' : '▶'}</button>
-      ${s.duration ? `<input type="range" min="0" max="${Math.floor(s.duration)}" value="${Math.floor(s.position)}">
+      ${mine ? `<select class="quality" title="Stream quality">${qualities.map((q) => `<option value="${q.id}" ${q.id === s.quality ? 'selected' : ''}>${esc(q.label)}</option>`).join('')}</select>
+      <button class="btn sm" data-a="${s.playing ? 'pause' : 'resume'}">${s.playing ? '⏸' : '▶'}</button>` : `<span class="time">${s.playing ? '▶ Playing' : '⏸ Paused'}</span>`}
+      ${s.duration ? `<input type="range" min="0" max="${Math.floor(s.duration)}" value="${Math.floor(s.position)}" ${mine ? '' : 'disabled'}>
         <span class="time">${fmt(s.position)} / ${fmt(s.duration)}</span>` : '<span class="time">LIVE</span>'}
-      <button class="btn sm danger" data-a="stop">Stop</button></div>`);
+      ${mine ? '<button class="btn sm danger" data-a="stop">Stop</button>' : ''}</div>`);
     const control = (action, seconds) => api('/api/control', { method: 'POST', body: JSON.stringify({ voiceChannelId: c.id, action, seconds }) })
       .then(() => pollNowPlaying(true)).catch((e) => toast(e.message));
     el.querySelectorAll('[data-a]').forEach((b) => { b.onclick = () => control(b.dataset.a); });
     const qSel = $('select.quality', el);
-    qSel.onchange = () => {
+    if (qSel) qSel.onchange = () => {
       qSel.disabled = true;
       toast('Changing quality… viewers will rejoin in a few seconds');
       api('/api/control', { method: 'POST', body: JSON.stringify({ voiceChannelId: c.id, action: 'quality', quality: qSel.value }) })
         .then(() => { qSel.blur(); pollNowPlaying(true); }).catch((e) => { toast(e.message); qSel.disabled = false; });
     };
     const range = $('input[type=range]', el);
-    if (range) {
+    if (range && mine) {
       range.oninput = () => { $('.time', el).textContent = `${fmt(range.value)} / ${fmt(s.duration)}`; };
       range.onchange = () => { control('seek', Number(range.value)); range.blur(); };
     }

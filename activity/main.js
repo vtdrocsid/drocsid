@@ -11,7 +11,9 @@ const fmt = (s) => {
   return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + `:${String(sec).padStart(2, '0')}`;
 };
 
-let token = null, ws = null, hls = null, canControl = false, publicUrl = '';
+let token = null, ws = null, hls = null, myId = null, publicUrl = '';
+// Only the person who started the stream gets working controls.
+const canControl = () => !!myId && state.startedById === myId;
 let state = { active: false }, stateAt = 0, clockSkew = 0, loadedVersion = null, seeking = false;
 
 function screen(title, html = '') {
@@ -47,8 +49,8 @@ function connect(channelId) {
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === 'hello') {
-      canControl = msg.canControl;
-      $('#ui').classList.toggle('viewer-only', !canControl);
+      myId = msg.userId;
+      $('#ui').classList.toggle('viewer-only', !canControl());
     }
     if (msg.type === 'state') applyState(msg.state);
     if (msg.type === 'error') console.warn(msg.error);
@@ -70,7 +72,7 @@ const report = (text) => {
   console.warn(text);
   if (ws?.readyState === 1) send({ type: 'clientlog', text }); else pending.push(text);
 };
-const control = (action, seconds) => canControl && send({ type: 'control', action, seconds });
+const control = (action, seconds) => canControl() && send({ type: 'control', action, seconds });
 
 // ---------- playback ----------
 function expectedPosition() {
@@ -204,6 +206,7 @@ function applyState(s) {
 
   $('#screen').hidden = true;
   $('#ui').hidden = false;
+  $('#ui').classList.toggle('viewer-only', !canControl());
   $('#title').textContent = s.title;
   $('#badge').textContent = isLive() ? 'LIVE' : `Started by ${s.startedBy}`;
   $('#badge').classList.toggle('live', isLive());

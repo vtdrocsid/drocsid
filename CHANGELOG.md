@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.10 — 2026-11-21
+- Only the person who started a stream can pause/resume, scrub, change quality or stop it
+  (Activity and Browse player bar; enforced on the server). Admins can still stop any stream from Admin.
+- Everyone else sees title, progress and play state without controls
+
 ## 0.1.9 — 2026-11-21
 - Fix 0.1.8 black screen: grouped segments now fetch Plex's pieces in order and wait for pieces
   Plex is still writing (0.1.8 fetched them in parallel and got 404s / empty pieces)
