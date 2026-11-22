@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.14 — 2026-11-22
+- Search box is vertically centred in the header, level with the logo and sign-in
+
 ## 0.2.13 — 2026-11-22
 - Logo and Signed in / Sign out are vertically centred in the header (search above the tabs is unchanged)
 
