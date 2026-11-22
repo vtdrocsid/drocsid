@@ -209,6 +209,17 @@ export async function liveStatus() {
   } catch (e) { return { available: false, error: e.message }; }
 }
 
+/** A channel plus what's on it now and next, for the Discord "now playing" post. */
+export async function liveNow(id) {
+  const ch = (await liveChannels()).find((c) => c.id === id);
+  if (!ch) return null;
+  const t = Date.now();
+  let progs = [];
+  try { progs = (await guide(t - 6 * 3600_000, t + 6 * 3600_000, [id]))[0]?.programmes || []; } catch {}
+  const i = progs.findIndex((p) => p.start <= t && p.stop > t);
+  return { channel: ch, now: i >= 0 ? progs[i] : null, next: i >= 0 ? progs[i + 1] || null : progs.find((p) => p.start > t) || null };
+}
+
 export async function liveChannel(id) {
   const c = (await liveChannels()).find((ch) => ch.id === id);
   if (!c) throw new Error('Channel not found');
@@ -232,6 +243,14 @@ async function gridFor(provider, gridKey, date) {
         title: m.grandparentTitle || m.title,
         subtitle: m.grandparentTitle ? m.title : '',
         desc: m.summary || '',
+        // Extra guide details used by the "now playing" post.
+        thumb: m.grandparentThumb || m.thumb || m.parentThumb || '',
+        season: m.parentIndex ?? null,
+        episode: m.index ?? null,
+        year: m.year || null,
+        contentRating: m.contentRating || '',
+        genres: (m.Genre || []).map((g) => g.tag).filter(Boolean).slice(0, 3),
+        premiere: !!(media.premiere || m.premiere),
       });
     }
   }

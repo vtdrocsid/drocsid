@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.21 — 2026-11-22
+- Live TV "now playing" posts use the guide: channel number, call sign and logo; the programme on now
+  (episode/subtitle, new/rating/year/genres, description, poster); start and end times, time left with a
+  live countdown, and what's up next. Times use Discord timestamps, so everyone sees their own time zone.
+
 ## 0.2.20 — 2026-11-22
 - Two admin levels. Super admins (owners + anyone promoted) can change everything. Admins can manage
   streams, roles, approved users, admins and access settings, but don't see or change Libraries or
