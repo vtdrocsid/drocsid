@@ -1,5 +1,5 @@
 # Builds the container on every push to main and on version tags, and publishes it to
-# GitHub Container Registry (ghcr.io/<owner>/plexcord). Unraid pulls from there.
+# GitHub Container Registry (ghcr.io/<owner>/drocsid). Unraid pulls from there.
 name: Build & publish image
 
 on:
@@ -32,7 +32,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/plexcord
+          images: ghcr.io/${{ github.repository_owner }}/drocsid
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}

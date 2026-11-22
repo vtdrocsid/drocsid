@@ -1,12 +1,12 @@
 # For Unraid's Compose Manager plugin, or any Docker host.
 services:
-  plexcord:
-    image: ghcr.io/GITHUB_OWNER/plexcord:latest
-    container_name: plexcord
+  drocsid:
+    image: ghcr.io/GITHUB_OWNER/drocsid:latest
+    container_name: drocsid
     restart: unless-stopped
     env_file: .env
     volumes:
-      - /mnt/user/appdata/plexcord:/data
+      - /mnt/user/appdata/drocsid:/data
     networks:
       - proxy-net   # same network as Nginx Proxy Manager / cloudflared
     labels:

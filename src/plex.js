@@ -4,16 +4,16 @@ import crypto from 'node:crypto';
 import { config } from './config.js';
 import { settings } from './settings.js';
 
-const CLIENT_ID = 'plexcord-' + crypto.createHash('sha1').update(config.clientId).digest('hex').slice(0, 12);
+const CLIENT_ID = 'drocsid-' + crypto.createHash('sha1').update(config.clientId).digest('hex').slice(0, 12);
 
 const baseHeaders = {
   Accept: 'application/json',
   'X-Plex-Token': config.plexToken,
   'X-Plex-Client-Identifier': CLIENT_ID,
-  'X-Plex-Product': 'Plexcord',
+  'X-Plex-Product': 'Drocsid',
   'X-Plex-Version': '1.0.0',
   'X-Plex-Device': 'Discord Activity',
-  'X-Plex-Device-Name': 'Plexcord',
+  'X-Plex-Device-Name': 'Drocsid',
   'X-Plex-Platform': 'Chrome',
 };
 

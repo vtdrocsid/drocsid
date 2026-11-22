@@ -1,4 +1,4 @@
-# Plexcord
+# Drocsid
 
 Watch Plex movies, shows and live TV together in Discord voice channels.
 
@@ -13,7 +13,7 @@ There are no slash commands. The bot posts "now playing" notices, reads roles an
 
 ```
 Browser (portal/admin) ──┐
-                         ├─► Plexcord container :3000 ──► Plex (LAN)
+                         ├─► Drocsid container :3000 ──► Plex (LAN)
 Discord Activity iframe ─┘        │
                                   └─► Discord bot gateway
 ```
@@ -45,9 +45,9 @@ Point `discordtv.plunkett.cloud` at the container's port 3000 in Nginx Proxy Man
 
 ## 4. Run on Unraid
 
-Images are built by GitHub Actions and published to `ghcr.io/<you>/plexcord`.
+Images are built by GitHub Actions and published to `ghcr.io/<you>/drocsid`.
 
-**Template:** copy `unraid/plexcord.xml` to `/boot/config/plugins/dockerMan/templates-user/my-plexcord.xml`. Replace `GITHUB_OWNER`, then go to Docker → Add Container → plexcord and fill in the variables.
+**Template:** copy `unraid/drocsid.xml` to `/boot/config/plugins/dockerMan/templates-user/my-drocsid.xml`. Replace `GITHUB_OWNER`, then go to Docker → Add Container → drocsid and fill in the variables.
 
 **Compose (Compose Manager plugin):** use `docker-compose.yml` with a `.env` built from `.env.example`.
 

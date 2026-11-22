@@ -133,7 +133,7 @@ function applyState(s) {
     video.removeAttribute('src');
     loadedVersion = null;
     $('#ui').hidden = true;
-    const link = publicUrl ? `<a href="${publicUrl}/browse/" target="_blank" rel="noopener">${publicUrl.replace(/^https?:\/\//, '')}</a>` : 'the Plexcord website';
+    const link = publicUrl ? `<a href="${publicUrl}/browse/" target="_blank" rel="noopener">${publicUrl.replace(/^https?:\/\//, '')}</a>` : 'the Drocsid website';
     return screen('Nothing playing yet', `Pick a movie, show or channel at ${link}, choose this voice channel, and it'll start here for everyone.`);
   }
 
