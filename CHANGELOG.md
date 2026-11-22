@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.3 — 2026-11-22
+- Sort menu on the right of the library panel; ▸▸ title stays on the left
+
 ## 0.2.2 — 2026-11-22
 - Library tabs: square (no slants) and centered
 - Sort menu moved into the library panel, beside the ▸▸ title

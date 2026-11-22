@@ -231,5 +231,3 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 @media (max-width: 600px) { .admin { grid-template-columns: 1fr; } .guide { --ch: 120px; } .g-ch img { display: none; } }
 /* Inside the schedule dialog the results list pushes the form down instead of floating. */
 #schedRes { position: static; margin-top: 4px; box-shadow: none; max-height: 300px; overflow: auto; }
-/* Sort menu sits right beside the library title */
-#tab-libraries .sec-row .sec-title { flex: none; }
