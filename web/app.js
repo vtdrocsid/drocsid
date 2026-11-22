@@ -617,8 +617,56 @@ const railThumb = (x) => (x.source === 'live'
   ? `<div class="r-thumb logo" style="background-image:url('/api/logo?id=${encodeURIComponent(x.channelId)}')"></div>`
   : `<div class="r-thumb" style="background-image:url('${thumb(x.thumb, 80, 120)}')"></div>`);
 
+// ---------- Watching Now ----------
+const AV_COLORS = ['#1a86d8', '#7b4bd6', '#2f9e6b', '#d6773b', '#c2410c', '#0e7490', '#be185d', '#4d7c0f'];
+function avatar(v) {
+  if (v.avatar) return `<span class="av" title="${esc(v.name)}" style="background-image:url('${esc(v.avatar)}')"></span>`;
+  let n = 0; for (const ch of String(v.id || v.name)) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+  return `<span class="av" title="${esc(v.name)}" style="background-color:${AV_COLORS[n % AV_COLORS.length]}">${esc((v.name || '?').charAt(0).toUpperCase())}</span>`;
+}
+function dur(s) {
+  s = Math.max(0, Math.round(s / 60));
+  return s >= 60 ? `${Math.floor(s / 60)}h ${s % 60}m` : `${s}m`;
+}
+async function loadWatching() {
+  const list = await api('/api/watching');
+  const box = $('#watching');
+  if (!list.length) { box.innerHTML = '<div class="rail-empty">Nobody\'s watching right now.</div>'; return; }
+  box.innerHTML = '';
+  for (const w of list) {
+    const live = w.source === 'live';
+    let pct = 0, left = '', right = '';
+    if (live && w.progStop) {
+      const now = Date.now();
+      pct = ((now - w.progStart) / (w.progStop - w.progStart)) * 100;
+      left = `Ends ${clock(w.progStop)}`;
+      right = `${dur((w.progStop - now) / 1000)} left`;
+    } else if (!live && w.duration) {
+      pct = (w.position / w.duration) * 100;
+      left = `${fmt(w.position)} / ${fmt(w.duration)}`;
+      right = `${dur(w.duration - w.position)} left`;
+    }
+    const title = live && w.program ? `${w.title} — ${w.program}` : w.title;
+    const names = w.viewers.map((v) => v.name).join(', ');
+    const row = h(`<div class="wn-item" title="Join 🔊 ${esc(w.voiceChannelName)} in Discord and open Activities (🚀) to watch">
+      ${live ? `<div class="wn-thumb logo" style="background-image:url('/api/logo?id=${encodeURIComponent(w.channelId)}')"></div>`
+        : `<div class="wn-thumb" style="background-image:url('${thumb(w.thumb, 88, 132)}')"></div>`}
+      <div class="wn-text">
+        <div class="wn-ch"><span class="wn-dot${w.playing ? '' : ' off'}"></span>🔊 ${esc(w.voiceChannelName)}${live ? ' <span class="tag-live">LIVE</span>' : ''}</div>
+        <div class="wn-title">${esc(title)}</div>
+        ${left ? `<div class="wn-bar"><i style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%"></i></div>
+        <div class="wn-meta"><span>${esc(left)}</span><span>${esc(right)}</span></div>` : ''}
+        <div class="wn-who">${w.viewers.length ? `<span class="avs">${w.viewers.slice(0, 6).map(avatar).join('')}</span><em>${esc(names)}</em>`
+          : `<em>started by ${esc(w.startedBy)} · no one in the player yet</em>`}${w.playing ? '' : '<b class="wn-paused">PAUSED</b>'}</div>
+      </div></div>`);
+    row.onclick = () => toast(`Join 🔊 ${w.voiceChannelName} in Discord, then open Activities (🚀) to watch.`);
+    box.append(row);
+  }
+}
+setInterval(() => { if (!document.hidden && me?.approved) loadWatching().catch(() => {}); }, 5000);
+
 async function refreshRails() {
-  await Promise.all([loadLineup().catch(() => {}), loadHistory().catch(() => {})]);
+  await Promise.all([loadWatching().catch(() => {}), loadLineup().catch(() => {}), loadHistory().catch(() => {})]);
 }
 
 async function loadLineup() {

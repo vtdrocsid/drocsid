@@ -250,8 +250,9 @@ async function mapLimit(items, limit, fn) {
 }
 
 /** Guide rows for every channel between `from` and `to` (ms). One grid call per channel per day, cached. */
-export async function guide(from, to) {
-  const { provider, channels } = await liveSetup();
+export async function guide(from, to, onlyIds = null) {
+  const { provider } = await liveSetup();
+  const channels = onlyIds ? (await liveSetup()).channels.filter((c) => onlyIds.includes(c.id)) : (await liveSetup()).channels;
   const dates = [...new Set([ymd(from), ymd(to)])];
   const rows = await mapLimit(channels, 8, async (c) => {
     if (!c.gridKey) return [];

@@ -73,6 +73,12 @@ export function textChannels(guildId = config.guildId) {
     .map((c) => ({ id: c.id, name: c.name, category: c.parent?.name || '' }));
 }
 
+/** Display name + avatar for a member, from the gateway cache (no API call). */
+export function memberCard(userId, fallbackName = '', guildId = config.guildId) {
+  const m = discordClient?.guilds.cache.get(guildId)?.members.cache.get(userId);
+  return { id: userId, name: m?.displayName || fallbackName, avatar: m ? m.displayAvatarURL({ size: 64 }) : null };
+}
+
 export function logout(token) { sessions.delete(token); }
 
 /** The voice channel the user is currently sitting in, or null. */

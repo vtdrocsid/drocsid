@@ -276,6 +276,38 @@ async function startStream(channel, item, user, { scheduled = false } = {}) {
     : `▶️ **${item.title}** started by ${user.name}. Open **Activities** (🚀) in this voice channel to watch.`);
 }
 
+// ---------- Watching Now (left rail) ----------
+// Every voice channel with a stream: what's on, how far along, and who has the player open.
+app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
+  const list = rooms.all();
+  const voice = auth.voiceChannels();
+  let guide = null;
+  const liveIds = list.filter((r) => r.item.source === 'live').map((r) => r.item.channelId);
+  if (liveIds.length) {
+    try { guide = await plex.guide(Date.now() - 3 * 3600_000, Date.now() + 3600_000, liveIds); } catch {}
+  }
+  const out = list.map((room) => {
+    const st = rooms.publicState(room);
+    const ch = voice.find((c) => c.id === room.id);
+    const seen = new Set();
+    const viewers = [...(subs.get(room.id) || [])]
+      .filter((ws) => ws.userId && !seen.has(ws.userId) && seen.add(ws.userId))
+      .map((ws) => auth.memberCard(ws.userId, ws.username));
+    const entry = {
+      voiceChannelId: room.id, voiceChannelName: ch?.name || 'Voice channel',
+      title: st.title, source: st.source, playing: st.playing, position: st.position, duration: st.duration,
+      startedBy: st.startedBy, thumb: room.item.thumb || null, channelId: room.item.channelId || null, viewers,
+    };
+    if (st.source === 'live' && guide) {
+      const now = Date.now();
+      const prog = guide.find((c) => c.id === room.item.channelId)?.programmes.find((p) => p.start <= now && p.stop > now);
+      if (prog) Object.assign(entry, { program: prog.title, progStart: prog.start, progStop: prog.stop });
+    }
+    return entry;
+  });
+  res.json(out);
+}));
+
 // ---------- play history & lineup API ----------
 app.get('/api/history', needSession, needApproved, (req, res) => {
   const live = new Set(rooms.all().map((r) => r.historyId));
@@ -531,6 +563,7 @@ export function startServer() {
     if (!session || !roomId) { console.warn('[ws] rejected: no session'); return ws.close(4001, 'unauthorized'); }
     console.log(`[ws] ${session.username} connected to ${roomId}`);
     ws.username = session.username;
+    ws.userId = session.userId;
     const isApproved = await approved(session);
     const inChannel = auth.voiceChannelOf(session.userId) === roomId;
     if (!inChannel && !isApproved) return ws.close(4003, 'join the voice channel first');

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.19 — 2026-11-22
+- New "Watching Now" panel at the top of the left column: every voice channel that's streaming, with
+  poster (or station logo + current programme for Live TV), progress and time left, PAUSED tag, and
+  Discord avatars of who has the player open. Refreshes every 5 seconds.
+
 ## 0.2.18 — 2026-11-22
 - "LIVE TV" tab text lines up with the other tabs (the 📡 icon no longer pushes it down on Windows)
 

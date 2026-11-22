@@ -345,3 +345,25 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 /* Emoji fonts (esp. on Windows) sit higher and taller than text; give the icon its own fixed box
    so the "LIVE TV" text stays on the same line as the other tabs. */
 .libtabs button .ico { display: block; font-size: 13px; line-height: 1; height: 14px; overflow: visible; }
+
+/* ---------- Watching Now (left rail) ---------- */
+.wn .wn-item { display: flex; gap: 9px; padding: 8px; border-bottom: 1px solid #d6dade; background: #fff; cursor: pointer; }
+.wn .wn-item:hover { background: #f1f8ff; }
+.wn-thumb { width: 44px; height: 66px; flex: none; background: #dfe3e8 center/cover; border: 1px solid #9aa2ab; }
+.wn-thumb.logo { background-size: 84%; background-repeat: no-repeat; background-color: #acacac; }
+.wn-text { flex: 1; min-width: 0; }
+.wn-ch { font: bold 10px var(--tiny); letter-spacing: 1px; text-transform: uppercase; color: var(--azure); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; }
+.wn-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #e0261b; animation: wnPulse 1.6s infinite; }
+.wn-dot.off { background: #b7791f; animation: none; }
+@keyframes wnPulse { 0% { box-shadow: 0 0 0 0 rgba(224,38,27,.6); } 70% { box-shadow: 0 0 0 6px rgba(224,38,27,0); } 100% { box-shadow: 0 0 0 0 rgba(224,38,27,0); } }
+.wn-title { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0 4px; }
+.wn-bar { height: 4px; background: #dfe3e8; border-radius: 2px; overflow: hidden; }
+.wn-bar i { display: block; height: 100%; background: linear-gradient(90deg, #2a8fe0, #135ea8); transition: width 1s linear; }
+.wn-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 3px; }
+.wn-who { display: flex; align-items: center; gap: 6px; margin-top: 5px; min-width: 0; }
+.wn-who .avs { display: flex; flex: none; }
+.wn-who .av { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; margin-left: -5px; background: #9aa2ab center/cover;
+  display: grid; place-items: center; font: bold 9px Arial, sans-serif; color: #fff; }
+.wn-who .av:first-child { margin-left: 0; }
+.wn-who em { font-style: normal; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.wn-paused { margin-left: auto; flex: none; font-size: 9px; color: #b7791f; border: 1px solid #e8c27a; background: #fff7e6; padding: 0 4px; }
