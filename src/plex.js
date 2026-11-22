@@ -51,7 +51,21 @@ function toItem(m) {
     duration: m.duration ? m.duration / 1000 : 0, // seconds
     leafCount: m.leafCount,
     childCount: m.childCount,
+    // Rotten Tomatoes scores, present when the library's ratings source is Rotten Tomatoes.
+    rt: rtScore(m),
   };
+}
+
+/** Tomatometer (critics) or, failing that, audience score: { kind, score, fresh } or null. */
+function rtScore(m) {
+  const pct = (v) => Math.round(Number(v) * 10);
+  if (typeof m.ratingImage === 'string' && m.ratingImage.startsWith('rottentomatoes://') && m.rating != null) {
+    return { kind: 'critic', score: pct(m.rating), fresh: !/rotten/.test(m.ratingImage) };
+  }
+  if (typeof m.audienceRatingImage === 'string' && m.audienceRatingImage.startsWith('rottentomatoes://') && m.audienceRating != null) {
+    return { kind: 'audience', score: pct(m.audienceRating), fresh: !/spilled/.test(m.audienceRatingImage) };
+  }
+  return null;
 }
 
 export async function libraries({ all = false } = {}) {

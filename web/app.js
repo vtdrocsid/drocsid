@@ -53,13 +53,22 @@ function showTab(name) {
 $('#tabs').onclick = (e) => { if (e.target.dataset.tab) showTab(e.target.dataset.tab); };
 
 // ---------- cards ----------
+/** Rotten Tomatoes badge: tomato (fresh) or green splat (rotten); popcorn for audience scores. */
+function rtBadge(rt) {
+  if (!rt || !Number.isFinite(rt.score)) return '';
+  const icon = rt.kind === 'audience'
+    ? (rt.fresh ? '🍿' : '🫗')
+    : (rt.fresh ? '<span class="rt-tomato" aria-hidden="true"></span>' : '<span class="rt-splat" aria-hidden="true"></span>');
+  const label = `${rt.kind === 'audience' ? 'Audience score' : 'Tomatometer'} ${rt.score}%${rt.fresh ? '' : ' (rotten)'}`;
+  return `<span class="rt ${rt.fresh ? 'fresh' : 'rotten'}" title="${label}">${icon}${rt.score}%</span>`;
+}
 function card(item) {
   const sub = item.kind === 'show' ? `${item.childCount || ''} season${item.childCount === 1 ? '' : 's'}`
     : item.kind === 'episode' ? 'Episode' : item.year || '';
   const el = h(`<div class="card">
     <div class="poster" style="background-image:url('${thumb(item.thumb)}')">${item.kind === 'show' ? '<span class="badge">TV</span>' : ''}</div>
     <div class="t" title="${esc(item.title)}">${esc(item.kind === 'episode' ? item.title : item.shortTitle || item.title)}</div>
-    <div class="s">${esc(sub)}</div></div>`);
+    <div class="s"><span>${esc(sub)}</span>${rtBadge(item.rt)}</div></div>`);
   el.onclick = () => openDetail(item.ratingKey);
   return el;
 }

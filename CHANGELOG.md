@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5 — 2026-11-22
+- Poster cards show the Rotten Tomatoes score bottom-right (tomato = fresh, splat = rotten; popcorn for
+  audience score when there's no critic score). Needs the library's ratings source set to Rotten Tomatoes in Plex.
+
 ## 0.2.4 — 2026-11-22
 - Admin page: top link is "Back to Home"
 - DROCSID wordmark: navy-to-azure gradient (dark at top)
