@@ -245,6 +245,7 @@ app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, r
   const room = rooms.get(req.params.id);
   if (!room?.masterPlaylist) return res.status(404).end();
   const body = room.masterPlaylist.replaceAll('/media/plex/', `/media/t/${encodeURIComponent(req.params.token)}/plex/`);
+  console.log(`[media] ${req.session.username} loaded master playlist for ${room.item.title}:\n${body.replace(/\/media\/t\/[^/]+\//g, '/media/t/<token>/')}`);
   res.type('application/vnd.apple.mpegurl').set('Cache-Control', 'no-store').send(body);
 });
 
@@ -252,6 +253,9 @@ app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, r
 app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) => {
   if (req.method !== 'GET' || !req.url.startsWith('/video/:/transcode/universal/session/')) return res.status(403).end();
   const upstream = await fetch(plex.plexProxyUrl(req.url));
+  const shortPath = req.url.split('?')[0];
+  if (!upstream.ok) console.warn(`[plex proxy] ${upstream.status} for ${shortPath}`);
+  else if (shortPath.endsWith('.m3u8')) console.log(`[plex proxy] 200 ${shortPath}`);
   res.status(upstream.status);
   for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
   res.set('Cache-Control', 'no-store');
@@ -298,6 +302,7 @@ export function startServer() {
     ws.on('message', async (raw) => {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
+      if (msg.type === 'clientlog') return console.warn(`[player ${session.username}] ${String(msg.text).slice(0, 500)}`);
       if (msg.type === 'sync') return send(ws, { type: 'state', state: rooms.publicState(rooms.get(roomId)) });
       if (msg.type === 'control' && isApproved) {
         try { await control(roomId, msg.action, msg.seconds); } catch (e) { send(ws, { type: 'error', error: e.message }); }

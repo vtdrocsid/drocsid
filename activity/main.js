@@ -56,6 +56,7 @@ function connect(channelId) {
   };
 }
 const send = (msg) => ws?.readyState === 1 && ws.send(JSON.stringify(msg));
+const report = (text) => { console.warn(text); send({ type: 'clientlog', text }); };
 const control = (action, seconds) => canControl && send({ type: 'control', action, seconds });
 
 // ---------- playback ----------
@@ -79,17 +80,21 @@ function loadStream() {
       startPosition: isLive() ? -1 : Math.max(0, expectedPosition() - state.offsetBase),
     });
     hls.on(Hls.Events.ERROR, (_, d) => {
+      report(`hls ${d.fatal ? 'FATAL' : 'warn'} ${d.type}/${d.details} ${d.response?.code ?? ''} ${d.url || d.frag?.url || ''}`.replace(/\/media\/t\/[^/]+\//, '/media/t/<token>/'));
       if (!d.fatal) return;
       if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 1500);
       else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
       else { console.error(d); setTimeout(loadStream, 2000); }
     });
+    hls.on(Hls.Events.MANIFEST_PARSED, (_, d) => report(`manifest ok: ${d.levels.length} level(s) ${d.levels.map((l) => `${l.width}x${l.height} ${l.videoCodec || ''}/${l.audioCodec || ''}`).join(', ')}`));
+    hls.on(Hls.Events.FRAG_BUFFERED, (_, d) => { if (d.frag.sn <= 1) report(`first segment buffered (sn ${d.frag.sn})`); });
     hls.loadSource(src);
     hls.attachMedia(video);
   } else {
     video.src = src; // Safari / iOS Discord: native HLS
   }
-  video.addEventListener('loadedmetadata', () => { sync(true); tryPlay(); }, { once: true });
+  video.addEventListener('loadedmetadata', () => { report(`video metadata ${video.videoWidth}x${video.videoHeight}`); sync(true); tryPlay(); }, { once: true });
+  video.onerror = () => report(`video element error ${video.error?.code} ${video.error?.message || ''}`);
 }
 
 async function tryPlay() {
@@ -97,6 +102,7 @@ async function tryPlay() {
   try {
     await video.play();
     $('#tapToPlay').hidden = true;
+    report(`playing at ${video.currentTime.toFixed(1)}s`);
   } catch {
     // Autoplay with sound blocked: start muted and offer an unmute button.
     video.muted = true;
