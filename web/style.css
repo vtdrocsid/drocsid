@@ -65,9 +65,16 @@ dialog::backdrop { background: rgba(0,0,0,.65); }
 .row { display: flex; gap: 8px; align-items: center; } .end { justify-content: flex-end; }
 
 /* Live TV guide */
-.guide { --ch: 190px; --pxmin: 4px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); max-height: calc(100vh - 230px); position: relative; }
+.guide { --ch: 190px; border: 1px solid var(--line); border-radius: var(--radius); max-height: calc(100vh - 230px); position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.g-headwrap { position: relative; flex: none; overflow: hidden; background: var(--panel); }
+.g-body { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.g-nav { width: 30px; height: 26px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); cursor: pointer; font-size: 12px; z-index: 5; }
+.g-nav:hover:not([disabled]) { border-color: var(--accent); }
+.g-nav[disabled] { opacity: .3; cursor: default; }
+.g-nav.prev { margin-left: auto; }
+.g-nav.next { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
 .g-row { display: flex; border-bottom: 1px solid var(--line); min-height: 56px; }
-.g-head { position: sticky; top: 0; z-index: 3; background: var(--panel); }
+.g-head { background: var(--panel); }
 .g-ch { position: sticky; left: 0; z-index: 2; width: var(--ch); flex: none; background: var(--panel); border-right: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
 .g-ch img { width: 40px; height: 30px; object-fit: contain; }
 .g-ch .num { color: var(--muted); font-size: 12px; }
@@ -86,7 +93,7 @@ dialog::backdrop { background: rgba(0,0,0,.65); }
 .g-prog.expand .pt, .g-prog.expand .ps { white-space: normal; overflow: visible; }
 .g-prog.expand .pd { display: block; margin-top: 4px; color: var(--text); font-size: 12px; line-height: 1.4; max-height: 9em; overflow: hidden; }
 .g-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); padding: 8px 6px; font-size: 12px; color: var(--muted); }
-.g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 1; pointer-events: none; }
+.g-now { position: absolute; top: 0; width: 2px; background: var(--accent); z-index: 1; pointer-events: none; }
 
 /* Now playing bar */
 .np { position: fixed; bottom: 0; left: 0; right: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; z-index: 20; max-height: 40vh; overflow: auto; }

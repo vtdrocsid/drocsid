@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.17 — 2026-11-21
+- Guide: no horizontal scrollbar; ◀ ▶ buttons at the ends of the timeline row move one hour at a time
+- Guide: timeline header stays fixed; the vertical scrollbar covers only the channel rows
+- Guide: 12 hours of listings (was 6); range label shows the visible window
+- Guide keeps its position when the filter changes or the guide refreshes
+
 ## 0.1.16 — 2026-11-21
 - Guide: hover details only for blocks scrolled under the channel column whose title is cut off
 

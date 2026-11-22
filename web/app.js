@@ -196,28 +196,40 @@ async function choosePlay(target) {
 
 // ---------- live TV guide ----------
 const PX_PER_MIN = 5;
+const GUIDE_HOURS = 12;
+const STEP_PX = 60 * PX_PER_MIN; // one hour per arrow click
 let guideData = null;
 async function loadGuide() {
   const box = $('#guide');
   if (!guideData) box.innerHTML = '<p class="center muted">Loading guide…</p>';
   try {
     const from = Math.floor((Date.now() - 30 * 60_000) / 1_800_000) * 1_800_000; // half-hour boundary
-    guideData = await api(`/api/livetv/guide?hours=6&from=${from}`);
+    guideData = await api(`/api/livetv/guide?hours=${GUIDE_HOURS}&from=${from}`);
     renderGuide();
   } catch (e) { box.innerHTML = `<p class="center error">${esc(e.message)}</p>`; }
 }
+
+// Layout: a fixed timeline header (with ◀ ▶ buttons) above a body that only scrolls vertically.
+// Horizontal movement is by the buttons; header and body are kept aligned in code.
 function renderGuide() {
   const { from, to, channels } = guideData;
   const f = $('#chfilter').value.trim().toLowerCase();
   const width = ((to - from) / 60_000) * PX_PER_MIN;
   const x = (t) => ((Math.max(from, Math.min(to, t)) - from) / 60_000) * PX_PER_MIN;
-  $('#guiderange').textContent = `${clock(from)} – ${clock(to)}`;
   const box = $('#guide');
-  box.innerHTML = '';
-
-  const head = h(`<div class="g-row g-head"><div class="g-ch muted small">Channel</div><div class="g-track" style="width:${width}px;height:34px"></div></div>`);
-  for (let t = from; t < to; t += 1_800_000) $('.g-track', head).append(h(`<div class="g-tick" style="left:${x(t)}px">${clock(t)}</div>`));
-  box.append(head);
+  const keepLeft = $('.g-body', box)?.scrollLeft;
+  const keepTop = $('.g-body', box)?.scrollTop;
+  box.innerHTML = `
+    <div class="g-headwrap">
+      <div class="g-row g-head">
+        <div class="g-ch muted small">Channel<button class="g-nav prev" title="Earlier">◀</button></div>
+        <div class="g-track" style="width:${width}px;height:34px"></div>
+      </div>
+      <button class="g-nav next" title="Later">▶</button>
+    </div>
+    <div class="g-body"></div>`;
+  const headwrap = $('.g-headwrap', box), body = $('.g-body', box);
+  for (let t = from; t < to; t += 1_800_000) $('.g-track', headwrap).append(h(`<div class="g-tick" style="left:${x(t)}px">${clock(t)}</div>`));
 
   const now = Date.now();
   channels
@@ -250,17 +262,33 @@ function renderGuide() {
         el.onclick = () => choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` });
         track.append(el);
       });
-      box.append(row);
+      body.append(row);
     });
 
   if (now > from && now < to) {
     const line = h('<div class="g-now"></div>');
     line.style.left = `calc(var(--ch) + ${x(now)}px)`;
-    box.append(line);
+    body.append(line);
+    line.style.height = `${body.scrollHeight}px`;
   }
-  box.scrollLeft = Math.max(0, x(now) - 120);
-  box.onscroll = () => { if (!slideQueued) { slideQueued = true; requestAnimationFrame(slideLabels); } };
-  slideLabels();
+
+  const maxLeft = () => Math.max(0, body.scrollWidth - body.clientWidth);
+  const onMove = () => {
+    headwrap.scrollLeft = body.scrollLeft;
+    $('.g-nav.prev', box).disabled = body.scrollLeft <= 0;
+    $('.g-nav.next', box).disabled = body.scrollLeft >= maxLeft() - 1;
+    const visFrom = from + (body.scrollLeft / PX_PER_MIN) * 60_000;
+    const visTo = Math.min(to, visFrom + ((body.clientWidth - $('.g-ch', body)?.offsetWidth || 0) / PX_PER_MIN) * 60_000);
+    $('#guiderange').textContent = `${clock(visFrom)} – ${clock(visTo)}`;
+    if (!slideQueued) { slideQueued = true; requestAnimationFrame(slideLabels); }
+  };
+  body.onscroll = onMove;
+  $('.g-nav.prev', box).onclick = () => body.scrollTo({ left: Math.max(0, body.scrollLeft - STEP_PX), behavior: 'smooth' });
+  $('.g-nav.next', box).onclick = () => body.scrollTo({ left: Math.min(maxLeft(), body.scrollLeft + STEP_PX), behavior: 'smooth' });
+
+  body.scrollLeft = keepLeft ?? Math.max(0, x(now) - 120);
+  if (keepTop) body.scrollTop = keepTop;
+  onMove();
 }
 
 // Keep each show's label in view: when a block starts left of the visible area (under the channel
@@ -268,7 +296,8 @@ function renderGuide() {
 let slideQueued = false;
 function slideLabels() {
   slideQueued = false;
-  const box = $('#guide');
+  const box = $('#guide .g-body');
+  if (!box) return;
   const visibleStart = box.scrollLeft; // track x that sits right at the channel column's edge
   box.querySelectorAll('.g-prog[data-left]').forEach((el) => {
     const left = Number(el.dataset.left), width = Number(el.dataset.width);
