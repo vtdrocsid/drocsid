@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.17 — 2026-11-22
+- Live TV guide channel column lightened to #acacac, with dark call signs
+
 ## 0.2.16 — 2026-11-22
 - Live TV guide: channel column is mid grey (#595959) with white call signs so light station logos show up
 
