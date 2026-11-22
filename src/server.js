@@ -310,15 +310,27 @@ app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, r
 const seenSegments = new Set();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Fetch one Plex segment, retrying while Plex is still producing it (404 or empty). */
+/**
+ * Fetch one Plex segment, retrying while Plex is still producing it. A piece only counts once it
+ * is real MPEG-TS (every TS packet starts with sync byte 0x47); right after a transcode restart
+ * (start or seek) Plex can briefly answer with a 404, an empty body or a small non-video reply.
+ */
+const loggedOdd = new Set();
+const loggedPlaylists = new Set();
 async function fetchPiece(pathName, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
-  let wait = 250;
+  let wait = 250, tries = 0;
   while (Date.now() < deadline) {
+    tries++;
     const up = await fetch(plex.plexProxyUrl(pathName)).catch(() => null);
     if (up?.ok) {
       const buf = Buffer.from(await up.arrayBuffer());
-      if (buf.length) return buf;
+      if (buf.length >= 188 && buf[0] === 0x47) return buf;
+      const key = pathName.split('/session/')[1]?.slice(0, 8) + (tries === 1 ? ':first' : ':retry');
+      if (!loggedOdd.has(key)) {
+        loggedOdd.add(key);
+        console.warn(`[plex proxy] ${pathName.split('/').pop()} not video yet (try ${tries}): ${up.headers.get('content-type')} ${buf.length} bytes, starts "${buf.subarray(0, 60).toString('latin1').replace(/[^\x20-\x7e]/g, '.')}"`);
+      }
     } else if (up && up.status !== 404) {
       await up.arrayBuffer().catch(() => {});
       console.warn(`[plex proxy] ${up.status} for ${pathName.split('/').pop()}`);
@@ -328,6 +340,7 @@ async function fetchPiece(pathName, timeoutMs = 30_000) {
   }
   return null;
 }
+
 // Only the transcoder session paths are proxied; the rest of the Plex API stays private.
 app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) => {
   if (req.method !== 'GET' || !req.url.startsWith('/video/:/transcode/universal/session/')) return res.status(403).end();
@@ -370,6 +383,11 @@ app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) =
   // Media playlist: regroup Plex's ~1 s segments into ~6 s ones.
   if (upstream.ok && shortPath.endsWith('.m3u8')) {
     const text = await upstream.text();
+    if (!loggedPlaylists.has(sess)) {
+      loggedPlaylists.add(sess);
+      const lines = text.split('\n');
+      console.log(`[plex proxy] playlist for ${sess}: ${lines.filter((l) => l.startsWith('#EXTINF')).length} segments; head: ${lines.slice(0, 8).join(' | ')}`);
+    }
     return res.type('application/vnd.apple.mpegurl').send(groupPlaylist(text, GROUP));
   }
 

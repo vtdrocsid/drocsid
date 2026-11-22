@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.20 — 2026-11-21
+- Fix black screen after seeking: only real MPEG-TS pieces from Plex are passed on; placeholder/empty
+  replies during a transcode restart are retried instead of sent to the player
+- Log the head of each Plex playlist and any non-video reply, for diagnosis
+
 ## 0.1.19 — 2026-11-21
 - Browse: Search tab removed; search bar sits in the middle of the top navigation with a live drop-down
   of up to 7 results (poster, title, type/year). Click, or ↑/↓ + Enter, opens the title. Esc closes.
