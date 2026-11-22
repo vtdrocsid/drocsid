@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.20 — 2026-11-22
+- Two admin levels. Super admins (owners + anyone promoted) can change everything. Admins can manage
+  streams, roles, approved users, admins and access settings, but don't see or change Libraries or
+  Live TV, and can't add or remove super admins. Enforced on the server, not just hidden in the page.
+- Existing admins become regular admins; promote them under Admins → Super admins.
+
 ## 0.2.19 — 2026-11-22
 - New "Watching Now" panel at the top of the left column: every voice channel that's streaming, with
   poster (or station logo + current programme for Live TV), progress and time left, PAUSED tag, and

@@ -24,7 +24,8 @@ export const QUALITY_PRESETS = [
 export const VALID = { quality: QUALITY_PRESETS.map((p) => p.id), librarySort: ['title', 'added', 'released'] };
 
 const defaults = {
-  adminUserIds: [],            // in addition to OWNER_USER_IDS
+  superAdminUserIds: [],       // full access incl. libraries & Live TV (in addition to OWNER_USER_IDS)
+  adminUserIds: [],            // users, roles, admins, access; no library or Live TV settings
   approvedUserIds: [],
   approvedRoleIds: [],
   viewRequiresApproval: false,
@@ -50,7 +51,10 @@ const ids = (v) => (Array.isArray(v) ? v : []).map(String).filter((s) => /^\d{5,
 /** Validate and save a partial update. */
 export function update(patch) {
   const next = { ...current };
+  if ('superAdminUserIds' in patch) next.superAdminUserIds = ids(patch.superAdminUserIds);
   if ('adminUserIds' in patch) next.adminUserIds = ids(patch.adminUserIds);
+  // Someone is either a super admin or an admin, not both.
+  next.adminUserIds = next.adminUserIds.filter((id) => !next.superAdminUserIds.includes(id));
   if ('approvedUserIds' in patch) next.approvedUserIds = ids(patch.approvedUserIds);
   if ('approvedRoleIds' in patch) next.approvedRoleIds = ids(patch.approvedRoleIds);
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);

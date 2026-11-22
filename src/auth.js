@@ -5,8 +5,13 @@ import { settings } from './settings.js';
 let discordClient = null;
 export const setClient = (c) => { discordClient = c; };
 
+/** Super admins (owners + promoted users) can change everything, including libraries and Live TV. */
+export function isSuperAdmin(userId) {
+  return config.ownerIds.includes(userId) || (settings().superAdminUserIds || []).includes(userId);
+}
+/** Any admin: super admins plus regular admins (users, roles, admins and access settings only). */
 export function isAdmin(userId) {
-  return config.ownerIds.includes(userId) || settings().adminUserIds.includes(userId);
+  return isSuperAdmin(userId) || settings().adminUserIds.includes(userId);
 }
 
 /** True if the user may browse and control content. Admins are always approved. */

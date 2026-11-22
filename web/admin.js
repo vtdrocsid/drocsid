@@ -28,12 +28,12 @@ async function save(patch) {
   } catch (e) { toast(e.message); }
 }
 
-function person(p, removable, onRemove) {
+function person(p, removable, onRemove, label = 'Owner') {
   const el = document.createElement('div');
   el.className = 'li';
   el.innerHTML = `${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : ''}
     <div class="grow"><div>${esc(p.name)}</div><div class="sub">${esc(p.username ? '@' + p.username + ' · ' : '')}${esc(p.id)}</div></div>
-    ${removable ? '<button class="btn sm danger">Remove</button>' : '<span class="sub">Owner</span>'}`;
+    ${removable ? '<button class="btn sm danger">Remove</button>' : `<span class="sub">${esc(label)}</span>`}`;
   if (removable) $('button', el).onclick = onRemove;
   return el;
 }
@@ -75,11 +75,22 @@ function render() {
   users.innerHTML = state.approvedUsers.length ? '' : '<p class="muted">None yet.</p>';
   state.approvedUsers.forEach((u) => users.append(person(u, true, () => save({ approvedUserIds: s.approvedUserIds.filter((id) => id !== u.id) }))));
 
-  // admins
+  // admins: super admins (owners + promoted) and regular admins
+  const isSuper = state.role === 'super';
+  document.querySelectorAll('.super-only').forEach((el) => { el.hidden = !isSuper; });
+  $('#superAddRow').hidden = !isSuper;
+  const supers = $('#supers');
+  supers.innerHTML = '';
+  state.owners.forEach((u) => supers.append(person(u, false)));
+  state.superAdmins.forEach((u) => supers.append(person(u, isSuper, () => save({ superAdminUserIds: s.superAdminUserIds.filter((id) => id !== u.id) }), 'Super admin')));
   const admins = $('#admins');
-  admins.innerHTML = '';
-  state.owners.forEach((u) => admins.append(person(u, false)));
+  admins.innerHTML = state.admins.length ? '' : '<p class="muted">None yet.</p>';
   state.admins.forEach((u) => admins.append(person(u, true, () => save({ adminUserIds: s.adminUserIds.filter((id) => id !== u.id) }))));
+  if (!isSuper) {
+    $('#viewRequiresApproval').checked = s.viewRequiresApproval;
+    $('#announceInVoiceChat').checked = s.announceInVoiceChat;
+    return; // no library or Live TV settings for regular admins
+  }
 
   // libraries: shown on Browse, default sort, and order
   const sortNames = { title: 'A–Z', added: 'Recently added', released: 'Release date' };
@@ -123,7 +134,12 @@ const addUser = (input, key) => {
   save({ [key]: [...state.settings[key], id] });
 };
 $('#userAddBtn').onclick = () => addUser('#userAdd', 'approvedUserIds');
-$('#adminAddBtn').onclick = () => addUser('#adminAdd', 'adminUserIds');
+$('#adminAddBtn').onclick = () => {
+  const id = resolveUser($('#adminAdd').value);
+  if (id && (state.settings.superAdminUserIds.includes(id) || state.owners.some((o) => o.id === id))) return toast('Already a super admin');
+  addUser('#adminAdd', 'adminUserIds');
+};
+$('#superAddBtn').onclick = () => addUser('#superAdd', 'superAdminUserIds');
 $('#viewRequiresApproval').onchange = (e) => save({ viewRequiresApproval: e.target.checked });
 $('#announceInVoiceChat').onchange = (e) => save({ announceInVoiceChat: e.target.checked });
 $('#refreshLive').onclick = async () => {

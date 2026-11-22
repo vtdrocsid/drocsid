@@ -70,6 +70,15 @@ const needApproved = wrap(async (req, res, next) => {
   next();
 });
 const needAdmin = (req, res, next) => (auth.isAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Admins only' }));
+const needSuper = (req, res, next) => (auth.isSuperAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Super admins only' }));
+// Settings only super admins may change.
+const SUPER_KEYS = ['superAdminUserIds', 'librarySections', 'libraryOrder', 'librarySort'];
+const LIB_KEYS = ['librarySections', 'libraryOrder', 'librarySort'];
+/** Settings as a given admin may see them: regular admins don't get library settings. */
+const settingsFor = (userId, s = settings()) => ({
+  ...(auth.isSuperAdmin(userId) ? s : Object.fromEntries(Object.entries(s).filter(([k]) => !LIB_KEYS.includes(k)))),
+  superAdminUserIds: s.superAdminUserIds || [],
+});
 const needViewer = wrap(async (req, res, next) => {
   if (settings().viewRequiresApproval && !(await approved(req.session))) return res.status(403).end();
   next();
@@ -131,7 +140,7 @@ app.post('/api/token', wrap(async (req, res) => {
 
 // ---------- portal API ----------
 app.get('/api/me', needSession, wrap(async (req, res) => {
-  res.json({ id: req.session.userId, name: req.session.username, approved: await approved(req.session), admin: auth.isAdmin(req.session.userId) });
+  res.json({ id: req.session.userId, name: req.session.username, approved: await approved(req.session), admin: auth.isAdmin(req.session.userId), superAdmin: auth.isSuperAdmin(req.session.userId) });
 }));
 
 app.get('/api/libraries', needSession, needApproved, wrap(async (req, res) => res.json(await plex.libraries())));
@@ -392,17 +401,20 @@ app.post('/api/control', needSession, needApproved, wrap(async (req, res) => {
 // ---------- admin API ----------
 app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   const s = settings();
-  const [directory, libs] = await Promise.all([auth.guildDirectory(), plex.libraries({ all: true }).catch(() => [])]);
+  const sup = auth.isSuperAdmin(req.session.userId);
+  const [directory, libs] = await Promise.all([auth.guildDirectory(), sup ? plex.libraries({ all: true }).catch(() => []) : []]);
   const named = (ids) => Promise.all(ids.map((id) => directory.members.find((m) => m.id === id) || auth.lookupUser(id)));
   res.json({
-    settings: s,
+    role: sup ? 'super' : 'admin',
+    settings: settingsFor(req.session.userId, s), // regular admins don't get library or Live TV details
     valid: VALID,
     owners: await named(config.ownerIds),
+    superAdmins: await named(s.superAdminUserIds || []),
     admins: await named(s.adminUserIds),
     approvedUsers: await named(s.approvedUserIds),
     directory,
-    libraries: libs,
-    live: await plex.liveStatus(),
+    libraries: sup ? libs : undefined,
+    live: sup ? await plex.liveStatus() : undefined,
     streams: rooms.all().map((r) => ({
       voiceChannelId: r.id,
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
@@ -415,7 +427,11 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
 
 app.put('/api/admin/settings', needSession, needAdmin, wrap(async (req, res) => {
   const { quality, ...patch } = req.body || {}; // quality is set from the player bar, not here
-  res.json({ settings: updateSettings(patch) });
+  if (!auth.isSuperAdmin(req.session.userId)) {
+    const blocked = SUPER_KEYS.filter((k) => k in patch);
+    if (blocked.length) return res.status(403).json({ error: 'Only super admins can change that' });
+  }
+  res.json({ settings: settingsFor(req.session.userId, updateSettings(patch)) });
 }));
 
 app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
@@ -423,7 +439,7 @@ app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-app.post('/api/admin/refresh-live', needSession, needAdmin, wrap(async (req, res) => {
+app.post('/api/admin/refresh-live', needSession, needSuper, wrap(async (req, res) => {
   plex.clearLiveCache();
   res.json(await plex.liveStatus());
 }));

@@ -40,12 +40,16 @@
 
       <section class="panel">
         <h2>Admins</h2>
-        <p class="desc">Admins can open this page. Owners are set in the container's environment and can't be removed here.</p>
+        <p class="desc"><b>Super admins</b> can change everything, including libraries and Live TV. <b>Admins</b> manage users, roles, admins and access, but don't see library or Live TV settings. Owners are set in the container's environment and can't be removed here.</p>
+        <h3 class="sub-h">Super admins</h3>
+        <div class="row" id="superAddRow"><input id="superAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="superAddBtn">Add</button></div>
+        <div id="supers" class="list"></div>
+        <h3 class="sub-h">Admins</h3>
         <div class="row"><input id="adminAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="adminAddBtn">Add</button></div>
         <div id="admins" class="list"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel super-only">
         <h2>Libraries</h2>
         <p class="desc">Tick the libraries to show on the Browse page (none ticked = show all), pick each one's default sort, and use ↑ ↓ to set their order. The top one opens first.</p>
         <div id="libraries" class="list"></div>
@@ -57,7 +61,7 @@
         <div class="field"><span>Post “now playing” in voice chat</span><input id="announceInVoiceChat" type="checkbox"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel super-only">
         <h2>Live TV</h2>
         <p class="desc">Channels, guide and tuning come from your Plex DVR.</p>
         <div id="live"></div>
