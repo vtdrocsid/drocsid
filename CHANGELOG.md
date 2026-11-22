@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.18 — 2026-11-22
+- "LIVE TV" tab text lines up with the other tabs (the 📡 icon no longer pushes it down on Windows)
+
 ## 0.2.17 — 2026-11-22
 - Live TV guide channel column lightened to #acacac, with dark call signs
 

@@ -200,7 +200,7 @@ async function loadLibraries() {
     box.append(c);
     if (i === 0) c.click();
   });
-  const live = h('<button class="live" data-live="1">📡 Live TV</button>');
+  const live = h('<button class="live" data-live="1"><span class="ico" aria-hidden="true">📡</span>Live TV</button>');
   live.onclick = () => showTab('live');
   box.append(live);
   if (!libs.length) box.prepend(h('<span class="muted small">No libraries available.</span>'));
