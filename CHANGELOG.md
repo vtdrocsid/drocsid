@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.12 — 2026-11-22
+- Search box is centred over the library tabs
+- Live TV tab text is white like the other tabs
+
 ## 0.2.11 — 2026-11-22
 - Library tabs now sit on a navy strip that is the same height as, and level with, the
   Upcoming Lineup and Play History strips, so the bar runs across the whole page

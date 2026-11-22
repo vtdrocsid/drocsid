@@ -104,13 +104,18 @@ main { padding: 14px; min-width: 0; }
 /* Library tabs stand on top of a navy strip that lines up with the rails' "Upcoming Lineup" / "Play History" strips. */
 .libtabs { position: absolute; left: 0; right: 0; bottom: 100%; display: flex; gap: 3px; flex-wrap: wrap-reverse; justify-content: center; align-items: flex-end; padding: 0 14px; }
 .banner.tabs-below { padding-bottom: 52px; }
+/* Browse page: the banner uses the same three columns as the page below, so the search box
+   is centred over the library tabs rather than between the logo and the sign-in. */
+.banner.tabs-below { display: grid; grid-template-columns: calc(280px - 22px) minmax(0, 1fr) calc(300px - 22px); gap: 0; }
+.banner.tabs-below .wordmark { grid-column: 1; }
+.banner.tabs-below .qwrap { grid-column: 2; width: 100%; justify-self: center; padding: 0 14px; box-sizing: border-box; max-width: 548px; }
+.banner.tabs-below .who { grid-column: 3; justify-self: end; margin-left: 0; }
 main { padding-top: 0; }
 .libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 3px 3px 0 0; cursor: pointer; padding: 7px 18px 6px;
   font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #021529;
   background: linear-gradient(#1a5a99, var(--navy2)); }
 .libtabs button:hover { background: linear-gradient(#2472b8, #0b3a6b); }
 .libtabs button.active { background: linear-gradient(#2a8fe0, #135ea8); }
-.libtabs button.live { color: #ffd1cd; }
 .sec-row select { font-size: 11px; padding: 3px 6px; }
 .secbody { background: var(--panel); border: 1px solid var(--line2); border-radius: 0 0 6px 6px; padding: 14px; }
 .sec-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -249,13 +254,14 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: linear-gradient(#2a8fe0, #135ea8); border: 1px solid var(--navy); color: #fff; padding: 7px 16px; z-index: 50; font-weight: bold; }
 
 /* ---------- smaller screens ---------- */
-@media (max-width: 1200px) { .layout { grid-template-columns: 240px minmax(0, 1fr) 250px; } }
+@media (max-width: 1200px) { .layout { grid-template-columns: 240px minmax(0, 1fr) 250px; }
+  .banner.tabs-below { grid-template-columns: calc(240px - 22px) minmax(0, 1fr) calc(250px - 22px); } }
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
   .rail.left, .rail.right { border: 0; border-top: 1px solid #c9ced4; }
   .rail.left { order: 2; } main { order: 1; } .rail.right { order: 3; }
   .wm-main { font-size: 40px; } .wm-tv { font-size: 34px; }
-  .banner.tabs-below { padding-bottom: 16px; }
+  .banner.tabs-below { padding-bottom: 16px; display: flex; }
   .tabbar { margin-top: 14px; } .libtabs { position: static; }
 }
 @media (max-width: 600px) { .admin { grid-template-columns: 1fr; } .guide { --ch: 120px; } .g-ch img { display: none; } }
