@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-11-22
+- Library tabs: square (no slants) and centered
+- Sort menu moved into the library panel, beside the ▸▸ title
+
 ## 0.2.1 — 2026-11-22
 - Top strip shows only the Admin link (admins only); Libraries / Live TV live in the center tabs
 - Wordmark is just DROCSID (no "(.TV)")

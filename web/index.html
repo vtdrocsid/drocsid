@@ -47,14 +47,16 @@
       <main>
         <div class="tabbar">
           <div id="libs" class="libtabs"></div>
-          <select id="sort" title="Sort">
-            <option value="title">A–Z</option>
-            <option value="added">Recently added</option>
-            <option value="released">Release date</option>
-          </select>
         </div>
         <section id="tab-libraries" class="tab secbody" hidden>
-          <div class="sec-title" id="secTitle">Library</div>
+          <div class="sec-row">
+            <div class="sec-title" id="secTitle">Library</div>
+            <select id="sort" title="Sort">
+              <option value="title">A–Z</option>
+              <option value="added">Recently added</option>
+              <option value="released">Release date</option>
+            </select>
+          </div>
           <div id="grid" class="grid"></div>
           <div class="center"><button id="more" class="btn" hidden>Load more</button></div>
         </section>

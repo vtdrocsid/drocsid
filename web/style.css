@@ -98,16 +98,15 @@ main { padding: 14px; min-width: 0; }
 .tag-now { color: var(--red); font-weight: bold; font-size: 10px; }
 
 /* ---------- center: slanted navy tabs ---------- */
-.tabbar { display: flex; align-items: flex-end; gap: 8px; }
-.libtabs { display: flex; gap: 3px; flex: 1; flex-wrap: wrap; }
-.libtabs button { position: relative; border: 0; cursor: pointer; padding: 8px 30px 6px 16px;
+.tabbar { display: flex; justify-content: center; }
+.libtabs { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 3px 3px 0 0; cursor: pointer; padding: 7px 18px 6px;
   font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #021529;
-  background: linear-gradient(#1a5a99, var(--navy2)); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%); }
-.libtabs button::after { content: ""; position: absolute; top: 0; right: 0; width: 14px; height: 14px; background: linear-gradient(225deg, #f1f2f4 50%, transparent 50%); }
+  background: linear-gradient(#1a5a99, var(--navy2)); }
 .libtabs button:hover { background: linear-gradient(#2472b8, #0b3a6b); }
 .libtabs button.active { background: linear-gradient(#2a8fe0, #135ea8); }
 .libtabs button.live { color: #ffd1cd; }
-.tabbar select { margin-bottom: 4px; font-size: 11px; padding: 3px 6px; }
+.sec-row select { font-size: 11px; padding: 3px 6px; }
 .secbody { background: var(--panel); border: 1px solid var(--line2); border-top: 3px solid var(--navy); border-radius: 0 0 6px 6px; padding: 14px; }
 .sec-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .sec-title { color: var(--azure); font: bold 17px Verdana, sans-serif; margin: 0 0 12px; }
@@ -143,8 +142,8 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .detail-hero .row { margin-top: 8px; }
 .detail-body { padding: 12px 20px 20px; }
 .seasons { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 8px; }
-.seasons .chip { border: 0; cursor: pointer; padding: 5px 22px 4px 12px; font: bold 12px Arial, sans-serif; text-transform: uppercase; color: #fff;
-  background: linear-gradient(#1a5a99, var(--navy2)); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 100%, 0 100%); }
+.seasons .chip { border: 0; cursor: pointer; padding: 5px 14px 4px; font: bold 12px Arial, sans-serif; text-transform: uppercase; color: #fff;
+  background: linear-gradient(#1a5a99, var(--navy2)); border-radius: 3px; }
 .seasons .chip.active { background: linear-gradient(#2a8fe0, #135ea8); }
 .eps { display: flex; flex-direction: column; max-height: 50vh; overflow: auto; border: 1px solid var(--line2); border-top: 3px solid var(--navy); background: #fff; }
 .ep { display: flex; gap: 12px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #e3e6ea; }
@@ -232,3 +231,5 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 @media (max-width: 600px) { .admin { grid-template-columns: 1fr; } .guide { --ch: 120px; } .g-ch img { display: none; } }
 /* Inside the schedule dialog the results list pushes the form down instead of floating. */
 #schedRes { position: static; margin-top: 4px; box-shadow: none; max-height: 300px; overflow: auto; }
+/* Sort menu sits right beside the library title */
+#tab-libraries .sec-row .sec-title { flex: none; }
