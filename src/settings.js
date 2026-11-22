@@ -5,12 +5,23 @@ import { config } from './config.js';
 
 const file = path.join(config.dataDir, 'settings.json');
 
-export const VALID = {
-  // Plex source: which version of a title Plex reads when an item has several.
-  sourceMaxResolution: ['highest', '2160', '1080', '720', '480'],
-  // Activity output: what Plex transcodes to for viewers. "original" = direct stream when the browser can play it.
-  outputResolution: ['original', '3840x2160', '1920x1080', '1280x720', '854x480'],
-};
+// Plex's standard quality presets (same list Plex apps offer). One setting for every stream.
+export const QUALITY_PRESETS = [
+  { id: 'original', label: 'Original (no conversion)', height: null, resolution: null, bitrate: null },
+  { id: '2160-40000', label: '4K · 40 Mbps', height: 2160, resolution: '3840x2160', bitrate: 40000 },
+  { id: '2160-30000', label: '4K · 30 Mbps', height: 2160, resolution: '3840x2160', bitrate: 30000 },
+  { id: '2160-20000', label: '4K · 20 Mbps', height: 2160, resolution: '3840x2160', bitrate: 20000 },
+  { id: '1080-20000', label: '1080p · 20 Mbps', height: 1080, resolution: '1920x1080', bitrate: 20000 },
+  { id: '1080-12000', label: '1080p · 12 Mbps', height: 1080, resolution: '1920x1080', bitrate: 12000 },
+  { id: '1080-10000', label: '1080p · 10 Mbps', height: 1080, resolution: '1920x1080', bitrate: 10000 },
+  { id: '1080-8000', label: '1080p · 8 Mbps', height: 1080, resolution: '1920x1080', bitrate: 8000 },
+  { id: '720-4000', label: '720p · 4 Mbps', height: 720, resolution: '1280x720', bitrate: 4000 },
+  { id: '720-3000', label: '720p · 3 Mbps', height: 720, resolution: '1280x720', bitrate: 3000 },
+  { id: '720-2000', label: '720p · 2 Mbps', height: 720, resolution: '1280x720', bitrate: 2000 },
+  { id: '480-1500', label: '480p · 1.5 Mbps', height: 480, resolution: '720x480', bitrate: 1500 },
+  { id: '320-720', label: '320p · 720 kbps', height: 320, resolution: '576x320', bitrate: 720 },
+];
+export const VALID = { quality: QUALITY_PRESETS.map((p) => p.id) };
 
 const defaults = {
   adminUserIds: [],            // in addition to OWNER_USER_IDS
@@ -20,9 +31,7 @@ const defaults = {
   announceInVoiceChat: true,
   librarySections: [],         // empty = all movie/show libraries
 
-  sourceMaxResolution: 'highest',
-  outputResolution: '1920x1080',
-  outputBitrate: 8000,         // kbps, ignored when outputResolution is "original"
+  quality: '1080-8000',        // id from QUALITY_PRESETS
 };
 
 let current = { ...defaults };
@@ -32,6 +41,7 @@ try {
 } catch { /* first run */ }
 
 export const settings = () => current;
+export const qualityPreset = () => QUALITY_PRESETS.find((p) => p.id === current.quality) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
 
 const ids = (v) => (Array.isArray(v) ? v : []).map(String).filter((s) => /^\d{5,25}$/.test(s));
 
@@ -44,9 +54,7 @@ export function update(patch) {
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);
   if ('viewRequiresApproval' in patch) next.viewRequiresApproval = !!patch.viewRequiresApproval;
   if ('announceInVoiceChat' in patch) next.announceInVoiceChat = !!patch.announceInVoiceChat;
-  if (VALID.sourceMaxResolution.includes(patch.sourceMaxResolution)) next.sourceMaxResolution = patch.sourceMaxResolution;
-  if (VALID.outputResolution.includes(patch.outputResolution)) next.outputResolution = patch.outputResolution;
-  if ('outputBitrate' in patch) next.outputBitrate = Math.min(80000, Math.max(500, Number(patch.outputBitrate) || 8000));
+  if (VALID.quality.includes(patch.quality)) next.quality = patch.quality;
   fs.mkdirSync(config.dataDir, { recursive: true });
   fs.writeFileSync(file + '.tmp', JSON.stringify(next, null, 2));
   fs.renameSync(file + '.tmp', file);

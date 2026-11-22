@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 — 2026-11-21
+- Admin: one "Stream quality" setting with Plex's standard presets replaces the separate source/output settings
+- Best source copy is chosen automatically for the selected quality
+
 ## 0.1.4 — 2026-11-21
 - Fix black video: Plex now always transcodes to H.264/AAC unless Output = "Original" (Discord can't decode HEVC)
 - Activity page loads versioned player files so Discord never runs a stale cached copy

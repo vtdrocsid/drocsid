@@ -87,14 +87,7 @@ function render() {
   $('#libraries').onchange = () => save({ librarySections: [...document.querySelectorAll('#libraries input:checked')].map((i) => i.value) });
 
   // quality
-  const srcNames = { highest: 'Highest available', 2160: 'Prefer up to 4K', 1080: 'Prefer up to 1080p', 720: 'Prefer up to 720p', 480: 'Prefer up to 480p' };
-  $('#sourceMaxResolution').innerHTML = valid.sourceMaxResolution.map((v) => `<option value="${v}" ${v === s.sourceMaxResolution ? 'selected' : ''}>${srcNames[v]}</option>`).join('');
-  const outNames = { original: 'Original (no transcode if compatible)', '3840x2160': '4K', '1920x1080': '1080p', '1280x720': '720p', '854x480': '480p' };
-  $('#outputResolution').innerHTML = valid.outputResolution.map((v) => `<option value="${v}" ${v === s.outputResolution ? 'selected' : ''}>${outNames[v]}</option>`).join('');
-  const br = $('#outputBitrate');
-  if (![...br.options].some((o) => Number(o.value) === s.outputBitrate)) br.append(new Option(String(s.outputBitrate)));
-  br.value = String(s.outputBitrate);
-  br.disabled = s.outputResolution === 'original';
+  $('#quality').innerHTML = state.qualityPresets.map((q) => `<option value="${q.id}" ${q.id === s.quality ? 'selected' : ''}>${esc(q.label)}</option>`).join('');
   $('#viewRequiresApproval').checked = s.viewRequiresApproval;
   $('#announceInVoiceChat').checked = s.announceInVoiceChat;
 
@@ -113,9 +106,7 @@ const addUser = (input, key) => {
 };
 $('#userAddBtn').onclick = () => addUser('#userAdd', 'approvedUserIds');
 $('#adminAddBtn').onclick = () => addUser('#adminAdd', 'adminUserIds');
-$('#sourceMaxResolution').onchange = (e) => save({ sourceMaxResolution: e.target.value });
-$('#outputResolution').onchange = (e) => save({ outputResolution: e.target.value });
-$('#outputBitrate').onchange = (e) => save({ outputBitrate: Number(e.target.value) });
+$('#quality').onchange = (e) => save({ quality: e.target.value });
 $('#applyNow').onclick = () => { if (confirm('Restart every running stream with the current quality settings?')) save({ applyNow: true }); };
 $('#viewRequiresApproval').onchange = (e) => save({ viewRequiresApproval: e.target.checked });
 $('#announceInVoiceChat').onchange = (e) => save({ announceInVoiceChat: e.target.checked });

@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
-import { settings, update as updateSettings, VALID } from './settings.js';
+import { settings, update as updateSettings, VALID, QUALITY_PRESETS } from './settings.js';
 import * as settingsMod from './settings.js';
 import * as auth from './auth.js';
 import * as plex from './plex.js';
@@ -222,6 +222,7 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   res.json({
     settings: s,
     valid: VALID,
+    qualityPresets: QUALITY_PRESETS.map(({ id, label }) => ({ id, label })),
     owners: await named(config.ownerIds),
     admins: await named(s.adminUserIds),
     approvedUsers: await named(s.approvedUserIds),

@@ -47,20 +47,9 @@
       </section>
 
       <section class="panel">
-        <h2>Plex source quality</h2>
-        <p class="desc">Which version of a title Plex reads when it has more than one (for example a 4K remux and a 1080p copy).</p>
-        <div class="field"><span>Source version</span><select id="sourceMaxResolution"></select></div>
-      </section>
-
-      <section class="panel">
-        <h2>Activity output quality</h2>
-        <p class="desc">What Plex transcodes to for everyone watching in a voice channel. “Original” streams the file untouched when the browser can play it.</p>
-        <div class="field"><span>Resolution</span><select id="outputResolution"></select></div>
-        <div class="field"><span>Bitrate (kbps)</span>
-          <select id="outputBitrate">
-            <option>40000</option><option>20000</option><option>12000</option><option>8000</option>
-            <option>4000</option><option>3000</option><option>2000</option><option>1500</option><option>720</option>
-          </select></div>
+        <h2>Stream quality</h2>
+        <p class="desc">The Plex quality everyone in a voice channel watches. Plex converts to this, picking the best source copy automatically. “Original” sends the file as-is when the player can handle it.</p>
+        <div class="field"><span>Quality</span><select id="quality"></select></div>
         <div class="field"><span>Apply to streams already playing</span><button class="btn sm" id="applyNow">Restart streams now</button></div>
       </section>
 

@@ -2,7 +2,7 @@
 // No media is processed here — Plex does all tuning and transcoding; we only proxy its HLS output.
 import crypto from 'node:crypto';
 import { config } from './config.js';
-import { settings } from './settings.js';
+import { settings, qualityPreset } from './settings.js';
 
 const CLIENT_ID = 'drocsid-' + crypto.createHash('sha1').update(config.clientId).digest('hex').slice(0, 12);
 
@@ -221,16 +221,20 @@ export async function tune(channel, sessionId) {
 }
 
 // ---------------- transcoder ----------------
-/** Pick which version (Media index) of a title to play, per the admin's "Plex source" setting. */
+/**
+ * Pick which version (Media index) of a title to read. For "Original" take the best copy;
+ * otherwise the smallest copy that still meets the preset's resolution (less work for Plex).
+ */
 export async function pickMediaIndex(ratingKey) {
   const data = await plexGet(`/library/metadata/${ratingKey}`);
   const media = data.MediaContainer?.Metadata?.[0]?.Media || [];
   if (media.length <= 1) return 0;
   const height = (m) => m.height || ({ '4k': 2160, 1080: 1080, 720: 720, 480: 480, sd: 480 }[String(m.videoResolution).toLowerCase()] || 0);
   const ranked = media.map((m, i) => ({ i, h: height(m), br: m.bitrate || 0 })).sort((a, b) => b.h - a.h || b.br - a.br);
-  const max = settings().sourceMaxResolution;
-  if (max === 'highest') return ranked[0].i;
-  return (ranked.find((r) => r.h <= Number(max)) || ranked[ranked.length - 1]).i;
+  const target = qualityPreset().height;
+  if (!target) return ranked[0].i;
+  const fits = ranked.filter((r) => r.h >= target);
+  return (fits.length ? fits[fits.length - 1] : ranked[0]).i;
 }
 
 /**
@@ -239,8 +243,8 @@ export async function pickMediaIndex(ratingKey) {
  * Returns the master playlist rewritten to go through /media/plex.
  */
 export async function startTranscode({ path, offset, mediaIndex = 0, sessionId }) {
-  const s = settings();
-  const original = s.outputResolution === 'original';
+  const q = qualityPreset();
+  const original = q.id === 'original';
   const params = {
     path,
     mediaIndex,
@@ -254,8 +258,8 @@ export async function startTranscode({ path, offset, mediaIndex = 0, sessionId }
     directStream: original ? 1 : 0,
     directStreamAudio: 0, // AAC audio so every browser can play it
     videoQuality: 100,
-    videoResolution: original ? '3840x2160' : s.outputResolution,
-    maxVideoBitrate: original ? 200000 : s.outputBitrate,
+    videoResolution: original ? '3840x2160' : q.resolution,
+    maxVideoBitrate: original ? 200000 : q.bitrate,
     subtitleSize: 100,
     audioBoost: 100,
     location: 'lan',
