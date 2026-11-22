@@ -238,8 +238,13 @@ function renderGuide() {
           <div class="g-in"><div class="pt">${esc(p.title)}</div>
           <div class="ps">${clock(p.start)}–${clock(p.stop)}${p.subtitle ? ' · ' + esc(p.subtitle) : ''}</div>
           ${p.desc ? `<div class="pd">${esc(p.desc)}</div>` : ''}</div></div>`);
-        // Details pop up only for shows that started before the "now" line (currently airing or past).
-        if (p.start < Date.now()) el.onmouseenter = () => el.classList.add('expand');
+        el.dataset.left = x(p.start);
+        el.dataset.width = w;
+        // Details pop up only where the title can't be read: block clipped at the left, or title ends in "…".
+        el.onmouseenter = () => {
+          const t = $('.pt', el);
+          if (Number(el.dataset.shift) > 0 || (t && t.scrollWidth > t.clientWidth + 1)) el.classList.add('expand');
+        };
         el.onmouseleave = () => el.classList.remove('expand');
         el.onclick = () => choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` });
         track.append(el);
@@ -253,6 +258,26 @@ function renderGuide() {
     box.append(line);
   }
   box.scrollLeft = Math.max(0, x(now) - 120);
+  box.onscroll = () => { if (!slideQueued) { slideQueued = true; requestAnimationFrame(slideLabels); } };
+  slideLabels();
+}
+
+// Keep each show's label in view: when a block starts left of the visible area (under the channel
+// column), move its label to the visible edge and shorten it to the space left.
+let slideQueued = false;
+function slideLabels() {
+  slideQueued = false;
+  const box = $('#guide');
+  const visibleStart = box.scrollLeft; // track x that sits right at the channel column's edge
+  box.querySelectorAll('.g-prog[data-left]').forEach((el) => {
+    const left = Number(el.dataset.left), width = Number(el.dataset.width);
+    const shift = Math.max(0, Math.min(visibleStart - left, width - 24));
+    if (Number(el.dataset.shift || 0) === shift) return;
+    el.dataset.shift = shift;
+    const inner = $('.g-in', el);
+    inner.style.marginLeft = shift ? `${shift}px` : '';
+    inner.style.maxWidth = shift ? `${width - shift}px` : '';
+  });
 }
 $('#chfilter').oninput = () => guideData && renderGuide();
 setInterval(() => { if (!$('#tab-live').hidden) loadGuide(); }, 5 * 60_000);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.15 — 2026-11-21
+- Guide: labels of shows scrolled under the channel column now actually slide to the visible edge
+  (the 0.1.12 sticky approach couldn't move long titles)
+- Guide: hover details only where the title is cut off (clipped at the left or ending in "…")
+
 ## 0.1.14 — 2026-11-21
 - Guide: hover details only for shows that started before the "now" line (currently airing or past)
 
