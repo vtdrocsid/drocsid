@@ -2,7 +2,7 @@
 // No media is processed here — Plex does all tuning and transcoding; we only proxy its HLS output.
 import crypto from 'node:crypto';
 import { config } from './config.js';
-import { settings, qualityPreset } from './settings.js';
+import { settings } from './settings.js';
 
 const CLIENT_ID = 'drocsid-' + crypto.createHash('sha1').update(config.clientId).digest('hex').slice(0, 12);
 
@@ -225,13 +225,13 @@ export async function tune(channel, sessionId) {
  * Pick which version (Media index) of a title to read. For "Original" take the best copy;
  * otherwise the smallest copy that still meets the preset's resolution (less work for Plex).
  */
-export async function pickMediaIndex(ratingKey) {
+export async function pickMediaIndex(ratingKey, preset) {
   const data = await plexGet(`/library/metadata/${ratingKey}`);
   const media = data.MediaContainer?.Metadata?.[0]?.Media || [];
   if (media.length <= 1) return 0;
   const height = (m) => m.height || ({ '4k': 2160, 1080: 1080, 720: 720, 480: 480, sd: 480 }[String(m.videoResolution).toLowerCase()] || 0);
   const ranked = media.map((m, i) => ({ i, h: height(m), br: m.bitrate || 0 })).sort((a, b) => b.h - a.h || b.br - a.br);
-  const target = qualityPreset().height;
+  const target = preset.height;
   if (!target) return ranked[0].i;
   const fits = ranked.filter((r) => r.h >= target);
   return (fits.length ? fits[fits.length - 1] : ranked[0]).i;
@@ -242,8 +242,8 @@ export async function pickMediaIndex(ratingKey) {
  * `path` is a library item (/library/metadata/123) or a tuned live session key.
  * Returns the master playlist rewritten to go through /media/plex.
  */
-export async function startTranscode({ path, offset, mediaIndex = 0, sessionId }) {
-  const q = qualityPreset();
+export async function startTranscode({ path, offset, mediaIndex = 0, sessionId, preset }) {
+  const q = preset;
   const original = q.id === 'original';
   const params = {
     path,

@@ -185,32 +185,64 @@ app.get('/api/logo', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/voice', needSession, needApproved, (req, res) => {
   res.json({
     current: auth.voiceChannelOf(req.session.userId),
+    qualities: QUALITY_PRESETS.map(({ id, label }) => ({ id, label })),
     channels: auth.voiceChannels().map((c) => ({ ...c, nowPlaying: rooms.publicState(rooms.get(c.id)) })),
   });
 });
 
 app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
-  const { source, ratingKey, channelId: liveId, voiceChannelId } = req.body || {};
-  if (!auth.voiceChannels().some((c) => c.id === voiceChannelId)) return res.status(400).json({ error: 'Pick a voice channel' });
+  const { source, ratingKey, channelId: liveId, voiceChannelId, replace = false, stopMine = false } = req.body || {};
+  const channels = auth.voiceChannels();
+  const channel = channels.find((c) => c.id === voiceChannelId);
+  if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
+  const me = { id: req.session.userId, name: req.session.username };
+  const isAdmin = auth.isAdmin(me.id);
+
+  // One video per channel: a busy channel can only be replaced by whoever started it, or an admin.
+  const current = rooms.get(voiceChannelId);
+  if (current && !replace) {
+    const canReplace = isAdmin || current.startedById === me.id;
+    return res.status(409).json({
+      conflict: 'channel', canReplace,
+      error: `“${current.item.title}” is already playing in ${channel.name} (started by ${current.startedBy}).`,
+    });
+  }
+  if (current && replace && !(isAdmin || current.startedById === me.id)) {
+    return res.status(403).json({ error: `Only ${current.startedBy} or an admin can replace what's playing in ${channel.name}.` });
+  }
+
+  // One stream per user: starting somewhere else means stopping your other stream first.
+  const mine = rooms.startedBy(me.id);
+  if (mine && mine.id !== voiceChannelId) {
+    const where = channels.find((c) => c.id === mine.id)?.name || 'another channel';
+    if (!stopMine) return res.status(409).json({ conflict: 'user', error: `You're already streaming “${mine.item.title}” in ${where}.` });
+    await rooms.stop(mine.id);
+  }
+
   const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await plex.metadata(String(ratingKey).replace(/\D/g, ''));
   if (item.source === 'plex' && !['movie', 'episode'].includes(item.kind)) return res.status(400).json({ error: 'Pick a movie or an episode' });
-  await rooms.start(voiceChannelId, config.guildId, item, req.session.username);
+  await rooms.start(voiceChannelId, config.guildId, item, me, settings().quality);
   rooms.setViewers(voiceChannelId, subs.get(voiceChannelId)?.size || 0);
-  announce(voiceChannelId, `▶️ **${item.title}** started by ${req.session.username}. Open **Activities** (🚀) in this voice channel to watch.`);
+  announce(voiceChannelId, `▶️ **${item.title}** started by ${me.name}. Open **Activities** (🚀) in this voice channel to watch.`);
   res.json({ ok: true, state: rooms.publicState(rooms.get(voiceChannelId)) });
 }));
 
-async function control(roomId, action, seconds) {
+async function control(roomId, action, seconds, quality) {
   if (!rooms.get(roomId)) throw Object.assign(new Error('Nothing playing there'), { status: 404 });
   if (action === 'pause') rooms.pause(roomId);
   else if (action === 'resume') await rooms.resume(roomId);
   else if (action === 'seek') await rooms.seek(roomId, Number(seconds) || 0);
   else if (action === 'stop') await rooms.stop(roomId);
+  else if (action === 'quality') {
+    if (!VALID.quality.includes(quality)) throw Object.assign(new Error('Unknown quality'), { status: 400 });
+    await rooms.setQuality(roomId, quality);
+    updateSettings({ quality }); // becomes the default for the next stream
+  }
   else throw Object.assign(new Error('Unknown action'), { status: 400 });
 }
 
 app.post('/api/control', needSession, needApproved, wrap(async (req, res) => {
-  await control(String(req.body.voiceChannelId), req.body.action, req.body.seconds);
+  await control(String(req.body.voiceChannelId), req.body.action, req.body.seconds, req.body.quality);
   res.json({ ok: true });
 }));
 
@@ -222,7 +254,6 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   res.json({
     settings: s,
     valid: VALID,
-    qualityPresets: QUALITY_PRESETS.map(({ id, label }) => ({ id, label })),
     owners: await named(config.ownerIds),
     admins: await named(s.adminUserIds),
     approvedUsers: await named(s.approvedUserIds),
@@ -234,16 +265,14 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
       viewers: r.viewers,
       ...rooms.publicState(r),
+      qualityLabel: QUALITY_PRESETS.find((q) => q.id === r.quality)?.label || '',
     })),
   });
 }));
 
 app.put('/api/admin/settings', needSession, needAdmin, wrap(async (req, res) => {
-  const { applyNow, ...patch } = req.body || {};
-  const saved = updateSettings(patch);
-  // Quality changes apply to new streams; "apply now" restarts running ones at their current position.
-  if (applyNow) await Promise.allSettled(rooms.all().map((r) => rooms.reload(r.id)));
-  res.json({ settings: saved });
+  const { quality, ...patch } = req.body || {}; // quality is set from the player bar, not here
+  res.json({ settings: updateSettings(patch) });
 }));
 
 app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
@@ -338,7 +367,7 @@ export function startServer() {
       if (msg.type === 'clientlog') return console.warn(`[player ${session.username}] ${String(msg.text).slice(0, 500)}`);
       if (msg.type === 'sync') return send(ws, { type: 'state', state: rooms.publicState(rooms.get(roomId)) });
       if (msg.type === 'control' && isApproved) {
-        try { await control(roomId, msg.action, msg.seconds); } catch (e) { send(ws, { type: 'error', error: e.message }); }
+        try { await control(roomId, msg.action, msg.seconds, msg.quality); } catch (e) { send(ws, { type: 'error', error: e.message }); }
       }
     });
     ws.on('close', () => {

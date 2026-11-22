@@ -56,7 +56,7 @@ function render() {
     const el = document.createElement('div');
     el.className = 'li';
     el.innerHTML = `<div class="grow"><div><b>${esc(st.title)}</b> ${st.playing ? '' : '(paused)'}</div>
-      <div class="sub">🔊 ${esc(st.voiceChannel)} · ${st.viewers} watching · started by ${esc(st.startedBy)} · ${st.duration ? `${fmt(st.position)} / ${fmt(st.duration)}` : 'LIVE'}</div></div>
+      <div class="sub">🔊 ${esc(st.voiceChannel)} · ${st.viewers} watching · started by ${esc(st.startedBy)} · ${esc(st.qualityLabel)} · ${st.duration ? `${fmt(st.position)} / ${fmt(st.duration)}` : 'LIVE'}</div></div>
       <button class="btn sm danger">Stop</button>`;
     $('button', el).onclick = async () => { await api('/api/admin/stop', { method: 'POST', body: JSON.stringify({ voiceChannelId: st.voiceChannelId }) }); load(); };
     streams.append(el);
@@ -86,8 +86,6 @@ function render() {
     ${esc(l.title)} <span class="muted small">${l.type === 'show' ? 'TV' : 'Movies'}</span></label>`).join('') || '<p class="muted">Could not reach Plex.</p>';
   $('#libraries').onchange = () => save({ librarySections: [...document.querySelectorAll('#libraries input:checked')].map((i) => i.value) });
 
-  // quality
-  $('#quality').innerHTML = state.qualityPresets.map((q) => `<option value="${q.id}" ${q.id === s.quality ? 'selected' : ''}>${esc(q.label)}</option>`).join('');
   $('#viewRequiresApproval').checked = s.viewRequiresApproval;
   $('#announceInVoiceChat').checked = s.announceInVoiceChat;
 
@@ -106,8 +104,6 @@ const addUser = (input, key) => {
 };
 $('#userAddBtn').onclick = () => addUser('#userAdd', 'approvedUserIds');
 $('#adminAddBtn').onclick = () => addUser('#adminAdd', 'adminUserIds');
-$('#quality').onchange = (e) => save({ quality: e.target.value });
-$('#applyNow').onclick = () => { if (confirm('Restart every running stream with the current quality settings?')) save({ applyNow: true }); };
 $('#viewRequiresApproval').onchange = (e) => save({ viewRequiresApproval: e.target.checked });
 $('#announceInVoiceChat').onchange = (e) => save({ announceInVoiceChat: e.target.checked });
 $('#refreshLive').onclick = async () => {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6 — 2026-11-21
+- Quality moved from the admin page to the player bar (per stream); changing it restarts that stream in place
+- New streams default to the last quality picked
+- One video per voice channel: a busy channel can only be replaced by whoever started it, or an admin
+- One stream per user: starting elsewhere offers to stop your other stream first
+- Admin "Active streams" shows each stream's quality
+
 ## 0.1.5 — 2026-11-21
 - Admin: one "Stream quality" setting with Plex's standard presets replaces the separate source/output settings
 - Best source copy is chosen automatically for the selected quality

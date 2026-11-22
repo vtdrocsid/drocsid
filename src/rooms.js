@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import * as plex from './plex.js';
+import { findPreset } from './settings.js';
 
 export const events = new EventEmitter(); // 'update' (room), 'end' (roomId)
 const rooms = new Map(); // voiceChannelId -> room
@@ -28,11 +29,23 @@ export function publicState(room) {
     position: position(room),
     serverTime: now(),
     startedBy: room.startedBy,
+    startedById: room.startedById,
+    quality: room.quality,
   };
 }
 
 export const get = (roomId) => rooms.get(roomId);
 export const all = () => [...rooms.values()];
+/** The room a user started, if any (one stream per user). */
+export const startedBy = (userId) => [...rooms.values()].find((r) => r.startedById === userId) || null;
+
+/** Change a running stream's quality; restarts Plex's transcode at the current position. */
+export async function setQuality(roomId, quality) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  room.quality = findPreset(quality).id;
+  return reload(roomId);
+}
 const emit = (room) => events.emit('update', room);
 
 async function releasePlex(room) {
@@ -54,13 +67,14 @@ async function load(room, seconds) {
     const tuned = await plex.tune(room.item, sessionId);
     room.plexKey = tuned.key;
     room.plexRatingKey = tuned.ratingKey;
-    room.masterPlaylist = await plex.startTranscode({ path: tuned.key, sessionId });
+    room.masterPlaylist = await plex.startTranscode({ path: tuned.key, sessionId, preset: findPreset(room.quality) });
     room.offsetBase = 0;
   } else {
     room.plexKey = `/library/metadata/${room.item.ratingKey}`;
     room.plexRatingKey = room.item.ratingKey;
-    const mediaIndex = await plex.pickMediaIndex(room.item.ratingKey);
-    room.masterPlaylist = await plex.startTranscode({ path: room.plexKey, offset: seconds, mediaIndex, sessionId });
+    const preset = findPreset(room.quality);
+    const mediaIndex = await plex.pickMediaIndex(room.item.ratingKey, preset);
+    room.masterPlaylist = await plex.startTranscode({ path: room.plexKey, offset: seconds, mediaIndex, sessionId, preset });
     room.offsetBase = Math.max(0, Math.floor(seconds));
   }
   room.plexSession = sessionId;
@@ -68,10 +82,10 @@ async function load(room, seconds) {
   room.playlist = `room/${room.id}/master.m3u8?v=${room.playlistVersion}`; // client prefixes /media/t/<token>/
 }
 
-export async function start(roomId, guildId, item, userName) {
+export async function start(roomId, guildId, item, user, quality) {
   await stop(roomId, false);
   const room = {
-    id: roomId, guildId, item, startedBy: userName,
+    id: roomId, guildId, item, startedBy: user.name, startedById: user.id, quality: findPreset(quality).id,
     playing: true, anchorPos: 0, anchorTime: now(),
     offsetBase: 0, playlistVersion: 0, playlist: null,
     plexSession: null, plexKey: null, plexRatingKey: null,

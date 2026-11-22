@@ -13,7 +13,7 @@ const thumb = (p, w = 300, hh = 450) => (p ? `/api/thumb?path=${encodeURICompone
 async function api(path, opts = {}) {
   const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status, body: data });
   return data;
 }
 function toast(msg) {
@@ -161,15 +161,27 @@ async function choosePlay(target) {
   sel.innerHTML = channels.map((c) => `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>🔊 ${esc(c.name)}${c.members.length ? ` (${c.members.length})` : ''}${c.nowPlaying.active ? ' — playing' : ''}</option>`).join('');
   $('#voiceHint').textContent = current ? 'Defaulted to the channel you are in.' : "Tip: join a voice channel in Discord first, then open Activities (🚀) to watch.";
   dlg.showModal();
+  const start = async (extra = {}) => {
+    await api('/api/play', { method: 'POST', body: JSON.stringify({ ...target, voiceChannelId: sel.value, ...extra }) });
+    dlg.close();
+    $('#detail').close();
+    toast('Started. Open Activities (🚀) in that voice channel to watch.');
+    pollNowPlaying(true);
+  };
   $('#playGo').onclick = async (e) => {
     e.preventDefault();
     $('#playGo').disabled = true;
+    $('#playErr').textContent = '';
+    const extra = {};
     try {
-      await api('/api/play', { method: 'POST', body: JSON.stringify({ ...target, voiceChannelId: sel.value }) });
-      dlg.close();
-      $('#detail').close();
-      toast('Started. Open Activities (🚀) in that voice channel to watch.');
-      pollNowPlaying(true);
+      for (;;) {
+        try { await start(extra); break; } catch (err) {
+          const body = err.body || {};
+          if (body.conflict === 'channel' && body.canReplace && !extra.replace && confirm(`${err.message}\n\nReplace it?`)) { extra.replace = true; continue; }
+          if (body.conflict === 'user' && !extra.stopMine && confirm(`${err.message}\n\nStop it and start this instead?`)) { extra.stopMine = true; continue; }
+          throw err;
+        }
+      }
     } catch (err) {
       $('#playErr').textContent = err.message;
     } finally { $('#playGo').disabled = false; }
@@ -235,23 +247,27 @@ setInterval(() => { if (!$('#tab-live').hidden) loadGuide(); }, 5 * 60_000);
 
 // ---------- now playing ----------
 let npTimer;
+let qualities = [];
 async function pollNowPlaying(immediate) {
   clearTimeout(npTimer);
   try {
-    const { channels } = await api('/api/voice');
-    renderNowPlaying(channels.filter((c) => c.nowPlaying.active));
+    const data = await api('/api/voice');
+    qualities = data.qualities || qualities;
+    renderNowPlaying(data.channels.filter((c) => c.nowPlaying.active));
   } catch { /* ignore */ }
   npTimer = setTimeout(pollNowPlaying, immediate ? 1500 : 5000);
 }
 function renderNowPlaying(active) {
   const bar = $('#np');
   bar.hidden = !active.length;
-  if (bar.contains(document.activeElement) && document.activeElement.type === 'range') return; // don't fight the user's drag
+  const focused = document.activeElement;
+  if (bar.contains(focused) && (focused.type === 'range' || focused.tagName === 'SELECT')) return; // don't fight the user
   bar.innerHTML = '';
   active.forEach((c) => {
     const s = c.nowPlaying;
     const el = h(`<div class="np-item">
       <div class="meta"><div><b>${esc(s.title)}</b></div><div class="ch">🔊 ${esc(c.name)} · started by ${esc(s.startedBy)} · ${c.members.length} in channel</div></div>
+      <select class="quality" title="Stream quality">${qualities.map((q) => `<option value="${q.id}" ${q.id === s.quality ? 'selected' : ''}>${esc(q.label)}</option>`).join('')}</select>
       <button class="btn sm" data-a="${s.playing ? 'pause' : 'resume'}">${s.playing ? '⏸' : '▶'}</button>
       ${s.duration ? `<input type="range" min="0" max="${Math.floor(s.duration)}" value="${Math.floor(s.position)}">
         <span class="time">${fmt(s.position)} / ${fmt(s.duration)}</span>` : '<span class="time">LIVE</span>'}
@@ -259,6 +275,13 @@ function renderNowPlaying(active) {
     const control = (action, seconds) => api('/api/control', { method: 'POST', body: JSON.stringify({ voiceChannelId: c.id, action, seconds }) })
       .then(() => pollNowPlaying(true)).catch((e) => toast(e.message));
     el.querySelectorAll('[data-a]').forEach((b) => { b.onclick = () => control(b.dataset.a); });
+    const qSel = $('select.quality', el);
+    qSel.onchange = () => {
+      qSel.disabled = true;
+      toast('Changing quality… viewers will rejoin in a few seconds');
+      api('/api/control', { method: 'POST', body: JSON.stringify({ voiceChannelId: c.id, action: 'quality', quality: qSel.value }) })
+        .then(() => { qSel.blur(); pollNowPlaying(true); }).catch((e) => { toast(e.message); qSel.disabled = false; });
+    };
     const range = $('input[type=range]', el);
     if (range) {
       range.oninput = () => { $('.time', el).textContent = `${fmt(range.value)} / ${fmt(s.duration)}`; };

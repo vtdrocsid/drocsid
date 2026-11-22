@@ -31,7 +31,7 @@ const defaults = {
   announceInVoiceChat: true,
   librarySections: [],         // empty = all movie/show libraries
 
-  quality: '1080-8000',        // id from QUALITY_PRESETS
+  quality: '1080-8000',        // default for new streams = last quality picked in the player bar
 };
 
 let current = { ...defaults };
@@ -41,7 +41,7 @@ try {
 } catch { /* first run */ }
 
 export const settings = () => current;
-export const qualityPreset = () => QUALITY_PRESETS.find((p) => p.id === current.quality) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
+export const findPreset = (id) => QUALITY_PRESETS.find((p) => p.id === id) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
 
 const ids = (v) => (Array.isArray(v) ? v : []).map(String).filter((s) => /^\d{5,25}$/.test(s));
 
