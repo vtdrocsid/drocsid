@@ -240,10 +240,11 @@ function renderGuide() {
           ${p.desc ? `<div class="pd">${esc(p.desc)}</div>` : ''}</div></div>`);
         el.dataset.left = x(p.start);
         el.dataset.width = w;
-        // Details pop up only where the title can't be read: block clipped at the left, or title ends in "…".
+        // Details pop up only for blocks squeezed at the left edge: scrolled under the channel column
+        // AND too narrow to show the title in full.
         el.onmouseenter = () => {
           const t = $('.pt', el);
-          if (Number(el.dataset.shift) > 0 || (t && t.scrollWidth > t.clientWidth + 1)) el.classList.add('expand');
+          if (Number(el.dataset.shift) > 0 && t && t.scrollWidth > t.clientWidth + 1) el.classList.add('expand');
         };
         el.onmouseleave = () => el.classList.remove('expand');
         el.onclick = () => choosePlay({ source: 'live', channelId: c.id, title: `${c.name}${isNow ? ' — ' + p.title : ''}` });

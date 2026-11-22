@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.16 — 2026-11-21
+- Guide: hover details only for blocks scrolled under the channel column whose title is cut off
+
 ## 0.1.15 — 2026-11-21
 - Guide: labels of shows scrolled under the channel column now actually slide to the visible edge
   (the 0.1.12 sticky approach couldn't move long titles)
