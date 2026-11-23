@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.28 — 2026-11-22
+- Activity player: ⬚ Fill button (zooms the picture to fill the window, cropping the black bars; remembered
+  per viewer) and ⛶ Full screen button (also double-click the picture). Both work for every viewer.
+
 ## 0.2.27 — 2026-11-22
 - Watch progress per user: while someone has the player open on a movie or episode, their position is
   saved every 20 s (data/progress.json). Pressing Play on that title later offers "Resume from h:mm:ss"
