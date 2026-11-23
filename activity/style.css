@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: #000; color: #e8eaef; font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
 [hidden] { display: none !important; }
-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; } /* fill the window, cropping any black bars */
 
 .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; background: radial-gradient(circle at 50% 40%, #1d2029, #0b0c10); }
 .screen h1 { font-size: 22px; margin: 14px 0 6px; }
@@ -29,8 +29,3 @@ video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contai
 .time { font-variant-numeric: tabular-nums; font-size: 13px; color: #cfd3da; min-width: 110px; text-align: right; }
 .viewer-only #playPause, .viewer-only #stop { display: none; }
 .viewer-only #seek { pointer-events: none; }
-
-/* Fill mode: zoom the picture to cover the window (crops edges instead of showing black bars). */
-body.fill video { object-fit: cover; }
-.ctl.on { background: #e5a00d; color: #000; }
-.flash { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 6; background: rgba(0,0,0,.85); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: 90vw; text-align: center; }

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.29 — 2026-11-22
+- Activity player always fills the window (what the Fill button did); Fill and Full screen buttons removed.
+
 ## 0.2.28 — 2026-11-22
 - Activity player: ⬚ Fill button (zooms the picture to fill the window, cropping the black bars; remembered
   per viewer) and ⛶ Full screen button (also double-click the picture). Both work for every viewer.

@@ -236,41 +236,6 @@ $('#volume').oninput = () => {
   video.volume = Number($('#volume').value);
   try { localStorage.setItem('volume', $('#volume').value); } catch { /* storage unavailable */ }
 };
-function flash(msg) {
-  let t = document.getElementById('flash');
-  if (!t) { t = document.createElement('div'); t.id = 'flash'; t.className = 'flash'; document.body.append(t); }
-  t.textContent = msg; t.hidden = false;
-  clearTimeout(flash.timer); flash.timer = setTimeout(() => { t.hidden = true; }, 4000);
-}
-
-// ---------- picture size: fill (crop bars) and full screen, per viewer ----------
-function setFill(on) {
-  document.body.classList.toggle('fill', on);
-  $('#fill').classList.toggle('on', on);
-  $('#fill').title = on ? 'Fit the whole picture (show black bars)' : 'Fill the window (crops the black bars), just for you';
-  try { localStorage.setItem('fill', on ? '1' : '0'); } catch { /* storage unavailable */ }
-}
-$('#fill').onclick = () => setFill(!document.body.classList.contains('fill'));
-try { setFill(localStorage.getItem('fill') === '1'); } catch { /* ignore */ }
-
-const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
-async function toggleFullscreen() {
-  try {
-    if (fsEl()) await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    else {
-      const el = document.documentElement;
-      await (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
-    }
-  } catch {
-    // Discord can block full screen inside the Activity frame; its own button still works.
-    flash("Use Discord's full-screen button (top-right of the Activity) — this window can't go full screen by itself.");
-  }
-}
-$('#fullscreen').onclick = toggleFullscreen;
-// The controls overlay sits on top of the video, so listen on the page (ignoring the controls themselves).
-document.addEventListener('dblclick', (e) => { if (!e.target.closest('button, input')) toggleFullscreen(); });
-document.addEventListener('fullscreenchange', () => $('#fullscreen').classList.toggle('on', !!fsEl()));
-
 try { const v = localStorage.getItem('volume'); if (v) { $('#volume').value = v; video.volume = Number(v); } } catch { /* ignore */ }
 
 let hideTimer;
