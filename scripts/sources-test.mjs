@@ -110,6 +110,13 @@ await check('search across servers', async () => {
   const r = await sources.search('movie');
   const keys = r.map((x) => x.ratingKey);
   assert.ok(keys.includes('jellyfin-aa~m1') && keys.includes('emby-bb~m1'), keys.join(','));
+  assert.equal(r.find((x) => x.ratingKey === 'emby-bb~m1').serverName, 'MockEmby');
+  assert.equal(r.find((x) => x.ratingKey === 'emby-bb~m1').serverType, 'emby');
+});
+await check('rail entries name their server', async () => {
+  assert.deepEqual(sources.serverTag({ source: 'plex', ratingKey: 'jellyfin-aa~m1' }), { id: 'jellyfin-aa', name: 'MockJF', type: 'jellyfin' });
+  assert.equal(sources.serverTag({ source: 'live', channelId: 'emby-bb~ch1' }).name, 'MockEmby');
+  assert.equal(sources.serverTag({ source: 'plex', ratingKey: '123' }).id, 'plex1'); // old entries: first Plex
 });
 await check('hover info with cast photo', async () => {
   const i = await sources.info('jellyfin-aa~m1');

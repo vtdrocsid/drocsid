@@ -95,7 +95,10 @@ export async function search(query) {
     ? plex.withServer(srv, () => plex.search(query)).then((xs) => xs.map((x) => tagPlex(srv, x)))
     : jf.search(srv, query)).catch((e) => { console.warn(`[sources] search on ${srv.name}: ${e.message}`); return []; })));
   const order = { movie: 0, show: 0, season: 1, episode: 2 };
-  return results.flat().sort((a, b) => (order[a.kind] ?? 3) - (order[b.kind] ?? 3)).slice(0, 40);
+  // With several servers, say which one each result is on.
+  const multi = conn.servers().length > 1;
+  return results.flat().sort((a, b) => (order[a.kind] ?? 3) - (order[b.kind] ?? 3)).slice(0, 40)
+    .map((x) => (multi ? { ...x, serverName: conn.server(x.server)?.name || '' } : x));
 }
 
 export async function children(key) {

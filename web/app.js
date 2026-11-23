@@ -353,7 +353,7 @@ $('#q').oninput = () => {
       const row = h(`<div class="qrow">
         <div class="qthumb" style="background-image:url('${thumb(it.thumb, 80, 120)}')"></div>
         <div class="qtext"><div class="qt">${esc(it.kind === 'episode' ? it.title : it.shortTitle || it.title)}</div>
-        <div class="qs">${esc([kind, it.year].filter(Boolean).join(' · '))}</div></div></div>`);
+        <div class="qs">${esc([kind, it.year].filter(Boolean).join(' · '))}${srvBadge(it)}</div></div></div>`);
       row.onmousedown = (e) => { e.preventDefault(); closeResults(); openDetail(it.ratingKey); };
       qres.append(row);
     });
@@ -729,8 +729,7 @@ async function loadWatching() {
         : `<div class="wn-thumb" style="background-image:url('${thumb(w.thumb, 88, 132)}')"></div>`}
       <div class="wn-text">
         <div class="wn-ch"><span class="wn-dot${w.playing ? '' : ' off'}"></span>🔊 ${esc(w.voiceChannelName)}${live ? ' <span class="tag-live">LIVE</span>' : ''}</div>
-        <div class="wn-title">${esc(title)}</div>
-        ${srvLine(w, 'wn-srv')}
+        ${titleRow('wn-title', esc(title), w, title)}
         ${left ? `<div class="wn-bar"><i style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%"></i></div>
         <div class="wn-meta"><span>${esc(left)}</span><span>${esc(right)}</span></div>` : ''}
         <div class="wn-who">${w.viewers.length ? `<span class="avs">${w.viewers.slice(0, 6).map(avatar).join('')}</span><em>${esc(names)}</em>`
@@ -742,12 +741,23 @@ async function loadWatching() {
 }
 setInterval(() => { if (!document.hidden && me?.approved) loadWatching().catch(() => {}); }, 5000);
 
-/** Small server badge for rail entries (only sent when several servers are set up). */
-function srvLine(x, cls = 'r-meta') {
+/** Inline server icon + name for a search result (only present when several servers are set up). */
+function srvBadge(it) {
+  if (!it.serverName) return '';
+  const [typeName, ic, letter] = SERVER_TYPES[it.serverType] || [it.serverType, '', '?'];
+  return `<span class="q-srv" title="${esc(typeName)}"><span class="srv-mini ${ic}">${letter}</span>${esc(it.serverName)}</span>`;
+}
+
+/** Server icon + name for the top right of a rail tile (only sent when several servers are set up). */
+function srvTag(x) {
   if (!x.server) return '';
   const [typeName, ic, letter] = SERVER_TYPES[x.server.type] || [x.server.type, '', '?'];
-  return `<div class="${cls} r-srv" title="${esc(typeName)}"><span class="srv-mini ${ic}">${letter}</span>${esc(x.server.name || typeName)}</div>`;
+  return `<span class="r-srv" title="${esc(typeName)}"><span class="srv-mini ${ic}">${letter}</span>${esc(x.server.name || typeName)}</span>`;
 }
+/** A rail tile's title row: the title (trimmed to fit) with the server on the right. */
+const titleRow = (cls, inner, x, tip = '') => (x.server
+  ? `<div class="r-top"><div class="${cls}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</div>${srvTag(x)}</div>`
+  : `<div class="${cls}"${tip ? ` title="${esc(tip)}"` : ''}>${inner}</div>`);
 
 async function refreshRails() {
   await Promise.all([loadWatching().catch(() => {}), loadLineup().catch(() => {}), loadHistory().catch(() => {})]);
@@ -763,8 +773,8 @@ async function loadLineup() {
     if (d !== day) { box.append(h(`<div class="r-day">${esc(d)}</div>`)); day = d; }
     const row = h(`<div class="r-item">${railThumb(x)}
       <div class="r-text"><div class="r-time">${timeOf(x.at)}${x.source === 'live' ? ' <span class="tag-live">LIVE TV</span>' : ''}</div>
-        <div class="r-title" title="${esc(x.title)}">${esc(x.title)}</div>
-        <div class="r-meta">🔊 ${esc(x.voiceChannelName)} · by ${esc(x.by)}</div>${srvLine(x)}</div>
+        ${titleRow('r-title', esc(x.title), x, x.title)}
+        <div class="r-meta">🔊 ${esc(x.voiceChannelName)} · by ${esc(x.by)}</div></div>
       ${x.canDelete ? '<button class="r-del" title="Remove from lineup">✕</button>' : ''}</div>`);
     const del = $('.r-del', row);
     if (del) del.onclick = async () => {
@@ -787,11 +797,10 @@ async function loadHistory() {
     const pic = prog && x.programPoster
       ? `<div class="r-thumb" style="background-image:url('${x.programPoster}')"></div>` : railThumb(x);
     box.append(h(`<div class="r-item">${pic}
-      <div class="r-text"><div class="r-title" title="${esc(prog ? [x.program, x.subtitle].filter(Boolean).join(' — ') : title)}">${esc(title)}${x.playing ? ' <span class="tag-now">● NOW</span>' : ''}</div>
+      <div class="r-text">${titleRow('r-title', `${esc(title)}${x.playing ? ' <span class="tag-now">● NOW</span>' : ''}`, x, prog ? [x.program, x.subtitle].filter(Boolean).join(' — ') : title)}
         ${prog ? `<div class="r-meta">📡 ${esc(x.title)}${x.subtitle ? ` · ${esc(x.subtitle)}` : ''}</div>` : ''}
         <div class="r-meta">${esc(when)} · started by <b>${esc(x.startedBy)}</b>${x.scheduled ? ' 📅' : ''}</div>
         <div class="r-meta">🔊 ${esc(x.voiceChannelName || '')}</div>
-        ${srvLine(x)}
         ${x.watchers?.length ? `<div class="r-who">👥 ${esc(x.watchers.join(', '))}</div>` : ''}</div></div>`));
   });
 }
@@ -833,7 +842,7 @@ $('#schedQ').oninput = () => {
     box.innerHTML = items.length ? '' : '<div class="qempty">No movies or episodes match</div>';
     items.forEach((it) => {
       const row = h(`<div class="qrow"><div class="qthumb" style="background-image:url('${thumb(it.thumb, 80, 120)}')"></div>
-        <div class="qtext"><div class="qt">${esc(it.title)}</div><div class="qs">${it.kind === 'episode' ? 'Episode' : 'Movie'}${it.year ? ' · ' + it.year : ''}</div></div></div>`);
+        <div class="qtext"><div class="qt">${esc(it.title)}</div><div class="qs">${it.kind === 'episode' ? 'Episode' : 'Movie'}${it.year ? ' · ' + it.year : ''}${srvBadge(it)}</div></div></div>`);
       row.onmousedown = (e) => { e.preventDefault(); box.hidden = true; setSchedTarget({ source: 'plex', ratingKey: it.ratingKey, title: it.title, thumb: it.thumb }); };
       box.append(row);
     });
