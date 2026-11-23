@@ -44,3 +44,4 @@ body.idle, body.idle * { cursor: none !important; }
 .ico-pause { width: 36px; height: 44px; border-left: 12px solid #fff; border-right: 12px solid #fff; }
 .note { position: fixed; top: 50%; left: 50%; transform: translate(-50%, 70px); z-index: 6; background: rgba(0,0,0,.8); color: #fff;
   padding: 8px 14px; border-radius: 8px; font-size: 14px; pointer-events: none; }
+.sizeinfo { margin-left: auto; font-size: 11px; font-weight: 400; color: #9aa1ae; font-variant-numeric: tabular-nums; }

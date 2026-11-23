@@ -237,7 +237,9 @@ probe.width = 160; probe.height = 90;
 const pctx = probe.getContext('2d', { willReadFrequently: true });
 
 function layout() {
-  const vw = video.videoWidth, vh = video.videoHeight, ww = innerWidth, wh = innerHeight;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  // The Activity's own box. clientWidth/Height is the most reliable inside Discord's frame.
+  const ww = document.documentElement.clientWidth || innerWidth, wh = document.documentElement.clientHeight || innerHeight;
   if (!vw || !vh) return;
   const cw = vw * (1 - crop.l - crop.r), ch = vh * (1 - crop.t - crop.b); // real picture, in video pixels
   const s = Math.min(ww / cw, wh / ch);                                      // fit it inside the window
@@ -245,6 +247,9 @@ function layout() {
   video.style.width = `${vw * s}px`;
   video.style.height = `${vh * s}px`;
   video.style.transform = `translate(${x}px, ${y}px)`;
+  // Diagnostic readout in the title bar (only visible with the controls): Activity box, stream, picture.
+  $('#sizeInfo').textContent = `box ${ww}×${wh} · stream ${vw}×${vh} · picture ${Math.round(cw * s)}×${Math.round(ch * s)}`
+    + (crop.t + crop.b + crop.l + crop.r > 0.01 ? ' · borders trimmed' : '');
 }
 
 /** Fraction of black rows/columns at each edge of the current frame. */

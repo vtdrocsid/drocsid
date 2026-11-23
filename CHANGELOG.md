@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.35 — 2026-11-22
+- Player sizing measures the Activity box with clientWidth/clientHeight (more reliable inside Discord).
+- Temporary size readout in the player's title bar (Activity box, stream size, shown picture size)
+  to diagnose full-screen sizing.
+
 ## 0.2.34 — 2026-11-22
 - Activity player sizing: the picture is sized by the player itself on every window change (and re-checked
   every second), so it keeps scaling after play/pause and full screen. Black borders baked into the video
