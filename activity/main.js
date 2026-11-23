@@ -238,12 +238,25 @@ $('#volume').oninput = () => {
 };
 try { const v = localStorage.getItem('volume'); if (v) { $('#volume').value = v; video.volume = Number(v); } } catch { /* ignore */ }
 
-let hideTimer;
-document.addEventListener('pointermove', () => {
+// Title, timeline and controls (and the mouse pointer) hide after 1.5 s without movement,
+// and come back as soon as the mouse moves. They stay up while a control is being dragged.
+const IDLE_MS = 1500;
+let hideTimer, dragging = false;
+function wake() {
   $('#ui').classList.add('show');
+  document.body.classList.remove('idle');
   clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => $('#ui').classList.remove('show'), 2500);
-});
+  hideTimer = setTimeout(() => {
+    if (dragging) return wake();
+    $('#ui').classList.remove('show');
+    document.body.classList.add('idle');
+  }, IDLE_MS);
+}
+document.addEventListener('pointermove', wake);
+document.addEventListener('pointerdown', (e) => { dragging = !!e.target.closest('input'); wake(); });
+document.addEventListener('pointerup', () => { dragging = false; wake(); });
+document.addEventListener('pointerleave', () => { if (!dragging) { clearTimeout(hideTimer); $('#ui').classList.remove('show'); document.body.classList.add('idle'); } });
+wake();
 
 setInterval(() => {
   if (!state.active) return;

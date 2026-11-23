@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.31 — 2026-11-22
+- Activity player: title, timeline and controls, and the mouse pointer, hide after 1.5 s without mouse
+  movement and come back as soon as the mouse moves (they stay up while dragging the timeline or volume).
+
 ## 0.2.30 — 2026-11-22
 - Activity player always shows the whole picture, scaled as large as the window allows (no cropping);
   black bars appear only where the window's shape differs from the video's.
