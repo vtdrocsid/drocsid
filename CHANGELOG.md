@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.33 — 2026-11-22
+- Pause indicator reworked: when paused (screen click or the ⏸ button), a ⏸ sits in the center until it
+  plays again; on play it turns into ▶ and fades out over 0.25 s. No pop animation on pause.
+
 ## 0.2.32 — 2026-11-22
 - Activity player: click the picture to pause / play (the person who started it). A big ▶ / ⏸ icon pops and
   fades for everyone on each change, and a ▶ stays in the middle while paused. Others clicking see

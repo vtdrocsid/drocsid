@@ -15,9 +15,8 @@
     <p id="screenText"></p>
   </div>
 
-  <!-- Play/pause feedback: a big icon that pops and fades on every change, and a resting ▶ while paused. -->
-  <div id="ppFlash" class="pp-flash" aria-hidden="true"></div>
-  <div id="pausedMark" class="paused-mark" hidden aria-label="Paused"></div>
+  <!-- Paused: ⏸ sits in the center until it plays again; then it turns into ▶ and fades out. -->
+  <div id="ppMark" class="pp-mark" hidden aria-hidden="true"></div>
   <div id="note" class="note" hidden></div>
 
   <button id="tapToPlay" class="tap" hidden>▶ Tap to start watching</button>

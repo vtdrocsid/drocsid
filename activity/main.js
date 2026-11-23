@@ -200,6 +200,7 @@ function applyState(s) {
     video.removeAttribute('src');
     loadedVersion = null;
     $('#ui').hidden = true;
+    showPlayState('none');
     const link = publicUrl ? `<a href="${publicUrl}/browse/" target="_blank" rel="noopener">${publicUrl.replace(/^https?:\/\//, '')}</a>` : 'the Drocsid website';
     return screen('Nothing playing yet', `Pick a movie, show or channel at ${link}, choose this voice channel, and it'll start here for everyone.`);
   }
@@ -211,9 +212,8 @@ function applyState(s) {
   $('#badge').textContent = isLive() ? 'LIVE' : `Started by ${s.startedBy}`;
   $('#badge').classList.toggle('live', isLive());
   $('#playPause').textContent = s.playing ? '⏸' : '▶';
-  // Everyone sees the change, whoever made it; a resting ▶ stays up while paused.
-  if (wasPlaying !== undefined && wasPlaying !== s.playing && loadedVersion) ppFlash(s.playing);
-  $('#pausedMark').hidden = s.playing || isLive();
+  // Everyone sees it, whoever paused (screen click or the ⏸ button).
+  showPlayState(s.playing && !isLive() ? 'playing' : isLive() ? 'live' : 'paused');
   $('#seek').hidden = isLive();
   $('#liveTag').hidden = !isLive(); // takes the progress bar's place so the controls line up the same
   if (!isLive()) $('#seek').max = Math.floor(s.duration);
@@ -224,12 +224,28 @@ function applyState(s) {
 }
 
 // ---------- click the picture to pause / play ----------
-const icon = (playing) => `<span class="${playing ? 'ico-play' : 'ico-pause'}"></span>`;
-$('#pausedMark').innerHTML = icon(true);
-function ppFlash(playing) {
-  const el = $('#ppFlash');
-  el.innerHTML = icon(playing);
-  el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+// Paused: ⏸ stays in the center. When it plays again: switch to ▶ and fade out over 0.25 s.
+let markState = null;
+function showPlayState(st) {
+  const el = $('#ppMark');
+  if (st === markState) return;
+  const prev = markState;
+  markState = st;
+  clearTimeout(showPlayState.t);
+  if (st === 'paused') {
+    el.innerHTML = '<span class="ico-pause"></span>';
+    el.classList.remove('fade');
+    el.hidden = false;
+  } else if (prev === 'paused' && st === 'playing') {
+    el.innerHTML = '<span class="ico-play"></span>';
+    el.hidden = false;
+    void el.offsetWidth;
+    el.classList.add('fade');
+    showPlayState.t = setTimeout(() => { el.hidden = true; el.classList.remove('fade'); }, 260);
+  } else {
+    el.hidden = true;
+    el.classList.remove('fade');
+  }
 }
 function note(msg) {
   const el = $('#note');

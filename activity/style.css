@@ -32,17 +32,12 @@ body.idle, body.idle * { cursor: none !important; }
 .viewer-only #playPause, .viewer-only #stop { display: none; }
 .viewer-only #seek { pointer-events: none; }
 
-/* Click-to-pause feedback */
-.pp-flash { position: fixed; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%;
-  background: rgba(0,0,0,.55); z-index: 3; pointer-events: none; opacity: 0; display: grid; place-items: center; }
-.pp-flash.go { animation: ppPop .7s ease-out; }
-@keyframes ppPop { 0% { opacity: .95; transform: scale(.7); } 60% { opacity: .85; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1.25); } }
-.paused-mark { position: fixed; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
-  background: rgba(0,0,0,.45); z-index: 2; pointer-events: none; display: grid; place-items: center; }
+/* Pause / play indicator */
+.pp-mark { position: fixed; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%;
+  background: rgba(0,0,0,.55); z-index: 3; pointer-events: none; display: grid; place-items: center; opacity: 1; }
+.pp-mark.fade { opacity: 0; transition: opacity .25s ease-out; }
 /* Icons drawn in CSS so they look the same on every platform (no emoji differences). */
-.ico-play { width: 0; height: 0; border-style: solid; border-width: 18px 0 18px 30px; border-color: transparent transparent transparent #fff; margin-left: 8px; }
-.pp-flash .ico-play { border-width: 22px 0 22px 36px; }
-.ico-pause { width: 30px; height: 36px; border-left: 10px solid #fff; border-right: 10px solid #fff; }
-.pp-flash .ico-pause { width: 36px; height: 44px; border-left-width: 12px; border-right-width: 12px; }
+.ico-play { width: 0; height: 0; border-style: solid; border-width: 22px 0 22px 36px; border-color: transparent transparent transparent #fff; margin-left: 8px; }
+.ico-pause { width: 36px; height: 44px; border-left: 12px solid #fff; border-right: 12px solid #fff; }
 .note { position: fixed; top: 50%; left: 50%; transform: translate(-50%, 70px); z-index: 6; background: rgba(0,0,0,.8); color: #fff;
   padding: 8px 14px; border-radius: 8px; font-size: 14px; pointer-events: none; }
