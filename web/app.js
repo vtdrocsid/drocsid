@@ -697,8 +697,14 @@ async function loadHistory() {
   box.innerHTML = items.length ? '' : '<div class="rail-empty">Nothing has been played yet.</div>';
   items.forEach((x) => {
     const when = x.playing ? 'Now playing' : `${dayOf(x.startedAt, true)} ${timeOf(x.startedAt)}`;
-    box.append(h(`<div class="r-item">${railThumb(x)}
-      <div class="r-text"><div class="r-title" title="${esc(x.title)}">${esc(x.title)}${x.playing ? ' <span class="tag-now">● NOW</span>' : ''}</div>
+    // Live TV: programme title + poster, with the channel underneath. Older entries keep the channel only.
+    const prog = x.source === 'live' && x.program;
+    const title = prog ? x.program : x.title;
+    const pic = prog && x.programPoster
+      ? `<div class="r-thumb" style="background-image:url('${x.programPoster}')"></div>` : railThumb(x);
+    box.append(h(`<div class="r-item">${pic}
+      <div class="r-text"><div class="r-title" title="${esc(prog ? [x.program, x.subtitle].filter(Boolean).join(' — ') : title)}">${esc(title)}${x.playing ? ' <span class="tag-now">● NOW</span>' : ''}</div>
+        ${prog ? `<div class="r-meta">📡 ${esc(x.title)}${x.subtitle ? ` · ${esc(x.subtitle)}` : ''}</div>` : ''}
         <div class="r-meta">${esc(when)} · started by <b>${esc(x.startedBy)}</b>${x.scheduled ? ' 📅' : ''}</div>
         <div class="r-meta">🔊 ${esc(x.voiceChannelName || '')}</div>
         ${x.watchers?.length ? `<div class="r-who">👥 ${esc(x.watchers.join(', '))}</div>` : ''}</div></div>`));

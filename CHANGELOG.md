@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.24 — 2026-11-22
+- Play History: Live TV entries show the programme that was on when the stream started (title, with
+  channel and sub-title underneath) and the programme's poster instead of the station logo.
+  Entries from before this version keep showing the channel only.
+- (0.2.23's XMLTV change was withdrawn; guide details are fixed in Dispatcharr instead)
+
 ## 0.2.22 — 2026-11-22
 - Fix: Live TV guide/posts could show a programme at the wrong time (e.g. 3 hours late). Plex lists
   every airing of a programme, including on other channels/feeds; we now keep only this channel's airing.

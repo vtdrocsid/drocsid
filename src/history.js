@@ -46,6 +46,15 @@ export function begin({ item, voiceChannelId, voiceChannelName, startedBy, start
   return entry.id;
 }
 
+/** Live TV: remember the programme that was on when the stream started (title, sub-title, poster). */
+export function setProgram(id, { program, subtitle, programThumb }) {
+  const e = id && entries.find((x) => x.id === id);
+  if (!e) return;
+  Object.assign(e, { program: program || null, subtitle: subtitle || null, programThumb: programThumb || null });
+  save();
+}
+export const get = (id) => entries.find((x) => x.id === id) || null;
+
 export function addWatcher(id, name) {
   const e = id && entries.find((x) => x.id === id);
   if (!e || e.watchers.includes(name)) return;

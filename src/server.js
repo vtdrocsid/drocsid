@@ -280,6 +280,13 @@ async function startStream(channel, item, user, { scheduled = false } = {}) {
   // Anyone already watching in the Activity counts as a watcher of the new title.
   subs.get(channel.id)?.forEach((ws) => history.addWatcher(room.historyId, ws.username));
   rooms.setViewers(channel.id, subs.get(channel.id)?.size || 0);
+  if (item.source === 'live') {
+    // Play history shows the programme that was on, not just the channel.
+    const hid = room.historyId;
+    plex.liveNow(item.channelId).then((info) => {
+      if (info?.now) history.setProgram(hid, { program: info.now.title, subtitle: info.now.subtitle, programThumb: info.now.thumb });
+    }).catch(() => {});
+  }
   announce(channel.id, scheduled
     ? `📅 Scheduled showing: **${item.title}** (scheduled by ${user.name}) is starting now. Open **Activities** (🚀) in this voice channel to watch.`
     : `▶️ **${item.title}** started by ${user.name}. Open **Activities** (🚀) in this voice channel to watch.`);
@@ -320,8 +327,21 @@ app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
 // ---------- play history & lineup API ----------
 app.get('/api/history', needSession, needApproved, (req, res) => {
   const live = new Set(rooms.all().map((r) => r.historyId));
-  res.json(history.list(Math.min(100, Number(req.query.limit) || 30)).map((e) => ({ ...e, playing: live.has(e.id) })));
+  res.json(history.list(Math.min(100, Number(req.query.limit) || 30)).map(({ programThumb, ...e }) => ({
+    ...e, playing: live.has(e.id), programPoster: programThumb ? `/api/history/${e.id}/poster` : null,
+  })));
 });
+
+// Poster of the live programme recorded in a history entry (fetched through Plex's photo transcoder).
+app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, res) => {
+  const src = history.get(String(req.params.id))?.programThumb;
+  if (!src) return res.status(404).end();
+  const upstream = await fetch(plex.photoUrl(src, 160, 240)).catch(() => null);
+  if (!upstream?.ok) return res.status(404).end();
+  res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
+  res.set('Cache-Control', 'private, max-age=86400');
+  Readable.fromWeb(upstream.body).pipe(res);
+}));
 
 app.get('/api/schedule', needSession, needApproved, (req, res) => {
   res.json(schedule.upcoming().map((x) => ({ ...x, mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
