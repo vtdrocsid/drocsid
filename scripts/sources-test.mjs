@@ -207,6 +207,20 @@ await check('old settings keep Live TV on', async () => {
   assert.equal(st.liveInSections, true);
 });
 
+console.log('Server order');
+await check('libraries grouped by server in the admin order', async () => {
+  settings.update({ serverOrder: ['emby-bb', 'jellyfin-aa'], libraryOrder: [] });
+  const libs = await sources.libraries({ all: true });
+  const servers = [...new Set(libs.map((l) => l.server))];
+  assert.deepEqual(servers.slice(0, 2), ['emby-bb', 'jellyfin-aa']);
+  const emby = libs.filter((l) => l.server === 'emby-bb');
+  assert.equal(emby[emby.length - 1].type, 'live'); // Live TV last within its server
+});
+await check('guide for one server', async () => {
+  const rows = await sources.guide(Date.now(), Date.now() + 3600_000, null, 'jellyfin-aa');
+  assert.ok(rows.length && rows.every((r) => r.server === 'jellyfin-aa'));
+});
+
 console.log('Several Plex servers');
 const plex = await import('../src/plex.js');
 await check('calls go to the chosen Plex server', async () => {

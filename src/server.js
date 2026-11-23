@@ -84,8 +84,8 @@ const needApproved = wrap(async (req, res, next) => {
 const needAdmin = (req, res, next) => (auth.isAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Admins only' }));
 const needSuper = (req, res, next) => (auth.isSuperAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Super admins only' }));
 // Settings only super admins may change.
-const SUPER_KEYS = ['superAdminUserIds', 'librarySections', 'libraryOrder', 'librarySort'];
-const LIB_KEYS = ['librarySections', 'libraryOrder', 'librarySort'];
+const SUPER_KEYS = ['superAdminUserIds', 'librarySections', 'libraryOrder', 'librarySort', 'serverOrder'];
+const LIB_KEYS = ['librarySections', 'libraryOrder', 'librarySort', 'serverOrder'];
 /** Settings as a given admin may see them: regular admins don't get library settings. */
 const settingsFor = (userId, s = settings()) => ({
   ...(auth.isSuperAdmin(userId) ? s : Object.fromEntries(Object.entries(s).filter(([k]) => !LIB_KEYS.includes(k)))),
@@ -224,7 +224,7 @@ app.get('/api/face/:id', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/livetv/guide', needSession, needApproved, wrap(async (req, res) => {
   const hours = Math.min(12, Math.max(1, Number(req.query.hours) || 4));
   const from = Number(req.query.from) || Date.now() - 30 * 60_000;
-  res.json({ from, to: from + hours * 3600_000, channels: await sources.guide(from, from + hours * 3600_000) });
+  res.json({ from, to: from + hours * 3600_000, channels: await sources.guide(from, from + hours * 3600_000, null, req.query.server ? String(req.query.server) : null) });
 }));
 
 app.get('/api/logo', needSession, needApproved, wrap(async (req, res) => {

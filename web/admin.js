@@ -192,7 +192,11 @@ function renderConnections() {
   const media = $('#media');
   media.innerHTML = conns.mediaServers.length ? '' : '<p class="muted">No media server connected.</p>';
   const TYPE = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
-  conns.mediaServers.forEach((p) => {
+  // Browse order: the first server is selected by default on the Browse page.
+  const order = state.settings.serverOrder || [];
+  const pos = (id) => { const i = order.indexOf(id); return i === -1 ? 1e6 : i; };
+  const sorted = conns.mediaServers.map((x, i) => ({ x, i })).sort((a, b) => pos(a.x.id) - pos(b.x.id) || a.i - b.i).map((o) => o.x);
+  sorted.forEach((p, idx) => {
     const [typeName, cls, letter] = TYPE[p.type] || [p.type, '', '?'];
     const el = document.createElement('div');
     el.className = 'li';
@@ -201,11 +205,21 @@ function renderConnections() {
       <div class="grow"><div><b>${esc(p.name)}</b> <span class="muted small">${typeName}</span> ${h ? (h.ok ? '<span class="pill">Online</span>' : '<span class="pill off">Offline</span>') : '<span class="pill wait">Checking</span>'}</div>
         <div class="sub">${esc(p.url)}${p.username ? ` · as ${esc(p.username)}` : ''}${h?.ok ? ` · ${h.libraries} movie/TV ${h.libraries === 1 ? 'library' : 'libraries'} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}</div></div>
       <div class="acts">
+        ${sorted.length > 1 ? `<button class="btn sm" data-move="-1" ${idx === 0 ? 'disabled' : ''} title="Move up">↑</button>
+        <button class="btn sm" data-move="1" ${idx === sorted.length - 1 ? 'disabled' : ''} title="Move down">↓</button>` : ''}
         <button class="btn sm" data-act="test">Test</button>
         <a class="btn sm" href="/setup/?add=media&server=${encodeURIComponent(p.id)}">Edit</a>
         <button class="btn sm danger" data-act="remove">Remove</button>
       </div>`;
     el.querySelector('[data-act=test]').onclick = () => checkPlex(p, true);
+    el.querySelectorAll('[data-move]').forEach((b) => {
+      b.onclick = () => {
+        const ids = sorted.map((x) => x.id);
+        const j = idx + Number(b.dataset.move);
+        [ids[idx], ids[j]] = [ids[j], ids[idx]];
+        save({ serverOrder: ids });
+      };
+    });
     el.querySelector('[data-act=remove]').onclick = () => {
       if (confirm(`Remove ${p.name}? Its libraries disappear from Browse, and anything playing from it stops working.`)) connAct(`/api/connections/media/${encodeURIComponent(p.id)}`, 'DELETE');
     };

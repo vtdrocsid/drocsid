@@ -397,3 +397,18 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .li .acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .li .ic.jf { border-radius: 6px; background: linear-gradient(135deg, #aa5cc3, #00a4dc); color: #fff; }
 .li .ic.emby { border-radius: 6px; background: #52b54b; color: #fff; }
+
+/* ---------- left rail: media servers ---------- */
+.srv-tiles { display: flex; flex-direction: column; }
+.srv-tile { display: flex; align-items: center; gap: 9px; padding: 8px; border: 0; border-bottom: 1px solid #d6dade; background: #fff;
+  cursor: pointer; text-align: left; font: inherit; color: inherit; border-left: 4px solid transparent; }
+.srv-tile:hover { background: #f1f8ff; }
+.srv-tile.active { background: linear-gradient(90deg, #e3f1fd, #fff); border-left-color: var(--azure); }
+.srv-ic { width: 32px; height: 32px; flex: none; border-radius: 6px; display: grid; place-items: center; font: 900 15px Arial, sans-serif; }
+.srv-ic.plex { background: #1f1f1f; color: #e5a00d; }
+.srv-ic.jf { background: linear-gradient(135deg, #aa5cc3, #00a4dc); color: #fff; }
+.srv-ic.emby { background: #52b54b; color: #fff; }
+.srv-tx { display: flex; flex-direction: column; min-width: 0; }
+.srv-tx b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srv-tx small { color: var(--muted); font-size: 10px; }
+.srv-tile.active .srv-tx b { color: var(--azure); }

@@ -39,9 +39,16 @@ function tagPlex(srv, item) {
 const run = (srv, plexFn, jfFn) => (srv.type === 'plex' ? plex.withServer(srv, plexFn) : jfFn());
 
 // ---------------- libraries ----------------
-/** Movie and TV libraries across all servers, filtered and ordered by the admin settings. */
+/** Media servers in the admin's order (Admin → Connections); servers not ordered yet follow. */
+export function orderedServers() {
+  const order = settings().serverOrder || [];
+  const pos = (id) => { const i = order.indexOf(id); return i === -1 ? 1e6 : i; };
+  return conn.servers().map((s, i) => ({ s, i })).sort((a, b) => pos(a.s.id) - pos(b.s.id) || a.i - b.i).map((x) => x.s);
+}
+
+/** Movie and TV libraries across all servers, grouped by server (in server order), then the library order. */
 export async function libraries({ all = false } = {}) {
-  const servers = conn.servers();
+  const servers = orderedServers();
   const multi = servers.length > 1;
   const lists = await Promise.all(servers.map(async (srv, si) => {
     try {
@@ -58,7 +65,7 @@ export async function libraries({ all = false } = {}) {
   return lists.flat()
     .filter((l) => all || !allowed.length || allowed.includes(l.id))
     .map((l) => ({ ...l, defaultSort: sorts[l.id] || 'title' }))
-    .sort((a, b) => pos(a.id) - pos(b.id) || a.rank - b.rank)
+    .sort((a, b) => Math.floor(a.rank / 1000) - Math.floor(b.rank / 1000) || (a.type === 'live') - (b.type === 'live') || pos(a.id) - pos(b.id) || a.rank - b.rank)
     .map(({ rank, multi: m, ...l }) => (m ? l : { ...l, serverName: undefined }));
 }
 
@@ -190,7 +197,7 @@ async function liveEntries(servers, multi) {
       const ch = await rawChannels(srv);
       if (!ch.length) throw new Error('no channels');
       noLive.delete(srv.id);
-      return { id: liveKey(srv), title: 'Live TV', type: 'live', channels: ch.length, server: srv.id, serverName: srv.name, serverType: srv.type, multi, rank: 1e5 + si };
+      return { id: liveKey(srv), title: 'Live TV', type: 'live', channels: ch.length, server: srv.id, serverName: srv.name, serverType: srv.type, multi, rank: si * 1000 + 999 };
     } catch {
       noLive.set(srv.id, Date.now());
       return null;
@@ -223,9 +230,9 @@ export async function liveChannels() {
   return lists.flat();
 }
 
-/** Guide rows for every enabled channel (or just onlyIds) between from and to. */
-export async function guide(from, to, onlyIds = null) {
-  const servers = await liveServers();
+/** Guide rows for every enabled channel (or just onlyIds, or one server's) between from and to. */
+export async function guide(from, to, onlyIds = null, serverId = null) {
+  const servers = (await liveServers()).filter((s) => !serverId || s.id === serverId);
   const lists = await Promise.all(servers.map(async (srv) => {
     const mine = onlyIds ? onlyIds.map((k) => parseKey(k)).filter((p) => p.srv?.id === srv.id).map((p) => p.id) : null;
     if (mine && !mine.length) return [];

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 2026-11-23
+- With more than one media server, a **Media Servers** section at the top of the left rail shows a tile for each one. Picking a server shows only its libraries (and its Live TV) in the tabs along the top, and its titles in the centre.
+- Admin → Connections: ↑ ↓ set the order of media servers. The first one is selected when Browse opens.
+
 ## 0.4.0 — 2026-11-23
 - **Several media servers, of any kind:** Plex, Jellyfin and Emby. Admin → Connections lists them with Test, Edit and Remove, and **+ Add server** asks which kind, then connects it.
 - Plex: Sign in with Plex or address + token. Jellyfin/Emby: username + password, or an API key (browses as the first administrator).

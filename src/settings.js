@@ -32,7 +32,8 @@ const defaults = {
   announceInVoiceChat: true,
   librarySections: [],         // empty = all movie/show libraries
   libraryOrder: [],            // library ids in Browse-page order; libraries not listed follow in Plex's order
-  librarySort: {},             // library id -> default sort: title | added | released
+  librarySort: {},
+  serverOrder: [],             // media server ids in Browse order; the first is selected by default             // library id -> default sort: title | added | released
 
   quality: '1080-8000',        // default for new streams = last quality picked in the player bar
 };
@@ -92,6 +93,7 @@ export function update(patch) {
     }
   }
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);
+  if ('serverOrder' in patch) next.serverOrder = (patch.serverOrder || []).map(String).filter((id) => /^[A-Za-z0-9_-]{1,40}$/.test(id));
   if ('libraryOrder' in patch) next.libraryOrder = (patch.libraryOrder || []).map(String).filter((id) => LIB_ID.test(id));
   if (patch.librarySort && typeof patch.librarySort === 'object') {
     next.librarySort = { ...current.librarySort };

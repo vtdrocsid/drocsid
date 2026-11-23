@@ -188,22 +188,50 @@ function showHover(el, i) {
 
 // ---------- libraries ----------
 let libsLoaded = false, curLib = null, curLibEl = null, libStart = 0;
+let allLibs = [], curServer = null, guideServer = null;
+const SERVER_TYPES = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
+
 async function loadLibraries() {
   libsLoaded = true;
-  const all = await api('/api/libraries');
-  // Live TV entries (one per server) only decide whether the Live TV tab shows.
-  const libs = all.filter((l) => l.type !== 'live');
-  const hasLive = all.some((l) => l.type === 'live');
+  allLibs = await api('/api/libraries'); // grouped by server, in the admin's server order
+  // Servers with anything to show, in order. With more than one, they're tiles in the left rail.
+  const servers = [];
+  for (const l of allLibs) if (!servers.some((x) => x.id === l.server)) servers.push({ id: l.server, name: l.serverName || '', type: l.serverType });
+  $('#serversBox').hidden = servers.length < 2;
+  $('#servers').innerHTML = servers.map((x) => {
+    const [typeName, cls, letter] = SERVER_TYPES[x.type] || [x.type, '', '?'];
+    const libs = allLibs.filter((l) => l.server === x.id);
+    const n = libs.filter((l) => l.type !== 'live').length;
+    return `<button class="srv-tile" data-server="${esc(x.id)}"><span class="srv-ic ${cls}">${letter}</span>
+      <span class="srv-tx"><b>${esc(x.name || typeName)}</b><small>${typeName} · ${n} ${n === 1 ? 'library' : 'libraries'}${libs.some((l) => l.type === 'live') ? ' · Live TV' : ''}</small></span></button>`;
+  }).join('');
+  $('#servers').querySelectorAll('[data-server]').forEach((b) => { b.onclick = () => selectServer(b.dataset.server, true); });
+  // The first server in the admin's order is selected unless the URL names one (e.g. after a reload).
+  const fromUrl = new URLSearchParams(location.search).get('server');
+  selectServer(servers.some((x) => x.id === fromUrl) ? fromUrl : servers[0]?.id || null, false);
+}
+
+/** Show one server's libraries (and Live TV) as the tabs along the top. */
+function selectServer(id, clicked) {
+  curServer = id;
+  document.querySelectorAll('#servers [data-server]').forEach((b) => b.classList.toggle('active', b.dataset.server === id));
+  if (clicked) {
+    const u = new URL(location.href);
+    u.searchParams.set('server', id);
+    history.replaceState(null, '', u);
+  }
+  const mine = allLibs.filter((l) => l.server === id);
+  const libs = mine.filter((l) => l.type !== 'live');
+  const hasLive = mine.some((l) => l.type === 'live');
   const box = $('#libs');
   box.innerHTML = '';
-  // Two servers can have a library with the same name: name the server only then.
-  const dup = (l) => libs.filter((x) => x.title === l.title).length > 1;
+  curLib = null; curLibEl = null;
   libs.forEach((l, i) => {
-    const c = h(`<button title="${esc(l.serverName || '')}">${esc(l.title)}${l.serverName && dup(l) ? ` <small>· ${esc(l.serverName)}</small>` : ''}</button>`);
+    const c = h(`<button>${esc(l.title)}</button>`);
     c.onclick = (ev) => {
       curLib = l.id;
       curLibEl = c;
-      $('#secTitle').textContent = l.serverName && dup(l) ? `${l.title} · ${l.serverName}` : l.title;
+      $('#secTitle').textContent = l.title;
       $('#sort').value = l.defaultSort || 'title'; // admin's default for this library; viewers can still change it
       if (ev?.isTrusted || $('#tab-live').hidden) showTab('libraries');
       loadItems(true);
@@ -215,9 +243,13 @@ async function loadLibraries() {
     const live = h('<button class="live" data-live="1"><span class="ico" aria-hidden="true">📡</span>Live TV</button>');
     live.onclick = () => showTab('live');
     box.append(live);
-  } else if (location.hash === '#live') location.hash = '';
-  if (!libs.length) box.prepend(h('<span class="muted small">No libraries available.</span>'));
-  showTab(location.hash.slice(1) || 'libraries');
+  }
+  if (!libs.length && !hasLive) box.prepend(h('<span class="muted small">No libraries available.</span>'));
+  let want = location.hash.slice(1) || 'libraries';
+  if (want === 'live' && !hasLive) want = 'libraries';
+  if (clicked && libs.length) want = 'libraries';
+  if (!libs.length && hasLive) want = 'live';
+  showTab(want);
 }
 // Infinite scroll: a sentinel under the grid loads the next page as it nears the screen.
 let libTotal = 0, loadGen = 0, loadingItems = null, letterCounts = [];
@@ -482,10 +514,12 @@ const STEP_PX = 60 * PX_PER_MIN; // one hour per arrow click
 let guideData = null;
 async function loadGuide() {
   const box = $('#guide');
-  if (!guideData) box.innerHTML = '<p class="center muted">Loading guide…</p>';
+  if (!guideData || guideServer !== curServer) box.innerHTML = '<p class="center muted">Loading guide…</p>';
   try {
     const from = Math.floor((Date.now() - 30 * 60_000) / 1_800_000) * 1_800_000; // half-hour boundary
-    guideData = await api(`/api/livetv/guide?hours=${GUIDE_HOURS}&from=${from}`);
+    if (guideServer !== curServer) guideData = null; // another server's channels
+    guideServer = curServer;
+    guideData = await api(`/api/livetv/guide?hours=${GUIDE_HOURS}&from=${from}${curServer ? `&server=${encodeURIComponent(curServer)}` : ''}`);
     renderGuide();
   } catch (e) { box.innerHTML = `<p class="center error">${esc(e.message)}</p>`; }
 }
