@@ -101,24 +101,23 @@ main { padding: 14px; min-width: 0; }
 .tag-now { color: var(--red); font-weight: bold; font-size: 10px; }
 
 /* ---------- center: slanted navy tabs ---------- */
-.tabbar { position: relative; margin: 0 -14px 14px; }
-/* Library tabs stand on top of a navy strip that lines up with the rails' "Upcoming Lineup" / "Play History" strips. */
-.libtabs { position: absolute; left: 0; right: 0; bottom: 100%; display: flex; gap: 3px; flex-wrap: wrap-reverse; justify-content: center; align-items: flex-start; /* wrap-reverse: flex-start = bottom */ padding: 0 14px; }
-.banner.tabs-below { padding-bottom: 52px; }
+.tabbar { position: relative; margin: 0 -14px 16px; }
+/* Library buttons sit below the navy strip (which lines up with the rails' strips), above the browse panel. */
+.libtabs { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; padding: 14px 14px 0; }
 /* Browse page: the banner uses the same three columns as the page below, so the search box
    is centred over the library tabs rather than between the logo and the sign-in. */
 .banner.tabs-below { display: grid; grid-template-columns: calc(280px - 22px) minmax(0, 1fr) calc(300px - 22px); gap: 0; }
-.banner.tabs-below { grid-template-rows: minmax(89px, auto) 52px; padding-top: 0; padding-bottom: 0; align-items: center; }
-.banner.tabs-below .wordmark { grid-column: 1; grid-row: 1 / span 2; }
+.banner.tabs-below { grid-template-rows: minmax(89px, auto); padding-top: 0; padding-bottom: 0; align-items: center; }
+.banner.tabs-below .wordmark { grid-column: 1; grid-row: 1; }
 .banner.tabs-below .qwrap { grid-column: 2; width: 100%; justify-self: center; padding: 0 14px; box-sizing: border-box; max-width: 548px; }
-.banner.tabs-below .qwrap { grid-row: 1 / span 2; }
-.banner.tabs-below .who { grid-column: 3; grid-row: 1 / span 2; justify-self: end; margin-left: 0; }
+.banner.tabs-below .qwrap { grid-row: 1; }
+.banner.tabs-below .who { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
 main { padding-top: 0; }
-.libtabs button { border: 1px solid #041d38; border-bottom: 0; border-radius: 1px 1px 0 0; cursor: pointer; padding: 7px 18px 6px; line-height: 18px; height: 31px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #021529;
-  background: linear-gradient(#1a5a99, var(--navy2)); }
-.libtabs button:hover { background: linear-gradient(#2472b8, #0b3a6b); }
-.libtabs button.active { background: linear-gradient(#2a8fe0, #135ea8); }
+.libtabs button { border: 1px solid #4a0b08; border-radius: 3px; cursor: pointer; padding: 7px 18px 6px; line-height: 18px; height: 31px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: bold 14px Arial, Helvetica, sans-serif; letter-spacing: -.2px; text-transform: uppercase; color: #fff; text-shadow: 0 1px 0 #3a0503;
+  background: linear-gradient(#b52a22, #6e0f0b); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.libtabs button:hover { background: linear-gradient(#cf372e, #861611); }
+.libtabs button.active { background: linear-gradient(#ee4a3f, #b01d15); box-shadow: 0 0 0 2px rgba(238,74,63,.25), 0 1px 2px rgba(0,0,0,.25); }
 .sec-row select { font-size: 11px; padding: 3px 6px; }
 .secbody { background: var(--panel); border: 1px solid var(--line2); border-radius: 0 0 6px 6px; padding: 14px; }
 .sec-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }

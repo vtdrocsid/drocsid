@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.3 — 2026-11-23
+- Browse: the library buttons sit below the navy bar, above the browse panel, with space around them, and are a red gradient (the selected one brighter). The header is shorter now that it doesn't hold the buttons.
+
 ## 0.5.2 — 2026-11-23
 - **Real Plex, Jellyfin and Emby logos** (from the open-source dashboard-icons project, Apache-2.0; see web/img/NOTICE.md) replace the letter badges everywhere: Browse server tiles, rail tiles, search results, the TV guide, Admin (Connections, Libraries panels, Active streams) and the setup wizard.
 - **Media servers are named by the servers themselves**: Plex's friendly name, Jellyfin/Emby's server name. Set when connecting (the wizard no longer asks for a name), and kept in sync at startup and on every check, so an imported "Plex" becomes its real name.
