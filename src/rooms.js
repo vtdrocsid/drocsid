@@ -160,24 +160,53 @@ export async function stop(roomId, announce = true, reason = 'stopped') {
   if (!room) return false;
   console.log(`[room] ${room.item.title} in ${roomId} ended: ${reason} (at ${Math.floor(position(room))}s, ${room.viewers} watching)`);
   rooms.delete(roomId);
+  clearTimeout(room.emptyTimer);
   history.end(room.historyId);
   await releasePlex(room);
   if (announce) events.emit('end', roomId);
   return true;
 }
 
+const EMPTY_GRACE_MS = 10_000;          // a reload or brief disconnect isn't "everyone left"
+const EMPTY_END_MS = 3 * 60_000;         // nobody back in the player for 3 minutes: end the stream
+
+/**
+ * Viewer count for a room (people with the Activity player open).
+ * Once someone has watched: when everyone leaves, pause (after a short grace period);
+ * when someone comes back, carry on. Housekeeping ends it if nobody returns within 3 minutes.
+ */
 export function setViewers(roomId, count) {
   const room = rooms.get(roomId);
   if (!room) return;
   if (room.viewers !== count) console.log(`[room] ${room.item.title}: ${count} watching`);
   room.viewers = count;
-  if (count > 0) room.idleSince = null;
-  else if (!room.idleSince) room.idleSince = now();
+  if (count > 0) {
+    room.hadViewers = true;
+    room.idleSince = null;
+    clearTimeout(room.emptyTimer);
+    room.emptyTimer = null;
+    if (room.autoPaused) {
+      room.autoPaused = false;
+      console.log(`[room] ${room.item.title}: a viewer is back, resuming`);
+      resume(roomId).catch((e) => console.warn(`[room] auto-resume failed: ${e.message}`));
+    }
+    return;
+  }
+  if (!room.idleSince) room.idleSince = now();
+  if (room.hadViewers && !room.emptyTimer) {
+    room.emptyTimer = setTimeout(() => {
+      room.emptyTimer = null;
+      if (rooms.get(roomId) !== room || room.viewers > 0 || !room.playing) return;
+      console.log(`[room] ${room.item.title}: everyone left the player, pausing`);
+      room.autoPaused = true;
+      pause(roomId);
+    }, EMPTY_GRACE_MS);
+  }
 }
 
 // Housekeeping: keep Plex sessions alive, report progress, end finished titles, clean up empty rooms.
 setInterval(() => {
-  for (const room of rooms.values()) {
+  for (const room of [...rooms.values()]) {
     if (room.plexSession) {
       plex.pingTranscode(room.plexSession);
       plex.timeline({
@@ -186,6 +215,7 @@ setInterval(() => {
       });
     }
     if (room.item.duration && position(room) >= room.item.duration - 1) { stop(room.id, true, 'reached the end'); continue; }
-    if (room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id, true, 'nobody watching for 10 minutes');
+    if (room.hadViewers && room.idleSince && now() - room.idleSince > EMPTY_END_MS) { stop(room.id, true, 'everyone left the player for 3 minutes'); continue; }
+    if (!room.hadViewers && room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id, true, 'nobody opened the player for 10 minutes');
   }
 }, 20_000).unref();

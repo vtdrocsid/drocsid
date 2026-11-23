@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.26 — 2026-11-22
+- When everyone closes the Activity player, the stream pauses (after a 10-second grace for reloads);
+  when someone opens it again it carries on. If nobody comes back within 3 minutes, the stream ends.
+- A stream nobody has opened yet still ends after 10 minutes (as before).
+
 ## 0.2.25 — 2026-11-22
 - Play History shows the last 8 items (was 25). Older history is still kept on the server.
 

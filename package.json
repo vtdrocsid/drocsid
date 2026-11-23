@@ -1,6 +1,6 @@
 {
   "name": "drocsid",
-  "version": "0.2.25",
+  "version": "0.2.26",
   "private": true,
   "description": "Watch Plex movies, shows and live TV together in Discord voice channels",
   "type": "module",
