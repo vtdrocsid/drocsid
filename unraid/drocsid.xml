@@ -14,6 +14,6 @@
   <Overview>drocsid flips movie night right-side up. Stream your Plex library into a Discord voice channel, synced to the frame for the whole crew. Friends can browse and hit play without ever touching your Plex server, and you run it all from a self-hosted web panel.</Overview>
   <Category>MediaServer:Video</Category>
   <WebUI>https://discordtv.plunkett.cloud/admin</WebUI>
-  <ExtraParams>--env-file /mnt/user/appdata/drocsid-src/.env --restart unless-stopped</ExtraParams>
+  <ExtraParams>--env-file /mnt/user/appdata/drocsid-src/.env</ExtraParams>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/drocsid" Mode="rw" Type="Path" Display="always" Required="true" Description="Settings, play history, lineup and watch progress">/mnt/user/appdata/drocsid</Config>
 </Container>
