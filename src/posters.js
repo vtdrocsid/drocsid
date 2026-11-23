@@ -58,15 +58,14 @@ async function fetchAndSave(ref, w, h) {
   return { buf, type };
 }
 
-// Titles that have no poster: not asked for again for 6 hours.
+// Titles whose server said "no poster": not asked again for 30 minutes (artwork can arrive
+// any time, e.g. while the media server re-matches). Cleared whenever a refresh starts.
 const missing = new Map(); // hash -> time
-const MISSING_MS = 6 * 3600_000;
+const MISSING_MS = 30 * 60_000;
 
 /** A poster for the browser: { file, type } from disk, { buf, type } freshly fetched, or { status }. */
 export async function get(ref, w, h) {
   const hash = hashOf(ref, w, h);
-  const miss = missing.get(hash);
-  if (miss && Date.now() - miss < MISSING_MS) return { status: 404 };
   const hit = index.get(hash);
   if (hit && fs.existsSync(fileOf(hash, hit.ext))) {
     if (Date.now() - hit.at > 86400_000) { // note that it's still used (once a day is enough)
@@ -75,6 +74,8 @@ export async function get(ref, w, h) {
     }
     return { file: fileOf(hash, hit.ext), type: TYPE[hit.ext] || 'image/jpeg' };
   }
+  const miss = missing.get(hash);
+  if (miss && Date.now() - miss < MISSING_MS) return { status: 404 };
   return fetchAndSave(ref, w, h);
 }
 
@@ -105,6 +106,7 @@ export function refreshAll(reason = 'nightly') {
   if (running) return running;
   running = (async () => {
     const started = Date.now();
+    missing.clear(); // ask again for everything
     const refs = new Set();
     try {
       const libs = (await sources.libraries()).filter((l) => l.type !== 'live');

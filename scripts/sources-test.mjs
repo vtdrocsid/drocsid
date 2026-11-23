@@ -266,6 +266,9 @@ await check('refresh fetches every poster of the libraries that are on', async (
   assert.equal(st.last.failed, 0);
   const miss = await posters.get('jellyfin-aa~img:m2', 300, 450);
   assert.equal(miss.status, 404);
+  // A saved poster always wins over an earlier "no poster".
+  const before = await posters.get('jellyfin-aa~img:m1', 300, 450);
+  assert.ok(before.file);
   assert.ok(st.files >= 2);
   assert.ok(st.next > Date.now() && new Date(st.next).getHours() === 2);
   posters.clear();

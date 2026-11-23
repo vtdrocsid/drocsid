@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.7 — 2026-11-23
+- Fixed posters that stayed missing after the media server got them: a saved poster now always wins over an earlier "no poster" answer, that answer is only remembered for 30 minutes, and every refresh asks again for everything.
+
 ## 0.4.6 — 2026-11-23
 - Titles whose media server has no poster show the plain grey box instead of a broken-image icon.
 - A poster found by "Refresh now" or the nightly refresh shows right away, even if the title had no poster earlier.
