@@ -8,6 +8,9 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 console.log(`Drocsid v${version} starting`);
 
 process.on('unhandledRejection', (e) => console.error('Unhandled:', e));
+// Last resort: an unexpected error is logged and the server keeps running for everyone else,
+// instead of the whole site going down mid-stream.
+process.on('uncaughtException', (e) => console.error('[uncaught] kept running after:', e?.stack || e));
 
 startServer();
 // Bots start for every saved Discord app; one that can't sign in is reported on the

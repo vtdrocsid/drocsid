@@ -320,14 +320,34 @@ export const allowedStreamPath = (p) => /^(\/emby)?\/videos\/[A-Za-z0-9-]+\/[^?]
   || /^(\/emby)?\/videos\/[A-Za-z0-9-]+\/hls1?\/[^?]+(\?|$)/i.test(p);
 
 /** Fetch a stream playlist or segment from the server for the proxy. */
-export function streamFetch(srv, pathAndQuery) {
-  return fetch(base(srv) + pathAndQuery, { headers: authHeaders(srv), signal: AbortSignal.timeout(60_000) });
+export async function streamFetch(srv, pathAndQuery) {
+  // Time limit only until the server starts answering. A limit on the whole download would
+  // abort long segment downloads mid-way (that crashed 0.5.3 while scrubbing).
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(new Error(`${label(srv)} did not answer within 60 s`)), 60_000);
+  try {
+    return await fetch(base(srv) + pathAndQuery, { headers: authHeaders(srv), signal: ctl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
+ * Remove anything from a playlist that a browser shouldn't get: tag lines that carry their own
+ * URLs (e.g. Jellyfin's Trickplay preview tiles, whose URI includes the access key), and any
+ * api_key/ApiKey left in segment URLs.
+ */
+export function cleanPlaylist(text) {
+  return text.split('\n')
+    .filter((line) => !/^#EXT-X-(IMAGE-STREAM-INF|I-FRAME-STREAM-INF|SESSION-DATA)/.test(line) && !/URI="[^"]*(api_?key|token)=/i.test(line))
+    .map((line) => (line.startsWith('#') ? line : line.replace(/([?&])(api_key|apikey|x-emby-token)=[^&\s]*&?/gi, '$1').replace(/[?&]$/, '')))
+    .join('\n');
 }
 
 /** Rewrite a master playlist so its variant URLs go through our proxy. */
 export function rewriteMaster(srv, masterPath, text) {
   const dir = masterPath.split('?')[0].replace(/[^/]*$/, '');
-  return text.split('\n').map((line) => {
+  return cleanPlaylist(text).split('\n').map((line) => {
     if (!line || line.startsWith('#')) return line;
     const abs = /^https?:/.test(line) ? new URL(line).pathname + new URL(line).search : line.startsWith('/') ? line : dir + line.trim();
     const u = new URL(abs, 'http://x');

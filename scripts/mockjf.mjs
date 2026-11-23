@@ -69,7 +69,7 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
       return json({ PlaySessionId: 'ps1', MediaSources: [{ Id: m[1], LiveStreamId: m[1].startsWith('ch') ? 'ls-' + m[1] : undefined, TranscodingUrl: `/videos/${m[1]}/master.m3u8?MediaSourceId=${m[1]}&PlaySessionId=ps1&api_key=${token}` }] });
     }
     m = p.match(/^\/videos\/(\w+)\/master\.m3u8$/);
-    if (m) { res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' }); return res.end(`#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=8000000\nmain.m3u8?PlaySessionId=ps1&api_key=${token}\n`); }
+    if (m) { res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' }); return res.end(`#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=8000000\nmain.m3u8?PlaySessionId=ps1&api_key=${token}\n#EXT-X-IMAGE-STREAM-INF:BANDWIDTH=105394,RESOLUTION=320x180,CODECS="jpeg",URI="Trickplay/320/tiles.m3u8?MediaSourceId=x&ApiKey=${token}"\n`); }
     m = p.match(/^\/videos\/(\w+)\/main\.m3u8$/);
     if (m) { res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' }); return res.end(`#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nhls1/main/0.ts?PlaySessionId=ps1&api_key=${token}\n#EXT-X-ENDLIST\n`); }
     m = p.match(/^\/videos\/(\w+)\/hls1\/main\/(\d+)\.ts$/);

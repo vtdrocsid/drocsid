@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
@@ -80,6 +80,13 @@ async function approvedIn(session, guildId) {
 }
 /** Admin for the session's server (super admins: always). */
 const adminHere = (session) => auth.isSuperAdmin(session.userId) || (!!session.guildId && session.guildId !== '*' && auth.isAdmin(session.userId, session.guildId));
+/** Send an upstream body to the browser. If either side fails or goes away, just that response ends. */
+function sendBody(upstream, res) {
+  if (!upstream.body) return res.end();
+  pipeline(Readable.fromWeb(upstream.body), res, (err) => {
+    if (err && !['ERR_STREAM_PREMATURE_CLOSE', 'ECONNRESET'].includes(err.code) && err.name !== 'AbortError') console.warn(`[stream] ${err.message}`);
+  });
+}
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const needSession = wrap(async (req, res, next) => {
@@ -267,7 +274,7 @@ app.get('/api/face/:id', needSession, needApproved, wrap(async (req, res) => {
   if (!upstream.ok) return res.status(upstream.status).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
   res.set('Cache-Control', 'private, max-age=86400');
-  Readable.fromWeb(upstream.body).pipe(res);
+  sendBody(upstream, res);
 }));
 
 app.get('/api/livetv/guide', needSession, needApproved, wrap(async (req, res) => {
@@ -286,7 +293,7 @@ app.get('/api/logo', needSession, needApproved, wrap(async (req, res) => {
   if (!upstream?.ok) return res.status(404).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/png');
   res.set('Cache-Control', 'private, max-age=86400');
-  Readable.fromWeb(upstream.body).pipe(res);
+  sendBody(upstream, res);
 }));
 
 // Voice and text channels in the servers this user is approved in, grouped by server in the UI.
@@ -430,7 +437,7 @@ app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, r
   if (!upstream?.ok) return res.status(404).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
   res.set('Cache-Control', 'private, max-age=86400');
-  Readable.fromWeb(upstream.body).pipe(res);
+  sendBody(upstream, res);
 }));
 
 app.get('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
@@ -660,13 +667,12 @@ app.use('/media/t/:token/jf/:src', pathSession, needViewer, wrap(async (req, res
   if (!upstream.ok) console.warn(`[jf proxy] ${upstream.status} for ${req.url.split('?')[0]}`);
   if (upstream.ok && req.url.split('?')[0].endsWith('.m3u8')) {
     // Strip any token the server put in segment URLs; we add it ourselves.
-    const text = (await upstream.text()).replace(/([?&])(api_key|ApiKey)=[^&\s]*&?/g, '$1').replace(/[?&]$/gm, '');
+    const text = jf.cleanPlaylist(await upstream.text());
     return res.type('application/vnd.apple.mpegurl').send(text);
   }
   res.status(upstream.status);
   for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
-  if (upstream.body) Readable.fromWeb(upstream.body).pipe(res);
-  else res.end();
+  sendBody(upstream, res);
 }));
 
 // Only the transcoder session paths are proxied; the rest of the Plex API stays private.
@@ -727,8 +733,7 @@ const plexProxy = wrap(async (req, res) => {
 
   res.status(upstream.status);
   for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
-  if (upstream.body) Readable.fromWeb(upstream.body).pipe(res);
-  else res.end();
+  sendBody(upstream, res);
 });
 
 // ---------- setup wizard & Admin → Connections ----------

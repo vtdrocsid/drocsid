@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.4 — 2026-11-23
+- **Fixed the whole site going down while scrubbing a Jellyfin/Emby stream.** A 60-second limit covered the entire download of a video piece; when it ran out mid-download the error wasn't handled and Node exited. The limit now only covers the server starting to answer, every proxied download ends just its own response on error, and any unexpected error is logged instead of stopping the server.
+- **Scrubbing Jellyfin/Emby no longer starts a new stream each time**: their stream spans the whole title, so a seek just moves everyone's position and the server transcodes from there (much lighter, and no cut-off downloads).
+- **Security:** Jellyfin's preview-thumbnail line (Trickplay) in the stream list carried drocsid's Jellyfin access key to viewers' browsers. Those lines are now removed and any key in stream URLs is stripped.
+
 ## 0.5.3 — 2026-11-23
 - Browse: the library buttons sit below the navy bar, above the browse panel, with space around them, and are a red gradient (the selected one brighter). The header is shorter now that it doesn't hold the buttons.
 

@@ -155,7 +155,8 @@ await check('stream starts and playlists carry no token', async () => {
   const item = await sources.metadata('jellyfin-aa~m1');
   const room = await rooms.start('room1', 'g1', item, { id: 'u', name: 'U' }, '1080-8000', 120);
   assert.match(room.masterPlaylist, /\/media\/jf\/jellyfin-aa\/videos\/m1\/main\.m3u8\?PlaySessionId=ps1/);
-  assert.ok(!/api_key|tok-123/.test(room.masterPlaylist), room.masterPlaylist);
+  assert.ok(!/api_key|ApiKey|tok-123|Trickplay/i.test(room.masterPlaylist), room.masterPlaylist);
+  assert.ok(!/ApiKey|tok-123/.test(jf.cleanPlaylist('#EXTM3U\n#EXTINF:6,\nhls1/main/0.ts?PlaySessionId=1&ApiKey=tok-123&x=2\n')));
   assert.equal(room.anchorPos, 120);
   const variant = room.masterPlaylist.split('\n').find((l) => l.startsWith('/media/jf/')).replace('/media/jf/jellyfin-aa', '');
   assert.ok(jf.allowedStreamPath(variant));
@@ -169,7 +170,12 @@ await check('stream starts and playlists carry no token', async () => {
   assert.equal(seg[0], 0x47);
 });
 await check('seek and stop report to the server', async () => {
+  const infos = () => jfMock.log.filter((x) => x.includes('/PlaybackInfo')).length;
+  const before = infos();
   await rooms.seek('room1', 600);
+  await rooms.seek('room1', 1200);
+  assert.equal(infos(), before, 'a seek must not start a new Jellyfin stream');
+  assert.ok(Math.abs(rooms.position(rooms.get('room1')) - 1200) < 2);
   await rooms.stop('room1', false, 'test');
   const l = jfMock.log.join('\n');
   assert.match(l, /POST \/Sessions\/Playing\b/);

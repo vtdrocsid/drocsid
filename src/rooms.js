@@ -180,7 +180,10 @@ export async function seek(roomId, seconds) {
   if (!room) return null;
   if (room.item.source !== 'plex') throw new Error("You can't seek live TV.");
   const target = Math.max(0, Math.min(seconds, (room.item.duration || seconds) - 5));
-  await load(room, target); // restart Plex's transcode at the new point so every viewer lands together
+  // Plex: restart the transcode at the new point so every viewer lands together.
+  // Jellyfin/Emby: the stream spans the whole title and the server starts transcoding wherever the
+  // players ask, so only the clock moves (a new stream per scrub overloaded it and cut downloads).
+  if (!room.jfSession) await load(room, target);
   room.anchorPos = target;
   room.anchorTime = now();
   emit(room);
