@@ -76,22 +76,14 @@
         <span class="muted small">&nbsp; Plex, Jellyfin or Emby. Each server's libraries and Live TV are turned on in Libraries.</span>
       </section>
 
+      <!-- One Libraries panel per media server (filled in by admin.js) -->
+      <div id="libPanels" class="super-only lib-panels" hidden></div>
+
       <section class="panel super-only" hidden>
-        <h2>Libraries</h2>
-        <p class="desc">Tick the libraries (and each server's Live TV) to show on the Browse page (none ticked = show all), pick each one's default sort, and use ↑ ↓ to set their order. The top one opens first.</p>
-        <div id="libraries" class="list"></div>
-        <h3 class="sub-h">Poster cache</h3>
-        <p class="desc">Posters are saved in /data so pages load fast and survive restarts. Every night at 2:00 AM, every library above that's turned on is refreshed: new titles are ready before anyone browses, changed artwork is picked up, and posters unused for a week are removed.</p>
+        <h2>Poster cache</h2>
+        <p class="desc">Posters are saved in /data so pages load fast and survive restarts. Every night at 2:00 AM, every library that's turned on is refreshed: new titles are ready before anyone browses, changed artwork is picked up, and posters unused for a week are removed.</p>
         <div id="posterCache" class="small"></div>
         <div class="row" style="margin-top:8px"><button class="btn sm" id="postersRefresh">Refresh now</button><button class="btn sm" id="postersClear">Clear cache</button></div>
-      </section>
-
-
-      <section class="panel super-only" hidden>
-        <h2>Live TV</h2>
-        <p class="desc">Channels, guide and tuning come from each server's DVR / Live TV. Turn a server's Live TV on or off in <b>Libraries</b>.</p>
-        <div id="live"></div>
-        <button class="btn" id="refreshLive">Reload channels &amp; guide</button>
       </section>
     </div>
   </main>

@@ -2,6 +2,8 @@
 
 ## 0.5.1 — 2026-11-23
 - Access by server: **Approved users** first, then **Approved roles**, then **Admins**. The wording now says plainly that approved users and roles can browse the libraries and play content in that server.
+- **Libraries: one panel per media server**, headed by the server's icon and name. Each server's Live TV is a row in its panel with an On/Off tag and **Reload channels & guide**; the separate Live TV panel is gone.
+- **Poster cache** is its own panel, on the right.
 - Connections, Libraries, Live TV and Super admins panels are hidden from the start and only shown to super admins (regular admins never see them, even briefly; the server already refused them).
 
 ## 0.5.0 — 2026-11-23

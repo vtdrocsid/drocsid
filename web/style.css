@@ -444,3 +444,8 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .gsw-menu button:hover { background: #f1f8ff; } .gsw-menu button.cur { background: #e3f1fd; font-weight: bold; }
 .who, .who > span, .who .btn, .gsw-btn, .gsw-btn b { white-space: nowrap; }
 .gsw-btn b { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Admin: one Libraries panel per media server */
+.lib-panels { display: contents; }
+.panel h2.h-srv { display: flex; align-items: center; gap: 7px; }
+.srv-ic.sm { width: 17px; height: 17px; border-radius: 4px; font-size: 9px; }

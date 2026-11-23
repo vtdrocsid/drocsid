@@ -107,39 +107,71 @@ function render() {
   if (isSuper) renderConnections();
   if (!isSuper) return; // no library, Live TV or connection settings for regular admins
 
-  // libraries: shown on Browse, default sort, and order
-  const sortNames = { title: 'A–Z', added: 'Recently added', released: 'Release date' };
-  const libBox = $('#libraries');
-  libBox.innerHTML = '';
-  state.libraries.forEach((l, i) => {
-    const row = document.createElement('div');
-    row.className = 'li';
-    row.innerHTML = `<input type="checkbox" ${s.librarySections.includes(l.id) ? 'checked' : ''} title="Show on Browse page">
-      <div class="grow"><div>${l.type === 'live' ? '📡 ' : ''}${esc(l.title)}</div><div class="sub">${l.type === 'live' ? `${l.channels} channels` : l.type === 'show' ? 'TV' : 'Movies'}${l.serverName ? ` · ${esc(l.serverName)} (${esc({ plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' }[l.serverType] || l.serverType)})` : ''}</div></div>
-      <select title="Default sort" ${l.type === 'live' ? 'style="visibility:hidden"' : ''}>${valid.librarySort.map((v) => `<option value="${v}" ${v === (s.librarySort[l.id] || 'title') ? 'selected' : ''}>${sortNames[v]}</option>`).join('')}</select>
-      <button class="btn sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
-      <button class="btn sm" data-move="1" ${i === state.libraries.length - 1 ? 'disabled' : ''} title="Move down">↓</button>`;
-    $('input', row).onchange = () => save({ librarySections: state.libraries.filter((x, j) => libBox.children[j].querySelector('input').checked).map((x) => x.id) });
-    $('select', row).onchange = (e) => save({ librarySort: { [l.id]: e.target.value } });
-    row.querySelectorAll('[data-move]').forEach((b) => {
-      b.onclick = () => {
-        const ids = state.libraries.map((x) => x.id);
-        const j = i + Number(b.dataset.move);
-        [ids[i], ids[j]] = [ids[j], ids[i]];
-        save({ libraryOrder: ids });
-      };
-    });
-    libBox.append(row);
-  });
-
-
-  // live
+  renderLibraries();
   renderPosters();
-  const TN = { plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' };
-  $('#live').innerHTML = (state.live || []).map((x) => `<div class="li"><div class="grow"><div><b>${esc(x.serverName)}</b> <span class="muted small">${TN[x.serverType] || ''}</span>
-      ${x.available ? (x.enabled ? '<span class="pill">On</span>' : '<span class="pill off">Off</span>') : ''}</div>
-      <div class="sub">${x.available ? `<b>${x.channels}</b> channels${x.provider ? ` · ${esc(x.provider)}` : ''}` : esc(x.error && !/no channels/i.test(x.error) ? x.error : 'No Live TV on this server')}</div></div></div>`).join('')
-    || '<p class="muted">No media servers.</p>';
+}
+
+// ---------- libraries: one panel per media server ----------
+const SERVER_ICON = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
+function renderLibraries() {
+  const { settings: s, valid } = state;
+  const sortNames = { title: 'A–Z', added: 'Recently added', released: 'Release date' };
+  const all = state.libraries; // grouped by server, in server order
+  const groups = [];
+  for (const l of all) {
+    let g = groups.find((x) => x.server === l.server);
+    if (!g) groups.push(g = { server: l.server, name: l.serverName || '', type: l.serverType, libs: [] });
+    g.libs.push(l);
+  }
+  const box = $('#libPanels');
+  box.innerHTML = '';
+  const checked = () => [...box.querySelectorAll('input[data-lib]:checked')].map((i) => i.dataset.lib);
+  const liveFor = (serverId) => (state.live || []).find((x) => x.server === serverId);
+  groups.forEach((g) => {
+    const [typeName, cls, letter] = SERVER_ICON[g.type] || [g.type, '', '?'];
+    const panel = document.createElement('section');
+    panel.className = 'panel';
+    panel.innerHTML = `<h2 class="h-srv"><span class="srv-ic sm ${cls}">${letter}</span>Libraries${groups.length > 1 ? ` · ${esc(g.name || typeName)}` : ''}</h2>
+      <p class="desc">Tick the libraries${g.libs.some((l) => l.type === 'live') ? ' (and Live TV)' : ''} to show on the Browse page (none ticked anywhere = show all), pick each one's default sort, and use ↑ ↓ to set their order. The top one opens first.</p>
+      <div class="list"></div>`;
+    const list = $('.list', panel);
+    const lastLib = g.libs.map((l) => l.type).lastIndexOf('movie') > g.libs.map((l) => l.type).lastIndexOf('show')
+      ? g.libs.map((l) => l.type).lastIndexOf('movie') : g.libs.map((l) => l.type).lastIndexOf('show'); // Live TV always comes last
+    g.libs.forEach((l, i) => {
+      const live = l.type === 'live';
+      const lt = live ? liveFor(l.server) : null;
+      const row = document.createElement('div');
+      row.className = 'li';
+      row.innerHTML = `<input type="checkbox" data-lib="${esc(l.id)}" ${s.librarySections.includes(l.id) ? 'checked' : ''} title="Show on Browse page">
+        <div class="grow"><div>${live ? '📡 ' : ''}${esc(l.title)}${live && lt ? (lt.enabled ? ' <span class="pill">On</span>' : ' <span class="pill off">Off</span>') : ''}</div><div class="sub">${live ? `${l.channels} channels${lt?.provider ? ` · ${esc(lt.provider)}` : ''}` : l.type === 'show' ? 'TV' : 'Movies'}</div></div>
+        ${live ? '<button class="btn sm" data-reload title="Fetch the channel list and guide again from every server">Reload channels &amp; guide</button>'
+          : `<select title="Default sort">${valid.librarySort.map((v) => `<option value="${v}" ${v === (s.librarySort[l.id] || 'title') ? 'selected' : ''}>${sortNames[v]}</option>`).join('')}</select>`}
+        ${live ? '' : `<button class="btn sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
+        <button class="btn sm" data-move="1" ${i === lastLib ? 'disabled' : ''} title="Move down">↓</button>`}`;
+      $('input', row).onchange = () => save({ librarySections: checked() });
+      $('select', row)?.addEventListener('change', (e) => save({ librarySort: { [l.id]: e.target.value } }));
+      $('[data-reload]', row)?.addEventListener('click', reloadLive);
+      row.querySelectorAll('[data-move]').forEach((b) => {
+        b.onclick = () => {
+          // Swap within this server; other servers keep their order.
+          const ids = all.map((x) => x.id);
+          const a = ids.indexOf(l.id), other = g.libs[i + Number(b.dataset.move)].id, c = ids.indexOf(other);
+          [ids[a], ids[c]] = [ids[c], ids[a]];
+          save({ libraryOrder: ids });
+        };
+      });
+      list.append(row);
+    });
+    box.append(panel);
+  });
+}
+async function reloadLive() {
+  try {
+    const r = await api('/api/admin/refresh-live', { method: 'POST' });
+    const n = r.filter((x) => x.available).reduce((t, x) => t + x.channels, 0);
+    toast(`${n} channels loaded`);
+    load();
+  } catch (e) { toast(e.message); }
 }
 
 const addUser = (input, key) => {
@@ -275,14 +307,7 @@ $('#gAdminAddBtn').onclick = () => {
 $('#superAddBtn').onclick = () => addUser('#superAdd', 'superAdminUserIds');
 $('#gViewReq').onchange = (e) => { const g = curGuild(); if (g) save({ guildAccess: { [g.id]: { viewRequiresApproval: e.target.checked } } }); };
 $('#gAnnounce').onchange = (e) => { const g = curGuild(); if (g) save({ guildAccess: { [g.id]: { announceInVoiceChat: e.target.checked } } }); };
-$('#refreshLive').onclick = async () => {
-  try {
-    const r = await api('/api/admin/refresh-live', { method: 'POST' });
-    const n = r.filter((x) => x.available).reduce((t, x) => t + x.channels, 0);
-    toast(`${n} channels loaded`);
-    load();
-  } catch (e) { toast(e.message); }
-};
+
 
 async function load() {
   try {
