@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.25 — 2026-11-22
+- Play History shows the last 8 items (was 25). Older history is still kept on the server.
+
 ## 0.2.24 — 2026-11-22
 - Play History: Live TV entries show the programme that was on when the stream started (title, with
   channel and sub-title underneath) and the programme's poster instead of the station logo.
