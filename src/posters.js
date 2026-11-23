@@ -43,7 +43,13 @@ function write(hash, buf, type) {
 async function fetchAndSave(ref, w, h) {
   const r = await sources.image(ref, w, h);
   if (!r) return { status: 400 };
-  if (!r.ok) return { status: r.status };
+  if (!r.ok) {
+    if (r.status === 404) {
+      if (missing.size > 20000) missing.clear();
+      missing.set(hashOf(ref, w, h), Date.now());
+    }
+    return { status: r.status };
+  }
   const type = (r.headers.get('content-type') || 'image/jpeg').split(';')[0];
   const buf = Buffer.from(await r.arrayBuffer());
   if (!buf.length) return { status: 502 };
@@ -51,9 +57,15 @@ async function fetchAndSave(ref, w, h) {
   return { buf, type };
 }
 
+// Titles that have no poster: not asked for again for 6 hours.
+const missing = new Map(); // hash -> time
+const MISSING_MS = 6 * 3600_000;
+
 /** A poster for the browser: { file, type } from disk, { buf, type } freshly fetched, or { status }. */
 export async function get(ref, w, h) {
   const hash = hashOf(ref, w, h);
+  const miss = missing.get(hash);
+  if (miss && Date.now() - miss < MISSING_MS) return { status: 404 };
   const hit = index.get(hash);
   if (hit && fs.existsSync(fileOf(hash, hit.ext))) {
     if (Date.now() - hit.at > 86400_000) { // note that it's still used (once a day is enough)
@@ -108,11 +120,11 @@ export function refreshAll(reason = 'nightly') {
     } catch (e) { console.warn('[posters] could not list libraries:', e.message); }
     const list = [...refs];
     console.log(`[posters] ${reason} refresh: ${list.length} posters`);
-    let fetched = 0, failed = 0;
+    let fetched = 0, failed = 0, none = 0;
     progress = { done: 0, total: list.length };
     await mapLimit(list, PARALLEL, async (ref) => {
       const r = await fetchAndSave(ref, 300, 450).catch(() => ({ status: 500 }));
-      if (r.buf) fetched++; else failed++;
+      if (r.buf) fetched++; else if (r.status === 404) none++; else failed++;
       progress.done++;
     });
     // Remove posters not written or used for a week (other sizes, removed titles, old artwork).
@@ -124,14 +136,15 @@ export function refreshAll(reason = 'nightly') {
       index.delete(hash);
       removed++;
     }
-    last = { at: started, ms: Date.now() - started, reason, posters: list.length, fetched, failed, removed };
-    console.log(`[posters] done in ${Math.round(last.ms / 1000)} s: ${fetched} saved, ${failed} failed, ${removed} removed`);
+    last = { at: started, ms: Date.now() - started, reason, posters: list.length, fetched, failed, none, removed };
+    console.log(`[posters] done in ${Math.round(last.ms / 1000)} s: ${fetched} saved, ${none} without a poster, ${failed} failed, ${removed} removed`);
   })().finally(() => { running = null; progress = null; });
   return running;
 }
 
 /** Remove every saved poster (they're fetched again as people browse, or at the next refresh). */
 export function clear() {
+  missing.clear();
   for (const [hash, v] of index) fs.rmSync(fileOf(hash, v.ext), { force: true });
   index.clear();
 }

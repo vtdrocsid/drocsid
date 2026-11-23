@@ -86,7 +86,9 @@ await check('library filter and order from settings', async () => {
 });
 await check('library items', async () => {
   const r = await sources.libraryItems('jellyfin-aa~movies', { start: 0, size: 60, sort: 'title' });
-  assert.equal(r.total, 2);
+  assert.equal(r.total, 3);
+  // Posters don't depend on ImageTags (list replies can leave them out).
+  assert.equal(r.items.find((x) => x.ratingKey === 'jellyfin-aa~m3').thumb, 'jellyfin-aa~img:m3');
   const a = r.items[0];
   assert.equal(a.ratingKey, 'jellyfin-aa~m1');
   assert.equal(a.title, 'Alpha Movie (2001)');
@@ -97,7 +99,7 @@ await check('library items', async () => {
 });
 await check('A–Z jump bar counts', async () => {
   const L = await sources.libraryLetters('jellyfin-aa~movies');
-  assert.deepEqual(L.map((x) => [x.key, x.size]), [['A', 1], ['B', 1]]);
+  assert.deepEqual(L.map((x) => [x.key, x.size]), [['A', 1], ['B', 1], ['G', 1]]);
 });
 await check('show → seasons → episodes', async () => {
   const seasons = await sources.children('jellyfin-aa~s1');
@@ -258,8 +260,12 @@ await check('refresh fetches every poster of the libraries that are on', async (
   settings.update({ librarySections: ['jellyfin-aa~movies', 'jellyfin-aa~shows'] });
   await posters.refreshAll('test');
   const st = posters.status();
-  assert.equal(st.last.posters, 2, JSON.stringify(st.last)); // m1 and s1 have posters (m2 has none)
+  assert.equal(st.last.posters, 4, JSON.stringify(st.last)); // m1, m2, m3, s1
+  assert.equal(st.last.fetched, 3);
+  assert.equal(st.last.none, 1); // m2 has no poster: not a failure
   assert.equal(st.last.failed, 0);
+  const miss = await posters.get('jellyfin-aa~img:m2', 300, 450);
+  assert.equal(miss.status, 404);
   assert.ok(st.files >= 2);
   assert.ok(st.next > Date.now() && new Date(st.next).getHours() === 2);
   posters.clear();

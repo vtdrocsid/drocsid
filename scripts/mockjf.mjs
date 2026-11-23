@@ -11,9 +11,10 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     m2: { Id: 'm2', Name: 'Beta Movie', Type: 'Movie', ProductionYear: 2005, RunTimeTicks: 90 * 60 * 1e7 },
     s1: { Id: 's1', Name: 'Some Show', Type: 'Series', ProductionYear: 2010, ChildCount: 1, ImageTags: { Primary: 'y' } },
     se1: { Id: 'se1', Name: 'Season 1', Type: 'Season', SeriesName: 'Some Show', SeriesId: 's1', SeriesPrimaryImageTag: 'y', IndexNumber: 1, ParentId: 's1' },
+    m3: { Id: 'm3', Name: 'Gamma Movie', Type: 'Movie', ProductionYear: 2012 }, // poster exists, but no ImageTags in replies
     e1: { Id: 'e1', Name: 'Pilot', Type: 'Episode', SeriesName: 'Some Show', SeriesId: 's1', SeriesPrimaryImageTag: 'y', ParentIndexNumber: 1, IndexNumber: 1, RunTimeTicks: 30 * 60 * 1e7, ParentId: 'se1' },
   };
-  const lib = { movies: ['m1', 'm2'], shows: ['s1'] };
+  const lib = { movies: ['m1', 'm2', 'm3'], shows: ['s1'] };
   const authed = (req) => (req.headers.authorization || '').includes(`Token="${token}"`) || req.headers['x-emby-token'] === token;
 
   const server = http.createServer(async (req, res) => {
@@ -46,6 +47,7 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     let m = p.match(/^\/Users\/u1\/Items\/(\w+)$/);
     if (m) return items[m[1]] ? json(items[m[1]]) : json({}, 404);
     m = p.match(/^\/Items\/(\w+)\/Images\/Primary$/);
+    if (m && m[1] === 'm2') { res.writeHead(404); return res.end(); } // a title with no poster at all
     if (m) {
       stats.imgRequests++;
       if (flakyImages) {

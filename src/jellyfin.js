@@ -101,7 +101,10 @@ function toItem(srv, m) {
     title = `${m.SeriesName ? m.SeriesName + ' ' : ''}${se} — ${m.Name}`;
   }
   // Poster: the item's own, else its season's or series'.
-  const thumbId = m.ImageTags?.Primary ? m.Id : m.SeriesPrimaryImageTag && m.SeriesId ? m.SeriesId : null;
+  // Poster: don't rely on ImageTags (list replies sometimes leave them out); ask for the title's own
+  // poster, or for seasons/episodes without one, the show's. A title with no poster just 404s.
+  const ownless = (kind === 'season' || kind === 'episode') && !m.ImageTags?.Primary && m.SeriesId;
+  const thumbId = ownless ? m.SeriesId : m.Id;
   return {
     source: 'plex', // "library title" (as opposed to 'live'); the server is in `server`
     server: srv.id,

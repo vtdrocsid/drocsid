@@ -237,7 +237,7 @@ function renderPosters() {
   const l = p.last;
   $('#posterCache').innerHTML = `<div><b>${p.files.toLocaleString()}</b> posters saved · ${mb(p.bytes)}</div>
     ${p.running ? `<div class="wait">Refreshing now… ${p.progress ? `${p.progress.done.toLocaleString()} of ${p.progress.total.toLocaleString()}` : 'listing libraries'}</div>`
-      : l ? `<div class="muted">Last refresh ${when(l.at)} (${esc(l.reason)}): ${l.fetched.toLocaleString()} saved${l.failed ? `, <span class="error">${l.failed} failed</span>` : ''}, ${l.removed} removed, took ${dur(l.ms)}</div>`
+      : l ? `<div class="muted">Last refresh ${when(l.at)} (${esc(l.reason)}): ${l.fetched.toLocaleString()} saved${l.none ? `, ${l.none} without a poster` : ''}${l.failed ? `, <span class="error">${l.failed} failed</span>` : ''}, ${l.removed} removed, took ${dur(l.ms)}</div>`
       : '<div class="muted">Not refreshed yet since drocsid started.</div>'}
     <div class="muted">Next refresh ${when(p.next)} · container time zone ${esc(p.timeZone)}</div>`;
   $('#postersRefresh').disabled = p.running;
