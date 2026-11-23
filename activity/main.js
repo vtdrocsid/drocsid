@@ -91,6 +91,9 @@ function bufferedAhead() {
 }
 
 function loadStream() {
+  const newTitle = loadedVersion?.split(':')[0] !== state.source || state.title !== loadStream.title;
+  loadStream.title = state.title;
+  if (newTitle) samples = [];
   loadedVersion = `${state.source}:${state.playlistVersion}`;
   if (hls) { hls.destroy(); hls = null; }
   const src = `/media/t/${encodeURIComponent(token)}/${state.playlist}`;
@@ -222,6 +225,67 @@ function applyState(s) {
   if (loadedVersion !== `${s.source}:${s.playlistVersion}`) return loadStream();
   sync(wasPlaying !== s.playing);
 }
+
+// ---------- picture sizing ----------
+// Show the whole picture as large as the window allows (never cropping real picture). Some files have
+// black borders baked in (letterbox/pillarbox/windowbox); those are detected from the frames and left
+// off-screen, so the real picture can use the whole window.
+const crop = { t: 0, b: 0, l: 0, r: 0 };       // detected borders, as fractions of the frame
+let samples = [];                                // recent per-frame border measurements
+const probe = document.createElement('canvas');
+probe.width = 160; probe.height = 90;
+const pctx = probe.getContext('2d', { willReadFrequently: true });
+
+function layout() {
+  const vw = video.videoWidth, vh = video.videoHeight, ww = innerWidth, wh = innerHeight;
+  if (!vw || !vh) return;
+  const cw = vw * (1 - crop.l - crop.r), ch = vh * (1 - crop.t - crop.b); // real picture, in video pixels
+  const s = Math.min(ww / cw, wh / ch);                                      // fit it inside the window
+  const x = (ww - cw * s) / 2 - vw * crop.l * s, y = (wh - ch * s) / 2 - vh * crop.t * s;
+  video.style.width = `${vw * s}px`;
+  video.style.height = `${vh * s}px`;
+  video.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+/** Fraction of black rows/columns at each edge of the current frame. */
+function measure() {
+  try { pctx.drawImage(video, 0, 0, 160, 90); } catch { return null; }
+  const d = pctx.getImageData(0, 0, 160, 90).data;
+  const lum = (x, y) => { const i = (y * 160 + x) * 4; return 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; };
+  const rowDark = (y) => { let m = 0; for (let x = 0; x < 160; x += 2) m = Math.max(m, lum(x, y)); return m < 28; };
+  const colDark = (x) => { let m = 0; for (let y = 0; y < 90; y += 2) m = Math.max(m, lum(x, y)); return m < 28; };
+  let t = 0; while (t < 45 && rowDark(t)) t++;
+  let b = 0; while (b < 45 && rowDark(89 - b)) b++;
+  let l = 0; while (l < 80 && colDark(l)) l++;
+  let r = 0; while (r < 80 && colDark(159 - r)) r++;
+  if (t >= 45 || l >= 80) return null;            // a fully dark frame tells us nothing
+  return { t: t / 90, b: b / 90, l: l / 160, r: r / 160 };
+}
+
+/** Borders count only if every recent frame agrees (so dark scenes never trigger a crop). */
+let lastSampleAt = 0;
+function detectBorders() {
+  if (video.paused || video.readyState < 2 || Date.now() - lastSampleAt < 2000) return;
+  lastSampleAt = Date.now();
+  const m = measure();
+  if (!m) return;
+  samples.push(m);
+  if (samples.length > 6) samples.shift();
+  if (samples.length < 3) return;
+  const min = (k) => Math.max(0, Math.min(...samples.map((s) => s[k])) - 0.005); // tiny safety margin
+  const next = { t: min('t'), b: min('b'), l: min('l'), r: min('r') };
+  if (1 - next.t - next.b < 0.3 || 1 - next.l - next.r < 0.3) return;            // implausible; ignore
+  const changed = ['t', 'b', 'l', 'r'].some((k) => Math.abs(next[k] - crop[k]) > 0.01);
+  if (changed) { Object.assign(crop, next); layout(); }
+}
+function resetBorders() { samples = []; Object.assign(crop, { t: 0, b: 0, l: 0, r: 0 }); layout(); }
+
+addEventListener('resize', layout);
+video.addEventListener('loadedmetadata', () => { resetBorders(); layout(); });
+video.addEventListener('resize', layout);
+setInterval(() => { layout(); detectBorders(); }, 1000); // re-fit every second even if a resize event was missed
+document.addEventListener('fullscreenchange', layout);
+new ResizeObserver(layout).observe(document.documentElement);
 
 // ---------- click the picture to pause / play ----------
 // Paused: ⏸ stays in the center. When it plays again: switch to ▶ and fade out over 0.25 s.

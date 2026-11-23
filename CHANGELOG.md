@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.34 — 2026-11-22
+- Activity player sizing: the picture is sized by the player itself on every window change (and re-checked
+  every second), so it keeps scaling after play/pause and full screen. Black borders baked into the video
+  (letterbox, pillarbox, or both) are detected from the frames and kept off-screen, so the real picture
+  is as large as the window allows. Dark scenes never trigger a crop (borders must show in every recent frame).
+
 ## 0.2.33 — 2026-11-22
 - Pause indicator reworked: when paused (screen click or the ⏸ button), a ⏸ sits in the center until it
   plays again; on play it turns into ▶ and fades out over 0.25 s. No pop animation on pause.
