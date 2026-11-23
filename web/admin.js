@@ -154,7 +154,9 @@ async function load() {
   try {
     const me = await api('/api/me');
     $('#who').innerHTML = `Signed in as <b>${esc(me.name)}</b>`;
-    $('#today').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).replace(/,/g, '') + (me.version ? ` · v${me.version}` : '');
+    const d = new Date();
+    $('#today').textContent = `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getDate()}, ${d.getFullYear()}`;
+    if (me.version) { const v = document.createElement('span'); v.className = 'ver'; v.textContent = ` · v${me.version}`; $('#today').append(v); }
     state = await api('/api/admin/state');
     $('#msg').hidden = true;
     $('#admin').hidden = false;

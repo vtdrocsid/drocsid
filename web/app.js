@@ -22,12 +22,17 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2500);
 }
 
+// "Monday November 23, 2026" (shown upper-case by CSS)
+function todayText(d = new Date()) {
+  return `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
 // ---------- boot ----------
 let me = null;
 async function boot() {
-  $('#today').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).replace(/,/g, '');
+  $('#today').textContent = todayText();
   try { me = await api('/api/me'); } catch { $('#signin').hidden = false; return; }
-  if (me.version) $('#today').textContent += ` · v${me.version}`;
+  if (me.version) $('#today').append(h(`<span class="ver"> · v${esc(me.version)}</span>`));
   $('#who').innerHTML = `<span>Signed in as <b>${esc(me.name)}</b></span><button class="btn sm" id="logout">Sign out</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
   if (!me.approved) { $('#denied').hidden = false; return; }

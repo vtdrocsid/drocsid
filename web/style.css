@@ -28,6 +28,7 @@ a { color: var(--link); }
   font: bold 10px/1.6 var(--tiny); letter-spacing: 1.5px; text-transform: uppercase; color: #fff; }
 .utilbar nav button::before, .utilbar nav a::before { content: "■ "; color: var(--azure2); font-size: 8px; }
 .utilbar nav button:hover, .utilbar nav a:hover, .utilbar nav button.active, .utilbar nav a.active-link { color: var(--azure2); }
+.today .ver { color: #fff; }
 .today { margin-left: auto; color: #9fc8ee; font: bold 10px var(--tiny); letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; }
 
 .banner { display: flex; align-items: center; gap: 22px; padding: 16px 22px; min-height: 104px; flex-wrap: wrap;

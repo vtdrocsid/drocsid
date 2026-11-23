@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.38 — 2026-11-23
+- Top bar: date reads "MONDAY NOVEMBER 23, 2026"; the version is white, like the Admin link.
+
 ## 0.2.37 — 2026-11-23
 - The running version is shown in the top bar next to the date (browse and admin pages).
 - First release built by GitHub Actions and installed through Unraid's Update button.
