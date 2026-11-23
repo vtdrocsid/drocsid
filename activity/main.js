@@ -211,6 +211,9 @@ function applyState(s) {
   $('#badge').textContent = isLive() ? 'LIVE' : `Started by ${s.startedBy}`;
   $('#badge').classList.toggle('live', isLive());
   $('#playPause').textContent = s.playing ? '⏸' : '▶';
+  // Everyone sees the change, whoever made it; a resting ▶ stays up while paused.
+  if (wasPlaying !== undefined && wasPlaying !== s.playing && loadedVersion) ppFlash(s.playing);
+  $('#pausedMark').hidden = s.playing || isLive();
   $('#seek').hidden = isLive();
   $('#liveTag').hidden = !isLive(); // takes the progress bar's place so the controls line up the same
   if (!isLive()) $('#seek').max = Math.floor(s.duration);
@@ -220,6 +223,27 @@ function applyState(s) {
   sync(wasPlaying !== s.playing);
 }
 
+// ---------- click the picture to pause / play ----------
+const icon = (playing) => `<span class="${playing ? 'ico-play' : 'ico-pause'}"></span>`;
+$('#pausedMark').innerHTML = icon(true);
+function ppFlash(playing) {
+  const el = $('#ppFlash');
+  el.innerHTML = icon(playing);
+  el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+}
+function note(msg) {
+  const el = $('#note');
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(note.t); note.t = setTimeout(() => { el.hidden = true; }, 2000);
+}
+let gestureClick = false; // the first click that starts playback (browser autoplay rule) doesn't also pause
+document.addEventListener('click', (e) => {
+  if (gestureClick) { gestureClick = false; return; }
+  if (!state.active || e.target.closest('button, input, a, .bottom, .top')) return;
+  if (canControl()) control(state.playing ? 'pause' : 'resume');
+  else note(`Only ${state.startedBy} can pause or play`);
+});
+
 // ---------- controls ----------
 $('#playPause').onclick = () => control(state.playing ? 'pause' : 'resume');
 $('#stop').onclick = () => control('stop');
@@ -228,8 +252,8 @@ $('#seek').onchange = () => { seeking = false; control('seek', Number($('#seek')
 $('#tapToPlay').onclick = () => { $('#tapToPlay').hidden = true; video.muted = false; tryPlay(); };
 // Any click or tap in the Activity counts as the "start watching" gesture browsers require.
 document.addEventListener('pointerdown', () => {
-  if (!$('#tapToPlay').hidden) { $('#tapToPlay').hidden = true; video.muted = false; tryPlay(); }
-  else if (!$('#unmute').hidden) { video.muted = false; $('#unmute').hidden = true; }
+  if (!$('#tapToPlay').hidden) { gestureClick = true; $('#tapToPlay').hidden = true; video.muted = false; tryPlay(); }
+  else if (!$('#unmute').hidden) { gestureClick = true; video.muted = false; $('#unmute').hidden = true; }
 }, true);
 $('#unmute').onclick = () => { video.muted = false; $('#unmute').hidden = true; };
 $('#volume').oninput = () => {

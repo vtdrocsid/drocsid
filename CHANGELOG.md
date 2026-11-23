@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.32 — 2026-11-22
+- Activity player: click the picture to pause / play (the person who started it). A big ▶ / ⏸ icon pops and
+  fades for everyone on each change, and a ▶ stays in the middle while paused. Others clicking see
+  "Only <name> can pause or play".
+
 ## 0.2.31 — 2026-11-22
 - Activity player: title, timeline and controls, and the mouse pointer, hide after 1.5 s without mouse
   movement and come back as soon as the mouse moves (they stay up while dragging the timeline or volume).
