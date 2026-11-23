@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.30 — 2026-11-22
+- Activity player always shows the whole picture, scaled as large as the window allows (no cropping);
+  black bars appear only where the window's shape differs from the video's.
+
 ## 0.2.29 — 2026-11-22
 - Activity player always fills the window (what the Fill button did); Fill and Full screen buttons removed.
 
