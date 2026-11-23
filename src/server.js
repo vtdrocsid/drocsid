@@ -11,6 +11,8 @@ import * as settingsMod from './settings.js';
 import * as auth from './auth.js';
 import * as plex from './plex.js';
 import * as sources from './sources.js';
+import * as posters from './posters.js';
+import fs from 'node:fs';
 import * as jf from './jellyfin.js';
 import * as rooms from './rooms.js';
 import { announce, announceNowPlaying } from './bot.js';
@@ -193,12 +195,13 @@ app.get('/api/item/:key', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/thumb', needSession, needApproved, wrap(async (req, res) => {
   const w = Math.min(1280, Number(req.query.w) || 300);
   const h = Math.min(1280, Number(req.query.h) || 450);
-  const upstream = await sources.image(String(req.query.path || ''), w, h);
-  if (!upstream) return res.status(400).end();
-  if (!upstream.ok) return res.status(upstream.status).end();
-  res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
+  // From the poster cache on disk when present; otherwise fetched from the server and saved.
+  const p = await posters.get(String(req.query.path || ''), w, h);
+  if (p.status) return res.status(p.status).end();
+  res.set('Content-Type', p.type);
   res.set('Cache-Control', 'private, max-age=86400');
-  Readable.fromWeb(upstream.body).pipe(res);
+  if (p.buf) return res.end(p.buf);
+  fs.createReadStream(p.file).on('error', () => res.destroy()).pipe(res);
 }));
 
 // Hover card: compact details for one poster, cached briefly so sweeping the mouse over the grid is cheap.
@@ -489,6 +492,7 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
     directory: { members: [...everyone.values()].sort((a, b) => a.name.localeCompare(b.name)) },
     libraries: sup ? libs : undefined,
     live: sup ? await sources.liveStatus() : undefined,
+    posters: sup ? posters.status() : undefined,
     streams: rooms.all().map((r) => ({
       voiceChannelId: r.id,
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
@@ -518,6 +522,16 @@ app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
 app.get('/api/admin/guide-debug', needSession, needSuper, wrap(async (req, res) => {
   res.json(await plex.guideDebug(String(req.query.id || '')));
 }));
+
+// Poster cache: refresh now (runs in the background) or empty it.
+app.post('/api/admin/posters/refresh', needSession, needSuper, (req, res) => {
+  posters.refreshAll(`started by ${req.session.username}`);
+  res.json(posters.status());
+});
+app.post('/api/admin/posters/clear', needSession, needSuper, (req, res) => {
+  posters.clear();
+  res.json(posters.status());
+});
 
 app.post('/api/admin/refresh-live', needSession, needSuper, wrap(async (req, res) => {
   sources.clearLiveCache();

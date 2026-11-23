@@ -242,6 +242,31 @@ await check('guide for one server', async () => {
   assert.ok(rows.length && rows.every((r) => r.server === 'jellyfin-aa'));
 });
 
+console.log('Poster cache');
+const posters = await import('../src/posters.js');
+await check('posters saved to disk and served from there', async () => {
+  const before = jfMock.log.length;
+  const first = await posters.get('jellyfin-aa~img:m1', 300, 450);
+  assert.equal(first.buf.toString(), 'JPEGDATA');
+  const second = await posters.get('jellyfin-aa~img:m1', 300, 450);
+  assert.ok(second.file && fs.readFileSync(second.file, 'utf8') === 'JPEGDATA');
+  assert.equal(jfMock.log.filter((x, i) => i >= before && x.includes('/Images/')).length <= 1, true);
+  const bad = await posters.get('nope~img:m1', 300, 450);
+  assert.equal(bad.status, 400);
+});
+await check('refresh fetches every poster of the libraries that are on', async () => {
+  settings.update({ librarySections: ['jellyfin-aa~movies', 'jellyfin-aa~shows'] });
+  await posters.refreshAll('test');
+  const st = posters.status();
+  assert.equal(st.last.posters, 2, JSON.stringify(st.last)); // m1 and s1 have posters (m2 has none)
+  assert.equal(st.last.failed, 0);
+  assert.ok(st.files >= 2);
+  assert.ok(st.next > Date.now() && new Date(st.next).getHours() === 2);
+  posters.clear();
+  assert.equal(posters.status().files, 0);
+  settings.update({ librarySections: [] });
+});
+
 console.log('Several Plex servers');
 const plex = await import('../src/plex.js');
 await check('calls go to the chosen Plex server', async () => {

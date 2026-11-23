@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.4 — 2026-11-23
+- **Poster cache on disk** (`/data/cache/posters`) for every media server: posters load from drocsid's own disk and survive restarts and updates.
+- **Nightly refresh at 2:00 AM** (container time zone): every library that's turned on gets its posters fetched again (new titles ready ahead of time, changed artwork picked up); posters unused for a week are removed.
+- Admin → Libraries → Poster cache: count and size, last and next refresh, time zone, **Refresh now** and **Clear cache**.
+
 ## 0.4.3 — 2026-11-23
 - Jellyfin/Emby posters that sometimes didn't show: drocsid now asks for at most 6 at a time per server, waits longer for each, retries once, and keeps recent posters in memory; the page also re-requests a poster that failed. Failures are logged as `[jf image]`.
 

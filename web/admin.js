@@ -136,6 +136,7 @@ function render() {
   $('#announceInVoiceChat').checked = s.announceInVoiceChat;
 
   // live
+  renderPosters();
   const TN = { plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' };
   $('#live').innerHTML = (state.live || []).map((x) => `<div class="li"><div class="grow"><div><b>${esc(x.serverName)}</b> <span class="muted small">${TN[x.serverType] || ''}</span>
       ${x.available ? (x.enabled ? '<span class="pill">On</span>' : '<span class="pill off">Off</span>') : ''}</div>
@@ -226,6 +227,29 @@ function renderConnections() {
     media.append(el);
   });
 }
+// ---------- poster cache ----------
+function renderPosters() {
+  const p = state.posters;
+  if (!p) return;
+  const mb = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.round(b / 1048576)} MB`);
+  const when = (ms) => new Date(ms).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const dur = (ms) => (ms >= 60000 ? `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s` : `${Math.round(ms / 1000)} s`);
+  const l = p.last;
+  $('#posterCache').innerHTML = `<div><b>${p.files.toLocaleString()}</b> posters saved · ${mb(p.bytes)}</div>
+    ${p.running ? `<div class="wait">Refreshing now… ${p.progress ? `${p.progress.done.toLocaleString()} of ${p.progress.total.toLocaleString()}` : 'listing libraries'}</div>`
+      : l ? `<div class="muted">Last refresh ${when(l.at)} (${esc(l.reason)}): ${l.fetched.toLocaleString()} saved${l.failed ? `, <span class="error">${l.failed} failed</span>` : ''}, ${l.removed} removed, took ${dur(l.ms)}</div>`
+      : '<div class="muted">Not refreshed yet since drocsid started.</div>'}
+    <div class="muted">Next refresh ${when(p.next)} · container time zone ${esc(p.timeZone)}</div>`;
+  $('#postersRefresh').disabled = p.running;
+}
+$('#postersRefresh').onclick = async () => {
+  try { state.posters = await api('/api/admin/posters/refresh', { method: 'POST' }); renderPosters(); toast('Refreshing posters in the background'); } catch (e) { toast(e.message); }
+};
+$('#postersClear').onclick = async () => {
+  if (!confirm('Remove all saved posters? They are fetched again as people browse, or at the next refresh.')) return;
+  try { state.posters = await api('/api/admin/posters/clear', { method: 'POST' }); renderPosters(); toast('Poster cache cleared'); } catch (e) { toast(e.message); }
+};
+
 const plexHealth = {};
 async function checkPlex(p, announce = false) {
   try { plexHealth[p.id] = await api(`/api/connections/media/${encodeURIComponent(p.id)}/health`); }
