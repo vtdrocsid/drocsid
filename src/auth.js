@@ -9,9 +9,33 @@ import * as discord from './discord.js';
 export function isSuperAdmin(userId) {
   return config.ownerIds.includes(userId) || (settings().superAdminUserIds || []).includes(userId);
 }
-/** Any admin: super admins plus regular admins (users, roles, admins and access settings only). */
-export function isAdmin(userId) {
-  return isSuperAdmin(userId) || settings().adminUserIds.includes(userId);
+/**
+ * Admin of a Discord server: super admins everywhere, regular admins in the servers they were
+ * made admin of (approved users and roles, admins and access settings of that server only).
+ * Without a server: admin of any server.
+ */
+export function isAdmin(userId, guildId = null) {
+  if (isSuperAdmin(userId)) return true;
+  const ga = settings().guildAccess || {};
+  if (guildId) return (ga[guildId]?.adminIds || []).includes(userId);
+  return Object.values(ga).some((a) => (a.adminIds || []).includes(userId));
+}
+
+/** Is the user a member of this server? (bot's member cache, else one lookup) */
+export async function isMember(userId, guildId) {
+  const guild = discord.guild(guildId);
+  if (!guild) return false;
+  if (guild.members.cache.has(userId)) return true;
+  try { await guild.members.fetch(userId); return true; } catch { return false; }
+}
+
+/** Servers (with a drocsid bot) the user can choose on the website: theirs, or all for super admins. */
+export async function memberGuilds(userId) {
+  const all = guildList();
+  if (isSuperAdmin(userId)) return all;
+  const out = [];
+  for (const g of all) if (await isMember(userId, g.id)) out.push(g);
+  return out;
 }
 
 /** Who is approved in one Discord server: { userIds, roleIds }. */
@@ -19,7 +43,7 @@ export const accessFor = (guildId) => settings().guildAccess?.[guildId] || { use
 
 /** True if the user may browse and start streams in this server. Admins are approved everywhere. */
 export async function isApproved(userId, guildId) {
-  if (isAdmin(userId)) return true;
+  if (isAdmin(userId, guildId)) return true;
   if (!guildId) return (await approvedGuilds(userId)).length > 0;
   const a = accessFor(guildId);
   if (a.userIds.includes(userId)) return true;
@@ -37,7 +61,7 @@ export async function isApproved(userId, guildId) {
 /** Every server (with a drocsid bot in it) where the user is approved. */
 export async function approvedGuilds(userId) {
   const ids = discord.guilds().map((g) => g.guild.id);
-  if (isAdmin(userId)) return ids;
+  if (isSuperAdmin(userId)) return ids;
   const out = [];
   for (const id of ids) if (await isApproved(userId, id)) out.push(id);
   return out;

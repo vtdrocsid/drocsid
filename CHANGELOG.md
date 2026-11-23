@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 — 2026-11-23
+- **Choose your Discord after signing in.** People in more than one server with drocsid pick which one they're watching in; the top bar shows it and switches it. Voice channels, Watching Now, Upcoming Lineup and Play History are for that server. Super admins also get **All servers**. One server: picked automatically.
+- **Admins are per server.** Admin → Access by server has each server's approved roles, approved users, **admins**, and its own "viewers must be approved" and "now playing in voice chat" settings. A regular admin sees and changes only the server they're signed into; super admins see every server.
+- Existing admins became admins of the servers that existed before; each server starts with the previous global values of the two settings.
+- "Use for web sign-in" is gone; signing in to the website no longer depends on picking a Discord app.
+
 ## 0.4.7 — 2026-11-23
 - Fixed posters that stayed missing after the media server got them: a saved poster now always wins over an earlier "no poster" answer, that answer is only remembered for 30 minutes, and every refresh asks again for everything.
 

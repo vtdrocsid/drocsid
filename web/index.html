@@ -30,6 +30,20 @@
       <a class="btn primary big" href="/auth/login">Sign in with Discord</a>
     </section>
 
+    <section id="pickGuild" class="gate pick-guild" hidden>
+      <div class="strip"><span class="lo">Choose your</span>Discord</div>
+      <div class="pg-in">
+        <h2>Which Discord?</h2>
+        <p class="muted">You're in more than one server with drocsid. Pick where you're watching. You can switch any time from the top bar.</p>
+        <div id="guildCards" class="pg-cards"></div>
+      </div>
+    </section>
+
+    <section id="noGuild" class="center gate" hidden>
+      <h1>No server yet</h1>
+      <p>You're signed in, but you're not in any Discord server that has drocsid. Ask whoever runs it for an invite.</p>
+    </section>
+
     <section id="denied" class="center gate" hidden>
       <h1>Waiting for approval</h1>
       <p>You're signed in, but you haven't been approved to browse yet. Ask an admin to add you.</p>

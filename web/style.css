@@ -383,7 +383,8 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .gtabs button img, .gtabs button .gi { width: 18px; height: 18px; border-radius: 50%; background: #5865f2; color: #fff; display: inline-grid; place-items: center; font-size: 10px; }
 .gtabs button.active { background: linear-gradient(#2a8fe0, #135ea8); color: #fff; border-color: var(--navy); }
 .gtabs button .cnt { font-weight: normal; opacity: .8; }
-.access-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.access-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+@media (max-width: 1100px) { .access-cols { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 800px) { .access-cols { grid-template-columns: 1fr; } }
 .access-cols .sub-h:first-child { margin-top: 0; }
 .pill { font: bold 9px var(--tiny); padding: 2px 7px; border-radius: 9px; background: #e6f4e6; color: #2f7a2f; border: 1px solid #b8deb8; white-space: nowrap; }
@@ -423,3 +424,21 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .qs { display: flex; align-items: center; flex-wrap: wrap; }
 .q-srv { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; text-transform: none; letter-spacing: 0; }
 .wait { color: #b7791f; font-weight: bold; }
+
+/* ---------- which Discord: picker and top-bar switcher ---------- */
+.pick-guild { max-width: 900px; margin: 30px auto; background: #fff; border: 1px solid #9aa2ab; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
+.pg-in { padding: 18px 22px 22px; }
+.pg-in h2 { margin: 0 0 4px; font: bold 20px Arial, sans-serif; color: var(--azure); }
+.pg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 14px; }
+.pg-card { display: flex; gap: 12px; align-items: center; padding: 14px; border: 2px solid #d3d8de; background: #fff; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.pg-card:hover { border-color: var(--azure); background: #f1f8ff; }
+.pg-card .gi { width: 44px; height: 44px; font-size: 18px; }
+.pg-card b { display: block; } .pg-card small { display: block; color: var(--muted); font-size: 11px; }
+.gi { width: 22px; height: 22px; border-radius: 50%; background: #5865f2; color: #fff; display: inline-grid; place-items: center; font: 900 11px Arial, sans-serif; flex: none; object-fit: cover; }
+.gi.all { background: var(--azure); }
+.tag-super { font: bold 9px var(--tiny); font-style: normal; padding: 1px 6px; border-radius: 8px; background: #fff4dc; color: #b7791f; border: 1px solid #ecd29b; margin-left: 4px; }
+.gswitch { position: relative; }
+.gsw-btn { display: flex; align-items: center; gap: 7px; border: 1px solid #b3b9c1; background: #fff; padding: 3px 9px 3px 4px; cursor: pointer; font: inherit; font-size: 12px; color: inherit; }
+.gsw-menu { position: absolute; right: 0; top: calc(100% + 3px); z-index: 40; min-width: 240px; background: #fff; border: 1px solid #9aa2ab; box-shadow: 0 8px 20px rgba(0,0,0,.2); }
+.gsw-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-bottom: 1px solid #eee; background: #fff; cursor: pointer; font: inherit; font-size: 12px; color: inherit; text-align: left; }
+.gsw-menu button:hover { background: #f1f8ff; } .gsw-menu button.cur { background: #e3f1fd; font-weight: bold; }

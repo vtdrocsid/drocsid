@@ -26,8 +26,8 @@
       </section>
 
       <section class="panel" style="grid-column: 1 / -1">
-        <h2>Access by server</h2>
-        <p class="desc">Who can browse and start streams, set separately for each Discord server a drocsid bot is in. Admins are approved everywhere.</p>
+        <h2 id="accessTitle">Access by server</h2>
+        <p class="desc">Who can browse and start streams, and who admins it, set separately for each Discord server a drocsid bot is in. Super admins are approved everywhere.</p>
         <div id="guildTabs" class="gtabs"></div>
         <div id="guildAccess" class="access-cols">
           <div>
@@ -41,19 +41,24 @@
             <div class="row"><input id="userAdd" list="guildMemberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="userAddBtn">Add</button></div>
             <div id="users" class="list"></div>
           </div>
+          <div>
+            <h3 class="sub-h">Admins of this server</h3>
+            <p class="desc">Manage approvals, admins and notices for this server only.</p>
+            <div class="row"><input id="gAdminAdd" list="guildMemberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="gAdminAddBtn">Add</button></div>
+            <div id="gAdmins" class="list"></div>
+            <h3 class="sub-h">This server</h3>
+            <div class="field"><span>Viewers must be approved too</span><input id="gViewReq" type="checkbox"></div>
+            <div class="field"><span>Post “now playing” in voice chat</span><input id="gAnnounce" type="checkbox"></div>
+          </div>
         </div>
         <p id="noGuilds" class="muted" hidden>No Discord servers yet. A super admin can invite a bot under Connections.</p>
       </section>
 
-      <section class="panel">
-        <h2>Admins</h2>
-        <p class="desc"><b>Super admins</b> can change everything, including libraries, Live TV and connections (Discord bots and media servers). <b>Admins</b> manage who is approved in each server, admins and access, but don't see library, Live TV or connection settings. Owners were set during setup and can't be removed here.</p>
-        <h3 class="sub-h">Super admins</h3>
+      <section class="panel super-only">
+        <h2>Super admins</h2>
+        <p class="desc"><b>Super admins</b> can change everything in every server, including libraries, Live TV and connections (Discord bots and media servers). Admins of a single server are set in <b>Access by server</b>. Owners were set during setup and can't be removed here.</p>
         <div class="row" id="superAddRow"><input id="superAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="superAddBtn">Add</button></div>
         <div id="supers" class="list"></div>
-        <h3 class="sub-h">Admins</h3>
-        <div class="row"><input id="adminAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="adminAddBtn">Add</button></div>
-        <div id="admins" class="list"></div>
       </section>
 
       <section class="panel super-only" style="grid-column: 1 / -1" id="connections">
@@ -81,11 +86,6 @@
         <div class="row" style="margin-top:8px"><button class="btn sm" id="postersRefresh">Refresh now</button><button class="btn sm" id="postersClear">Clear cache</button></div>
       </section>
 
-      <section class="panel">
-        <h2>Access &amp; notices</h2>
-        <div class="field"><span>Viewers must be approved too</span><input id="viewRequiresApproval" type="checkbox"></div>
-        <div class="field"><span>Post “now playing” in voice chat</span><input id="announceInVoiceChat" type="checkbox"></div>
-      </section>
 
       <section class="panel super-only">
         <h2>Live TV</h2>

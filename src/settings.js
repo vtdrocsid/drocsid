@@ -26,8 +26,10 @@ export const VALID = { quality: QUALITY_PRESETS.map((p) => p.id), librarySort: [
 
 const defaults = {
   superAdminUserIds: [],       // full access incl. libraries & Live TV (in addition to OWNER_USER_IDS)
-  adminUserIds: [],            // users, roles, admins, access; no library or Live TV settings
-  guildAccess: {},             // Discord server id -> { userIds: [], roleIds: [] } approved in that server
+  adminUserIds: [],            // (before 0.5.0) admins everywhere; now admins are per server in guildAccess
+  // Discord server id -> { userIds, roleIds (approved), adminIds (admins of that server),
+  //   viewRequiresApproval, announceInVoiceChat (that server's own value; missing = the global one) }
+  guildAccess: {},
   viewRequiresApproval: false,
   announceInVoiceChat: true,
   librarySections: [],         // empty = all movie/show libraries
@@ -66,7 +68,30 @@ if (!current.liveInSections) {
   try { fs.mkdirSync(config.dataDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify(current, null, 2)); } catch {}
 }
 
+// 0.5.0: admins are given per Discord server. Admins from before become admins of the servers
+// that existed then (the original server, plus any already set up in Access by server).
+if (current.adminUserIds?.length && !current.adminsPerServer) {
+  const gids = new Set([...Object.keys(current.guildAccess || {}), conn.get().legacyGuildId || process.env.DISCORD_GUILD_ID].filter(Boolean));
+  current.guildAccess = { ...current.guildAccess };
+  for (const g of gids) {
+    const a = current.guildAccess[g] || { userIds: [], roleIds: [] };
+    current.guildAccess[g] = { ...a, adminIds: [...new Set([...(a.adminIds || []), ...current.adminUserIds])] };
+  }
+  console.log(`Admins are now per server: ${current.adminUserIds.length} admin(s) kept in ${gids.size} server(s)`);
+}
+if (!current.adminsPerServer) {
+  current.adminUserIds = [];
+  current.adminsPerServer = true;
+  try { fs.mkdirSync(config.dataDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify(current, null, 2)); } catch {}
+}
+
 export const settings = () => current;
+
+/** One server's value of a per-server setting (falls back to the global value). */
+export const guildSetting = (guildId, key) => {
+  const v = guildId ? current.guildAccess?.[guildId]?.[key] : undefined;
+  return v === undefined ? current[key] : v;
+};
 export const findPreset = (id) => QUALITY_PRESETS.find((p) => p.id === id) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
 
 // Library ids: Plex section numbers, or "<server id>~<id>" for other servers.
@@ -77,19 +102,20 @@ const ids = (v) => (Array.isArray(v) ? v : []).map(String).filter((s) => /^\d{5,
 export function update(patch) {
   const next = { ...current };
   if ('superAdminUserIds' in patch) next.superAdminUserIds = ids(patch.superAdminUserIds);
-  if ('adminUserIds' in patch) next.adminUserIds = ids(patch.adminUserIds);
-  // Someone is either a super admin or an admin, not both.
-  next.adminUserIds = next.adminUserIds.filter((id) => !next.superAdminUserIds.includes(id));
+
   // Per-server approval: { guildAccess: { <server id>: { userIds?, roleIds? } } }
   if (patch.guildAccess && typeof patch.guildAccess === 'object') {
     next.guildAccess = { ...current.guildAccess };
     for (const [gid, a] of Object.entries(patch.guildAccess)) {
       if (!/^\d{5,25}$/.test(gid) || !a || typeof a !== 'object') continue;
       const was = next.guildAccess[gid] || { userIds: [], roleIds: [] };
-      next.guildAccess[gid] = {
-        userIds: 'userIds' in a ? ids(a.userIds) : was.userIds,
-        roleIds: 'roleIds' in a ? ids(a.roleIds) : was.roleIds,
-      };
+      const g = { ...was };
+      if ('userIds' in a) g.userIds = ids(a.userIds);
+      if ('roleIds' in a) g.roleIds = ids(a.roleIds);
+      if ('adminIds' in a) g.adminIds = ids(a.adminIds);
+      if ('viewRequiresApproval' in a) g.viewRequiresApproval = !!a.viewRequiresApproval;
+      if ('announceInVoiceChat' in a) g.announceInVoiceChat = !!a.announceInVoiceChat;
+      next.guildAccess[gid] = g;
     }
   }
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);

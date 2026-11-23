@@ -67,7 +67,9 @@ function render() {
   // access by server: tabs, then that server's approved roles and users
   const guilds = state.guilds || [];
   $('#noGuilds').hidden = guilds.length > 0;
-  $('#guildAccess').hidden = $('#guildTabs').hidden = !guilds.length;
+  $('#guildAccess').hidden = !guilds.length;
+  $('#guildTabs').hidden = guilds.length < 2;
+  $('#accessTitle').textContent = state.role === 'super' || guilds.length !== 1 ? 'Access by server' : `Access · ${guilds[0].name}`;
   if (!guilds.some((g) => g.id === selGuild)) selGuild = guilds[0]?.id || null;
   const icon = (g, cls = 'gi') => (g.icon ? `<img src="${esc(g.icon)}" alt="">` : `<span class="${cls}">${esc((g.name || '?')[0])}</span>`);
   $('#guildTabs').innerHTML = guilds.map((g) => `<button data-g="${g.id}" class="${g.id === selGuild ? 'active' : ''}">${icon(g)} ${esc(g.name)}
@@ -82,6 +84,11 @@ function render() {
     users.innerHTML = g.approvedUsers.length ? '' : '<p class="muted">None yet.</p>';
     const ids = g.approvedUsers.map((u) => u.id);
     g.approvedUsers.forEach((u) => users.append(person(u, true, () => save({ guildAccess: { [g.id]: { userIds: ids.filter((id) => id !== u.id) } } }))));
+    const gAdmins = $('#gAdmins');
+    gAdmins.innerHTML = g.admins.length ? '' : '<p class="muted">None yet.</p>';
+    g.admins.forEach((u) => gAdmins.append(person(u, true, () => save({ guildAccess: { [g.id]: { adminIds: g.adminIds.filter((id) => id !== u.id) } } }))));
+    $('#gViewReq').checked = !!g.viewRequiresApproval;
+    $('#gAnnounce').checked = !!g.announceInVoiceChat;
     const inGuild = new Set(g.memberIds);
     $('#guildMemberList').innerHTML = directory.members.filter((m) => inGuild.has(m.id)).map((m) => `<option value="${esc(`${m.name} (@${m.username})`)}">`).join('');
   }
@@ -97,15 +104,8 @@ function render() {
   supers.innerHTML = '';
   state.owners.forEach((u) => supers.append(person(u, false)));
   state.superAdmins.forEach((u) => supers.append(person(u, isSuper, () => save({ superAdminUserIds: s.superAdminUserIds.filter((id) => id !== u.id) }), 'Super admin')));
-  const admins = $('#admins');
-  admins.innerHTML = state.admins.length ? '' : '<p class="muted">None yet.</p>';
-  state.admins.forEach((u) => admins.append(person(u, true, () => save({ adminUserIds: s.adminUserIds.filter((id) => id !== u.id) }))));
   if (isSuper) renderConnections();
-  if (!isSuper) {
-    $('#viewRequiresApproval').checked = s.viewRequiresApproval;
-    $('#announceInVoiceChat').checked = s.announceInVoiceChat;
-    return; // no library or Live TV settings for regular admins
-  }
+  if (!isSuper) return; // no library, Live TV or connection settings for regular admins
 
   // libraries: shown on Browse, default sort, and order
   const sortNames = { title: 'A–Z', added: 'Recently added', released: 'Release date' };
@@ -132,8 +132,6 @@ function render() {
     libBox.append(row);
   });
 
-  $('#viewRequiresApproval').checked = s.viewRequiresApproval;
-  $('#announceInVoiceChat').checked = s.announceInVoiceChat;
 
   // live
   renderPosters();
@@ -175,16 +173,14 @@ function renderConnections() {
     const el = document.createElement('div');
     el.className = 'li';
     el.innerHTML = `${a.user?.avatar ? `<img src="${esc(a.user.avatar)}" alt="" style="border-radius:50%">` : `<span class="ic">${esc((a.name || '?')[0])}</span>`}
-      <div class="grow"><div><b>${esc(a.name)}</b> ${pill} ${a.primary ? '<span class="pill wait" title="Used for Sign in with Discord on the website">Web sign-in</span>' : ''}</div>
+      <div class="grow"><div><b>${esc(a.name)}</b> ${pill}</div>
         <div class="sub">${esc(a.user?.tag || a.botUser || '')} · App ID ${esc(a.id)}${a.error ? ` · <span class="error">${esc(a.error)}</span>` : ''}</div>
         <div class="gchips">${a.guilds.length ? a.guilds.map((g) => `<span class="gchip">${icon(g)}${esc(g.name)}</span>`).join('') : '<span class="sub">Not in any server yet</span>'}</div></div>
       <div class="acts">
         <a class="btn sm" href="${esc(a.invite)}" target="_blank" rel="noopener">Invite to server</a>
         <a class="btn sm" href="/setup/?add=discord&app=${encodeURIComponent(a.id)}">Edit</a>
-        ${a.primary ? '' : '<button class="btn sm" data-act="primary">Use for web sign-in</button>'}
         <button class="btn sm danger" data-act="remove">Remove</button>
       </div>`;
-    el.querySelector('[data-act=primary]')?.addEventListener('click', () => connAct(`/api/connections/discord/${a.id}/primary`, 'POST'));
     el.querySelector('[data-act=remove]').onclick = () => {
       if (confirm(`Remove ${a.name}? Its bot goes offline and streams in its servers stop working.`)) connAct(`/api/connections/discord/${a.id}`, 'DELETE');
     };
@@ -265,14 +261,20 @@ $('#pubEdit').onclick = () => {
   const url = prompt('Public https address (no path):', conns?.publicUrl || '');
   if (url) connAct('/api/connections/public-url', 'PUT', { publicUrl: url });
 };
-$('#adminAddBtn').onclick = () => {
-  const id = resolveUser($('#adminAdd').value);
-  if (id && (state.settings.superAdminUserIds.includes(id) || state.owners.some((o) => o.id === id))) return toast('Already a super admin');
-  addUser('#adminAdd', 'adminUserIds');
+const curGuild = () => (state.guilds || []).find((x) => x.id === selGuild);
+$('#gAdminAddBtn').onclick = () => {
+  const g = curGuild();
+  if (!g) return;
+  const id = resolveUser($('#gAdminAdd').value);
+  if (!id) return toast('Pick someone from the list or paste a user ID');
+  if (state.settings.superAdminUserIds.includes(id) || state.owners.some((o) => o.id === id)) return toast('Already a super admin');
+  if (g.adminIds.includes(id)) return toast('Already an admin of this server');
+  $('#gAdminAdd').value = '';
+  save({ guildAccess: { [g.id]: { adminIds: [...g.adminIds, id] } } });
 };
 $('#superAddBtn').onclick = () => addUser('#superAdd', 'superAdminUserIds');
-$('#viewRequiresApproval').onchange = (e) => save({ viewRequiresApproval: e.target.checked });
-$('#announceInVoiceChat').onchange = (e) => save({ announceInVoiceChat: e.target.checked });
+$('#gViewReq').onchange = (e) => { const g = curGuild(); if (g) save({ guildAccess: { [g.id]: { viewRequiresApproval: e.target.checked } } }); };
+$('#gAnnounce').onchange = (e) => { const g = curGuild(); if (g) save({ guildAccess: { [g.id]: { announceInVoiceChat: e.target.checked } } }); };
 $('#refreshLive').onclick = async () => {
   try {
     const r = await api('/api/admin/refresh-live', { method: 'POST' });
@@ -285,7 +287,7 @@ $('#refreshLive').onclick = async () => {
 async function load() {
   try {
     const me = await api('/api/me');
-    $('#who').innerHTML = `Signed in as <b>${esc(me.name)}</b>`;
+    $('#who').innerHTML = `Signed in as <b>${esc(me.name)}</b>${me.guild ? ` · ${esc(me.guild.name)}` : ''}`;
     const d = new Date();
     $('#today').textContent = `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getDate()}, ${d.getFullYear()}`;
     if (me.version) { const v = document.createElement('span'); v.className = 'ver'; v.textContent = ` · v${me.version}`; $('#today').append(v); }
@@ -300,7 +302,7 @@ async function load() {
     if (!document.activeElement || !$('#admin').contains(document.activeElement) || document.activeElement.tagName === 'BUTTON') render();
   } catch (e) {
     if (e.status === 401) location.href = '/auth/login';
-    $('#msg').textContent = e.status === 403 ? 'Admins only.' : e.message;
+    $('#msg').textContent = e.status === 403 ? 'Admins only. Pick a server you admin from the Discord switcher on the Browse page.' : e.message;
   }
 }
 load().then(() => { if (location.hash === '#connections') $('#connections')?.scrollIntoView(); });

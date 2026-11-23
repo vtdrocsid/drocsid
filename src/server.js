@@ -57,20 +57,29 @@ function tokenOf(req) {
   if (h.startsWith('Bearer ')) return h.slice(7);
   return cookies(req)[COOKIE] || req.query.token || null;
 }
-/** Servers the user is approved in (cached on the session briefly). Approved anywhere = may browse. */
+/**
+ * Servers this session works with: the Discord the user picked on the website (or every server
+ * they're approved in, for "All servers" and for the Activity), limited to where they're approved.
+ * Cached on the session briefly.
+ */
 async function guildsOf(session) {
-  if (session.approvedVer === settingsMod.version && Date.now() - session.approvedAt < 2 * 60_000) return session.guilds;
-  session.guilds = await auth.approvedGuilds(session.userId);
-  session.approvedAt = Date.now();
-  session.approvedVer = settingsMod.version;
+  if (!(session.approvedVer === settingsMod.version && Date.now() - session.approvedAt < 2 * 60_000)) {
+    session.guilds = await auth.approvedGuilds(session.userId);
+    session.approvedAt = Date.now();
+    session.approvedVer = settingsMod.version;
+  }
+  const g = session.guildId;
+  if (g && g !== '*') return session.guilds.includes(g) ? [g] : [];
   return session.guilds;
 }
 async function approved(session) {
-  return auth.isAdmin(session.userId) || (await guildsOf(session)).length > 0;
+  return auth.isSuperAdmin(session.userId) || (await guildsOf(session)).length > 0;
 }
 async function approvedIn(session, guildId) {
-  return auth.isAdmin(session.userId) || (await guildsOf(session)).includes(guildId);
+  return auth.isSuperAdmin(session.userId) || (await guildsOf(session)).includes(guildId);
 }
+/** Admin for the session's server (super admins: always). */
+const adminHere = (session) => auth.isSuperAdmin(session.userId) || (!!session.guildId && session.guildId !== '*' && auth.isAdmin(session.userId, session.guildId));
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const needSession = wrap(async (req, res, next) => {
@@ -83,7 +92,7 @@ const needApproved = wrap(async (req, res, next) => {
   if (!(await approved(req.session))) return res.status(403).json({ error: 'Not approved' });
   next();
 });
-const needAdmin = (req, res, next) => (auth.isAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Admins only' }));
+const needAdmin = (req, res, next) => (adminHere(req.session) ? next() : res.status(403).json({ error: 'Admins only' }));
 const needSuper = (req, res, next) => (auth.isSuperAdmin(req.session.userId) ? next() : res.status(403).json({ error: 'Super admins only' }));
 // Settings only super admins may change.
 const SUPER_KEYS = ['superAdminUserIds', 'librarySections', 'libraryOrder', 'librarySort', 'serverOrder'];
@@ -93,8 +102,10 @@ const settingsFor = (userId, s = settings()) => ({
   ...(auth.isSuperAdmin(userId) ? s : Object.fromEntries(Object.entries(s).filter(([k]) => !LIB_KEYS.includes(k)))),
   superAdminUserIds: s.superAdminUserIds || [],
 });
+/** Watching a room's stream: if that server requires it, viewers must be approved there. */
 const needViewer = wrap(async (req, res, next) => {
-  if (settings().viewRequiresApproval && !(await approved(req.session))) return res.status(403).end();
+  const guildId = req.params.id ? rooms.get(req.params.id)?.guildId : null;
+  if (settingsMod.guildSetting(guildId, 'viewRequiresApproval') && !(guildId ? await approvedIn(req.session, guildId) : await approved(req.session))) return res.status(403).end();
   next();
 });
 
@@ -162,8 +173,43 @@ app.post('/api/token', wrap(async (req, res) => {
 }));
 
 // ---------- portal API ----------
+/** The Discord servers this user can pick on the website (cached briefly on the session). */
+async function choicesOf(session) {
+  if (session.choices && Date.now() - session.choicesAt < 2 * 60_000) return session.choices;
+  session.choices = await auth.memberGuilds(session.userId);
+  session.choicesAt = Date.now();
+  return session.choices;
+}
+
 app.get('/api/me', needSession, wrap(async (req, res) => {
-  res.json({ id: req.session.userId, name: req.session.username, approved: await approved(req.session), admin: auth.isAdmin(req.session.userId), superAdmin: auth.isSuperAdmin(req.session.userId), version: VERSION });
+  const s = req.session;
+  const sup = auth.isSuperAdmin(s.userId);
+  const choices = await choicesOf(s);
+  // One server to pick from: picked automatically. Several: the website asks.
+  if (s.guildId && s.guildId !== '*' && !choices.some((g) => g.id === s.guildId)) s.guildId = null;
+  if (!s.guildId && choices.length === 1) s.guildId = choices[0].id;
+  if (s.guildId === '*' && !sup) s.guildId = null;
+  const multi = choices.length > 1;
+  const cur = s.guildId === '*' ? { id: '*', name: 'All servers' } : choices.find((g) => g.id === s.guildId) || null;
+  res.json({
+    id: s.userId, name: s.username, version: VERSION,
+    guild: cur,
+    guilds: multi ? [...choices.map(({ id, name, icon, appIds }) => ({ id, name, icon, app: conn.app(appIds?.[0])?.name || '' })), ...(sup ? [{ id: '*', name: 'All servers', all: true }] : [])] : [],
+    needGuild: multi && !s.guildId,
+    noGuild: !choices.length && !sup,
+    approved: s.guildId ? await approved(s) : sup,
+    admin: adminHere(s),
+    superAdmin: sup,
+  });
+}));
+
+/** Pick which Discord to use the website with. */
+app.post('/api/me/guild', needSession, wrap(async (req, res) => {
+  const id = String(req.body?.guildId || '');
+  const ok = (id === '*' && auth.isSuperAdmin(req.session.userId)) || (await choicesOf(req.session)).some((g) => g.id === id);
+  if (!ok) return res.status(403).json({ error: "You're not in that server" });
+  req.session.guildId = id;
+  res.json({ ok: true });
 }));
 
 app.get('/api/libraries', needSession, needApproved, wrap(async (req, res) => res.json(await sources.libraries())));
@@ -261,7 +307,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
   if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
   if (!(await approvedIn(req.session, channel.guildId))) return res.status(403).json({ error: `You aren't approved in ${channel.guildName}.` });
   const me = { id: req.session.userId, name: req.session.username };
-  const isAdmin = auth.isAdmin(me.id);
+  const isAdmin = auth.isAdmin(me.id, channel.guildId);
 
   // One video per channel: a busy channel can only be replaced by whoever started it, or an admin.
   const current = rooms.get(voiceChannelId);
@@ -389,7 +435,7 @@ app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, r
 
 app.get('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
   const mine = await guildsOf(req.session);
-  res.json(schedule.upcoming().filter((x) => !x.guildId || mine.includes(x.guildId)).map((x) => ({ ...x, server: sources.serverTag(x), mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
+  res.json(schedule.upcoming().filter((x) => !x.guildId || mine.includes(x.guildId)).map((x) => ({ ...x, server: sources.serverTag(x), mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId, x.guildId) })));
 }));
 
 app.post('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
@@ -415,7 +461,7 @@ app.post('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
 app.delete('/api/schedule/:id', needSession, needApproved, (req, res) => {
   const x = schedule.get(req.params.id);
   if (!x) return res.status(404).json({ error: 'Not found' });
-  if (x.byId !== req.session.userId && !auth.isAdmin(req.session.userId)) return res.status(403).json({ error: 'Only whoever scheduled it, or an admin, can remove it' });
+  if (x.byId !== req.session.userId && !auth.isAdmin(req.session.userId, x.guildId)) return res.status(403).json({ error: 'Only whoever scheduled it, or an admin, can remove it' });
   schedule.remove(x.id);
   res.json({ ok: true });
 });
@@ -468,7 +514,8 @@ app.post('/api/control', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   const s = settings();
   const sup = auth.isSuperAdmin(req.session.userId);
-  const guildList = auth.guildList();
+  // Regular admins see only the server they signed into; super admins see every server.
+  const guildList = auth.guildList().filter((g) => sup || g.id === req.session.guildId);
   const [dirs, libs] = await Promise.all([
     Promise.all(guildList.map((g) => auth.guildDirectory(g.id).catch(() => ({ roles: [], members: [] })))),
     sup ? sources.libraries({ all: true }).catch(() => []) : [],
@@ -479,7 +526,13 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   const named = (ids) => Promise.all(ids.map((id) => everyone.get(id) || auth.lookupUser(id)));
   const guilds = await Promise.all(guildList.map(async (g, i) => {
     const a = auth.accessFor(g.id);
-    return { ...g, roles: dirs[i].roles, memberIds: dirs[i].members.map((m) => m.id), roleIds: a.roleIds, approvedUsers: await named(a.userIds) };
+    const ga = s.guildAccess?.[g.id] || {};
+    return {
+      ...g, roles: dirs[i].roles, memberIds: dirs[i].members.map((m) => m.id), roleIds: a.roleIds,
+      approvedUsers: await named(a.userIds), admins: await named(ga.adminIds || []), adminIds: ga.adminIds || [],
+      viewRequiresApproval: settingsMod.guildSetting(g.id, 'viewRequiresApproval'),
+      announceInVoiceChat: settingsMod.guildSetting(g.id, 'announceInVoiceChat'),
+    };
   }));
   res.json({
     role: sup ? 'super' : 'admin',
@@ -487,13 +540,12 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
     valid: VALID,
     owners: await named(config.ownerIds),
     superAdmins: await named(s.superAdminUserIds || []),
-    admins: await named(s.adminUserIds),
     guilds,
     directory: { members: [...everyone.values()].sort((a, b) => a.name.localeCompare(b.name)) },
     libraries: sup ? libs : undefined,
     live: sup ? await sources.liveStatus() : undefined,
     posters: sup ? posters.status() : undefined,
-    streams: rooms.all().map((r) => ({
+    streams: rooms.all().filter((r) => sup || r.guildId === req.session.guildId).map((r) => ({
       voiceChannelId: r.id,
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
       guildName: auth.guildList().find((g) => g.id === r.guildId)?.name || '',
@@ -507,13 +559,19 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
 app.put('/api/admin/settings', needSession, needAdmin, wrap(async (req, res) => {
   const { quality, ...patch } = req.body || {}; // quality is set from the player bar, not here
   if (!auth.isSuperAdmin(req.session.userId)) {
-    const blocked = SUPER_KEYS.filter((k) => k in patch);
-    if (blocked.length) return res.status(403).json({ error: 'Only super admins can change that' });
+    // Regular admins change only their own server's access, admins and notices.
+    const keys = Object.keys(patch);
+    const gids = Object.keys(patch.guildAccess || {});
+    if (keys.some((k) => k !== 'guildAccess') || gids.some((g) => g !== req.session.guildId)) {
+      return res.status(403).json({ error: 'Only super admins can change that' });
+    }
   }
   res.json({ settings: settingsFor(req.session.userId, updateSettings(patch)) });
 }));
 
 app.post('/api/admin/stop', needSession, needAdmin, wrap(async (req, res) => {
+  const room = rooms.get(String(req.body.voiceChannelId));
+  if (room && !auth.isAdmin(req.session.userId, room.guildId)) return res.status(403).json({ error: 'Admins of that server only' });
   await rooms.stop(String(req.body.voiceChannelId), true, 'stopped by an admin');
   res.json({ ok: true });
 }));
@@ -707,7 +765,7 @@ export function startServer() {
     const isApproved = guildId ? await approvedIn(session, guildId) : await approved(session);
     const inChannel = auth.voiceChannelOf(session.userId) === roomId;
     if (!inChannel && !isApproved) return ws.close(4003, 'join the voice channel first');
-    if (settings().viewRequiresApproval && !isApproved) return ws.close(4003, 'not approved');
+    if (settingsMod.guildSetting(guildId, 'viewRequiresApproval') && !isApproved) return ws.close(4003, 'not approved');
 
     if (!subs.has(roomId)) subs.set(roomId, new Set());
     subs.get(roomId).add(ws);

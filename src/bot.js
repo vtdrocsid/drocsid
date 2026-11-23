@@ -3,7 +3,7 @@
 // Each Discord app's bot is run by discord.js (see discord.js); messages go out through
 // whichever bot is in the channel's server.
 import { Events } from 'discord.js';
-import { settings } from './settings.js';
+import { guildSetting } from './settings.js';
 import * as discord from './discord.js';
 import * as rooms from './rooms.js';
 import * as plex from './plex.js';
@@ -11,9 +11,9 @@ import * as sources from './sources.js';
 
 /** Post a message in a voice channel's built-in text chat. */
 export async function announce(channelId, content) {
-  if (!settings().announceInVoiceChat) return;
   try {
     const ch = discord.channel(channelId);
+    if (!guildSetting(ch?.guild?.id, 'announceInVoiceChat')) return; // each server decides
     if (ch?.isTextBased()) await ch.send({ content, allowedMentions: { parse: [] } });
   } catch (e) { console.warn('announce failed:', e.message); }
 }

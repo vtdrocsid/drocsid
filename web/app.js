@@ -42,8 +42,28 @@ async function boot() {
   $('#today').textContent = todayText();
   try { me = await api('/api/me'); } catch { $('#signin').hidden = false; return; }
   if (me.version) $('#today').append(h(`<span class="ver"> · v${esc(me.version)}</span>`));
-  $('#who').innerHTML = `<span>Signed in as <b>${esc(me.name)}</b></span><button class="btn sm" id="logout">Sign out</button>`;
+  // Which Discord: a switcher in the top bar when there's more than one to pick from.
+  const gIcon = (g) => (g.all ? '<span class="gi all">★</span>' : g.icon ? `<img class="gi" src="${esc(g.icon)}" alt="">` : `<span class="gi">${esc((g.name || '?')[0])}</span>`);
+  const sw = me.guilds.length && me.guild
+    ? `<div class="gswitch"><button class="gsw-btn" id="gswBtn">${gIcon(me.guild.id === '*' ? { all: true } : me.guilds.find((g) => g.id === me.guild.id) || me.guild)}<b>${esc(me.guild.name)}</b> ▾</button>
+        <div class="gsw-menu" id="gswMenu" hidden>${me.guilds.map((g) => `<button data-g="${esc(g.id)}" class="${g.id === me.guild.id ? 'cur' : ''}">${gIcon(g)}<span>${esc(g.name)}</span>${g.all ? '<em class="tag-super">SUPER</em>' : ''}</button>`).join('')}</div></div>`
+    : '';
+  $('#who').innerHTML = `${sw}<span>Signed in as <b>${esc(me.name)}</b></span><button class="btn sm" id="logout">Sign out</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
+  const pick = async (id) => { await api('/api/me/guild', { method: 'POST', body: JSON.stringify({ guildId: id }) }); location.reload(); };
+  if (sw) {
+    $('#gswBtn').onclick = (e) => { e.stopPropagation(); $('#gswMenu').hidden = !$('#gswMenu').hidden; };
+    document.addEventListener('click', () => { $('#gswMenu').hidden = true; });
+    $('#gswMenu').querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => pick(b.dataset.g); });
+  }
+  if (me.noGuild) { $('#noGuild').hidden = false; return; }
+  if (me.needGuild) {
+    $('#guildCards').innerHTML = me.guilds.map((g) => `<button class="pg-card" data-g="${esc(g.id)}">${gIcon(g)}
+      <span><b>${esc(g.name)}</b>${g.all ? '<em class="tag-super">SUPER ADMIN</em><small>Everything, every server</small>' : `<small>${g.app ? `via ${esc(g.app)}` : ''}</small>`}</span></button>`).join('');
+    $('#guildCards').querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => pick(b.dataset.g); });
+    $('#pickGuild').hidden = false;
+    return;
+  }
   if (!me.approved) { $('#denied').hidden = false; return; }
   $('#adminLink').hidden = !me.admin;
   $('#qwrap').hidden = false;
