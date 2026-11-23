@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.36 — 2026-11-22
+- Removed the temporary size readout from the player's title bar.
+
 ## 0.2.35 — 2026-11-22
 - Player sizing measures the Activity box with clientWidth/clientHeight (more reliable inside Discord).
 - Temporary size readout in the player's title bar (Activity box, stream size, shown picture size)

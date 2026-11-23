@@ -247,9 +247,6 @@ function layout() {
   video.style.width = `${vw * s}px`;
   video.style.height = `${vh * s}px`;
   video.style.transform = `translate(${x}px, ${y}px)`;
-  // Diagnostic readout in the title bar (only visible with the controls): Activity box, stream, picture.
-  $('#sizeInfo').textContent = `box ${ww}×${wh} · stream ${vw}×${vh} · picture ${Math.round(cw * s)}×${Math.round(ch * s)}`
-    + (crop.t + crop.b + crop.l + crop.r > 0.01 ? ' · borders trimmed' : '');
 }
 
 /** Fraction of black rows/columns at each edge of the current frame. */
