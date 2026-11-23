@@ -9,6 +9,15 @@ const fmt = (s) => {
 };
 const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const thumb = (p, w = 300, hh = 450) => (p ? `/api/thumb?path=${encodeURIComponent(p)}&w=${w}&h=${hh}` : '');
+// A poster that fails (a busy media server still resizing it) is asked for again, twice, a bit later.
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (img?.tagName !== 'IMG' || !img.src.includes('/api/thumb?')) return;
+  const n = Number(img.dataset.retry || 0);
+  if (n >= 2) return;
+  img.dataset.retry = n + 1;
+  setTimeout(() => { img.src = img.src.replace(/&r=\d+$/, '') + `&r=${n + 1}`; }, (n + 1) * 3000);
+}, true);
 
 async function api(path, opts = {}) {
   const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });

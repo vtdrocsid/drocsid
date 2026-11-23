@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.3 — 2026-11-23
+- Jellyfin/Emby posters that sometimes didn't show: drocsid now asks for at most 6 at a time per server, waits longer for each, retries once, and keeps recent posters in memory; the page also re-requests a poster that failed. Failures are logged as `[jf image]`.
+
 ## 0.4.2 — 2026-11-23
 - With more than one media server, Watching Now, Upcoming Lineup and Play History show which server each entry is from (icon + name in the top right of the tile; long titles trim to fit), and search results show the server too.
 

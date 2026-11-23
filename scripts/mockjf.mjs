@@ -1,8 +1,10 @@
 // A tiny fake Jellyfin/Emby server for tests: sign-in, libraries, items, images and HLS playback.
 import http from 'node:http';
 
-export function startMockJellyfin(port, { product = 'Jellyfin Server', token = 'tok-123' } = {}) {
+export function startMockJellyfin(port, { product = 'Jellyfin Server', token = 'tok-123', flakyImages = false } = {}) {
   const log = [];
+  const imgSeen = new Map();
+  const stats = { imgActive: 0, imgMaxActive: 0, imgRequests: 0 };
   const items = {
     m1: { Id: 'm1', Name: 'Alpha Movie', Type: 'Movie', ProductionYear: 2001, RunTimeTicks: 60 * 60 * 1e7, ImageTags: { Primary: 'x' }, CriticRating: 91, OfficialRating: 'PG',
       People: [{ Id: 'p1', Name: 'Ann Actor', Role: 'Hero', Type: 'Actor', PrimaryImageTag: 't' }, { Id: 'p2', Name: 'Dee Director', Type: 'Director' }], Genres: ['Drama'], Taglines: ['A tagline'] },
@@ -44,7 +46,20 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     let m = p.match(/^\/Users\/u1\/Items\/(\w+)$/);
     if (m) return items[m[1]] ? json(items[m[1]]) : json({}, 404);
     m = p.match(/^\/Items\/(\w+)\/Images\/Primary$/);
-    if (m) { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); return res.end(Buffer.from('JPEGDATA')); }
+    if (m) {
+      stats.imgRequests++;
+      if (flakyImages) {
+        // Like a server resizing on first request: slow, and the first try for each image fails.
+        stats.imgActive++; stats.imgMaxActive = Math.max(stats.imgMaxActive, stats.imgActive);
+        await new Promise((r) => setTimeout(r, 40));
+        stats.imgActive--;
+        const k = u.pathname + u.search;
+        const n = (imgSeen.get(k) || 0) + 1;
+        imgSeen.set(k, n);
+        if (n === 1) { res.writeHead(500); return res.end(); }
+      }
+      res.writeHead(200, { 'Content-Type': 'image/jpeg' }); return res.end(Buffer.from('JPEGDATA'));
+    }
     m = p.match(/^\/Items\/(\w+)\/PlaybackInfo$/);
     if (m && req.method === 'POST') {
       const b = JSON.parse(body || '{}');
@@ -72,5 +87,5 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     if (p.startsWith('/Sessions/Playing') || p === '/Videos/ActiveEncodings') { res.writeHead(204); return res.end(); }
     json({ error: 'not found' }, 404);
   });
-  return new Promise((r) => server.listen(port, '127.0.0.1', () => r({ server, log, url: `http://127.0.0.1:${port}`, close: () => server.close() })));
+  return new Promise((r) => server.listen(port, '127.0.0.1', () => r({ server, log, stats, url: `http://127.0.0.1:${port}`, close: () => server.close() })));
 }

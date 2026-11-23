@@ -133,6 +133,20 @@ await check('posters through the server', async () => {
   assert.equal(await sources.image('nope~img:m1'), null);
 });
 
+await check('busy server: posters limited, retried and cached', async () => {
+  const flaky = await startMockJellyfin(3914, { flakyImages: true });
+  const srv = { id: 'flaky', type: 'jellyfin', name: 'Flaky', url: flaky.url, token: 'tok-123', userId: 'u1' };
+  const ids = Array.from({ length: 30 }, (_, i) => `img:x${i}`);
+  const res = await Promise.all(ids.map((id) => jf.image(srv, id, 300, 450)));
+  assert.ok(res.every((r) => r.status === 200), res.map((r) => r.status).join(','));
+  assert.ok(flaky.stats.imgMaxActive <= 6, `max parallel ${flaky.stats.imgMaxActive}`);
+  const before = flaky.stats.imgRequests;
+  const again = await jf.image(srv, 'img:x3', 300, 450);
+  assert.equal(await again.text(), 'JPEGDATA');
+  assert.equal(flaky.stats.imgRequests, before); // served from memory
+  flaky.close();
+});
+
 console.log('Playback');
 const rooms = await import('../src/rooms.js');
 await check('stream starts and playlists carry no token', async () => {

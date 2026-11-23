@@ -212,10 +212,64 @@ export async function info(srv, id) {
 }
 
 /** Fetch an image: "img:<item id>" (poster) or a person id (cast photo). */
-export function image(srv, ref, w = 300, h = 450) {
+// Posters: a library page asks for ~60 at once, and Jellyfin/Emby resize each one the first time
+// (slow). So requests per server are limited, given time, retried once, and recent ones are
+// kept in memory (shared by everyone browsing).
+const IMG_PARALLEL = 6;
+const IMG_CACHE_BYTES = 64 * 1024 * 1024;
+const imgCache = new Map(); // key -> { buf, type, at }
+let imgCacheBytes = 0;
+const lanes = new Map(); // server id -> { active, queue: [] }
+async function inLane(srvId, fn) {
+  const lane = lanes.get(srvId) || lanes.set(srvId, { active: 0, queue: [] }).get(srvId);
+  if (lane.active >= IMG_PARALLEL) await new Promise((r) => lane.queue.push(r));
+  lane.active++;
+  try { return await fn(); } finally {
+    lane.active--;
+    lane.queue.shift()?.();
+  }
+}
+function remember(key, buf, type) {
+  imgCache.set(key, { buf, type, at: Date.now() });
+  imgCacheBytes += buf.length;
+  for (const [k, v] of imgCache) { // oldest first
+    if (imgCacheBytes <= IMG_CACHE_BYTES) break;
+    imgCache.delete(k);
+    imgCacheBytes -= v.buf.length;
+  }
+}
+
+/** A poster or photo as a Response (from memory when possible). */
+export async function image(srv, ref, w = 300, h = 450) {
   const id = ref.startsWith('img:') ? ref.slice(4) : ref;
   if (!/^[A-Za-z0-9-]{1,64}$/.test(id)) return null;
-  return call(srv, `/Items/${id}/Images/Primary`, { params: { maxWidth: w, maxHeight: h, quality: 90 }, raw: true });
+  const key = `${srv.id}|${id}|${w}x${h}`;
+  const hit = imgCache.get(key);
+  if (hit && Date.now() - hit.at < 24 * 3600_000) {
+    imgCache.delete(key); imgCache.set(key, hit); // most recently used last
+    return new Response(hit.buf, { headers: { 'content-type': hit.type } });
+  }
+  return inLane(srv.id, async () => {
+    const started = Date.now();
+    let last = '';
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const r = await call(srv, `/Items/${id}/Images/Primary`, { params: { maxWidth: w, maxHeight: h, quality: 90 }, raw: true, timeout: 45_000 });
+        if (r.status === 404) return r; // no image: nothing to retry
+        if (r.ok) {
+          const buf = Buffer.from(await r.arrayBuffer());
+          const type = r.headers.get('content-type') || 'image/jpeg';
+          remember(key, buf, type);
+          return new Response(buf, { headers: { 'content-type': type } });
+        }
+        last = `HTTP ${r.status}`;
+      } catch (e) {
+        last = e.name === 'TimeoutError' ? 'timed out' : e.message;
+      }
+    }
+    console.warn(`[jf image] ${srv.name}: ${id} ${w}x${h} failed after 2 tries (${last}, ${Date.now() - started} ms)`);
+    return new Response(null, { status: 504 });
+  });
 }
 
 // ---------------- playback ----------------
