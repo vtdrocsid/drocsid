@@ -115,8 +115,8 @@ function render() {
     const row = document.createElement('div');
     row.className = 'li';
     row.innerHTML = `<input type="checkbox" ${s.librarySections.includes(l.id) ? 'checked' : ''} title="Show on Browse page">
-      <div class="grow"><div>${esc(l.title)}</div><div class="sub">${l.type === 'show' ? 'TV' : 'Movies'}${l.serverName ? ` · ${esc(l.serverName)} (${esc({ plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' }[l.serverType] || l.serverType)})` : ''}</div></div>
-      <select title="Default sort">${valid.librarySort.map((v) => `<option value="${v}" ${v === (s.librarySort[l.id] || 'title') ? 'selected' : ''}>${sortNames[v]}</option>`).join('')}</select>
+      <div class="grow"><div>${l.type === 'live' ? '📡 ' : ''}${esc(l.title)}</div><div class="sub">${l.type === 'live' ? `${l.channels} channels` : l.type === 'show' ? 'TV' : 'Movies'}${l.serverName ? ` · ${esc(l.serverName)} (${esc({ plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' }[l.serverType] || l.serverType)})` : ''}</div></div>
+      <select title="Default sort" ${l.type === 'live' ? 'style="visibility:hidden"' : ''}>${valid.librarySort.map((v) => `<option value="${v}" ${v === (s.librarySort[l.id] || 'title') ? 'selected' : ''}>${sortNames[v]}</option>`).join('')}</select>
       <button class="btn sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
       <button class="btn sm" data-move="1" ${i === state.libraries.length - 1 ? 'disabled' : ''} title="Move down">↓</button>`;
     $('input', row).onchange = () => save({ librarySections: state.libraries.filter((x, j) => libBox.children[j].querySelector('input').checked).map((x) => x.id) });
@@ -136,9 +136,11 @@ function render() {
   $('#announceInVoiceChat').checked = s.announceInVoiceChat;
 
   // live
-  $('#live').innerHTML = state.live.available
-    ? `<p>DVR found · <b>${state.live.channels}</b> channels<br><span class="muted small">${esc(state.live.provider)}</span></p>`
-    : `<p class="error">${esc(state.live.error || 'Live TV unavailable')}</p>`;
+  const TN = { plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' };
+  $('#live').innerHTML = (state.live || []).map((x) => `<div class="li"><div class="grow"><div><b>${esc(x.serverName)}</b> <span class="muted small">${TN[x.serverType] || ''}</span>
+      ${x.available ? (x.enabled ? '<span class="pill">On</span>' : '<span class="pill off">Off</span>') : ''}</div>
+      <div class="sub">${x.available ? `<b>${x.channels}</b> channels${x.provider ? ` · ${esc(x.provider)}` : ''}` : esc(x.error && !/no channels/i.test(x.error) ? x.error : 'No Live TV on this server')}</div></div></div>`).join('')
+    || '<p class="muted">No media servers.</p>';
 }
 
 const addUser = (input, key) => {
@@ -197,7 +199,7 @@ function renderConnections() {
     const h = plexHealth[p.id];
     el.innerHTML = `<span class="ic ${cls}">${letter}</span>
       <div class="grow"><div><b>${esc(p.name)}</b> <span class="muted small">${typeName}</span> ${h ? (h.ok ? '<span class="pill">Online</span>' : '<span class="pill off">Offline</span>') : '<span class="pill wait">Checking</span>'}</div>
-        <div class="sub">${esc(p.url)}${p.username ? ` · as ${esc(p.username)}` : ''}${h?.ok ? ` · ${h.libraries} movie/TV ${h.libraries === 1 ? 'library' : 'libraries'} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}${p.id === firstPlex ? ' · Live TV' : ''}</div></div>
+        <div class="sub">${esc(p.url)}${p.username ? ` · as ${esc(p.username)}` : ''}${h?.ok ? ` · ${h.libraries} movie/TV ${h.libraries === 1 ? 'library' : 'libraries'} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}</div></div>
       <div class="acts">
         <button class="btn sm" data-act="test">Test</button>
         <a class="btn sm" href="/setup/?add=media&server=${encodeURIComponent(p.id)}">Edit</a>
@@ -236,7 +238,8 @@ $('#announceInVoiceChat').onchange = (e) => save({ announceInVoiceChat: e.target
 $('#refreshLive').onclick = async () => {
   try {
     const r = await api('/api/admin/refresh-live', { method: 'POST' });
-    toast(r.available ? `${r.channels} channels loaded` : r.error);
+    const n = r.filter((x) => x.available).reduce((t, x) => t + x.channels, 0);
+    toast(`${n} channels loaded`);
     load();
   } catch (e) { toast(e.message); }
 };

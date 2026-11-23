@@ -224,15 +224,17 @@ app.get('/api/face/:id', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/livetv/guide', needSession, needApproved, wrap(async (req, res) => {
   const hours = Math.min(12, Math.max(1, Number(req.query.hours) || 4));
   const from = Number(req.query.from) || Date.now() - 30 * 60_000;
-  res.json({ from, to: from + hours * 3600_000, channels: await plex.guide(from, from + hours * 3600_000) });
+  res.json({ from, to: from + hours * 3600_000, channels: await sources.guide(from, from + hours * 3600_000) });
 }));
 
 app.get('/api/logo', needSession, needApproved, wrap(async (req, res) => {
   // Channel logos may be Plex paths or LAN-only URLs, so fetch them server-side.
-  const ch = (await plex.liveChannels()).find((c) => c.id === req.query.id);
+  const ch = (await sources.liveChannels()).find((c) => c.id === String(req.query.id));
   if (!ch?.thumb) return res.status(404).end();
-  const upstream = await fetch(ch.thumb.startsWith('/') ? plex.photoUrl(ch.thumb, 120, 90) : ch.thumb);
-  if (!upstream.ok) return res.status(404).end();
+  let upstream = await sources.anyImage(ch.thumb, 120, 90);
+  const direct = ch.thumb.replace(/^[A-Za-z0-9_-]+~(?=https?:)/, '');
+  if (!upstream?.ok && /^https?:/.test(direct)) upstream = await fetch(direct).catch(() => null); // LAN-only logo URLs
+  if (!upstream?.ok) return res.status(404).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/png');
   res.set('Cache-Control', 'private, max-age=86400');
   Readable.fromWeb(upstream.body).pipe(res);
@@ -289,7 +291,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
 
 /** Look up a playable item from the client's request (library title or live channel). */
 async function resolveItem(source, ratingKey, liveId) {
-  const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await sources.metadata(sources.safeKey(ratingKey));
+  const item = source === 'live' ? await sources.liveChannel(sources.safeKey(liveId)) : await sources.metadata(sources.safeKey(ratingKey));
   if (item.source === 'plex' && !['movie', 'episode'].includes(item.kind)) throw Object.assign(new Error('Pick a movie or an episode'), { status: 400 });
   return item;
 }
@@ -305,7 +307,7 @@ async function startStream(channel, item, user, { scheduled = false, startAt = 0
   if (item.source === 'live') {
     // Play history shows the programme that was on, not just the channel.
     const hid = room.historyId;
-    plex.liveNow(item.channelId).then((info) => {
+    sources.liveNow(item.channelId).then((info) => {
       if (info?.now) history.setProgram(hid, { program: info.now.title, subtitle: info.now.subtitle, programThumb: info.now.thumb });
     }).catch(() => {});
   }
@@ -336,7 +338,7 @@ app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
   let guide = null;
   const liveIds = list.filter((r) => r.item.source === 'live').map((r) => r.item.channelId);
   if (liveIds.length) {
-    try { guide = await plex.guide(Date.now() - 3 * 3600_000, Date.now() + 3600_000, liveIds); } catch {}
+    try { guide = await sources.guide(Date.now() - 3 * 3600_000, Date.now() + 3600_000, liveIds); } catch {}
   }
   const out = list.map((room) => {
     const st = rooms.publicState(room);
@@ -374,7 +376,7 @@ app.get('/api/history', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, res) => {
   const src = history.get(String(req.params.id))?.programThumb;
   if (!src) return res.status(404).end();
-  const upstream = await fetch(plex.photoUrl(src, 160, 240)).catch(() => null);
+  const upstream = await sources.anyImage(src, 160, 240);
   if (!upstream?.ok) return res.status(404).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
   res.set('Cache-Control', 'private, max-age=86400');
@@ -485,7 +487,7 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
     guilds,
     directory: { members: [...everyone.values()].sort((a, b) => a.name.localeCompare(b.name)) },
     libraries: sup ? libs : undefined,
-    live: sup ? await plex.liveStatus() : undefined,
+    live: sup ? await sources.liveStatus() : undefined,
     streams: rooms.all().map((r) => ({
       voiceChannelId: r.id,
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
@@ -517,8 +519,8 @@ app.get('/api/admin/guide-debug', needSession, needSuper, wrap(async (req, res) 
 }));
 
 app.post('/api/admin/refresh-live', needSession, needSuper, wrap(async (req, res) => {
-  plex.clearLiveCache();
-  res.json(await plex.liveStatus());
+  sources.clearLiveCache();
+  res.json(await sources.liveStatus());
 }));
 
 // ---------- media (HLS) ----------

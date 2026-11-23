@@ -49,7 +49,7 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     if (m && req.method === 'POST') {
       const b = JSON.parse(body || '{}');
       if (!b.DeviceProfile?.TranscodingProfiles?.length) return json({ ErrorCode: 'NoCompatibleStream' });
-      return json({ PlaySessionId: 'ps1', MediaSources: [{ Id: m[1], TranscodingUrl: `/videos/${m[1]}/master.m3u8?MediaSourceId=${m[1]}&PlaySessionId=ps1&api_key=${token}` }] });
+      return json({ PlaySessionId: 'ps1', MediaSources: [{ Id: m[1], LiveStreamId: m[1].startsWith('ch') ? 'ls-' + m[1] : undefined, TranscodingUrl: `/videos/${m[1]}/master.m3u8?MediaSourceId=${m[1]}&PlaySessionId=ps1&api_key=${token}` }] });
     }
     m = p.match(/^\/videos\/(\w+)\/master\.m3u8$/);
     if (m) { res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' }); return res.end(`#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=8000000\nmain.m3u8?PlaySessionId=ps1&api_key=${token}\n`); }
@@ -57,6 +57,18 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     if (m) { res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' }); return res.end(`#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nhls1/main/0.ts?PlaySessionId=ps1&api_key=${token}\n#EXT-X-ENDLIST\n`); }
     m = p.match(/^\/videos\/(\w+)\/hls1\/main\/(\d+)\.ts$/);
     if (m) { const b = Buffer.alloc(188 * 4, 0); for (let i = 0; i < 4; i++) b[i * 188] = 0x47; res.writeHead(200, { 'Content-Type': 'video/mp2t' }); return res.end(b); }
+    if (p === '/LiveTv/Channels') return json({ Items: [{ Id: 'ch2', Name: 'News', ChannelNumber: '12', ImageTags: { Primary: 'z' } }, { Id: 'ch1', Name: 'Sports', ChannelNumber: '5' }] });
+    if (p === '/LiveTv/Programs') {
+      const now = Date.now(), hr = 3600_000;
+      const ids = (u.searchParams.get('ChannelIds') || '').split(',');
+      const all = [
+        { Id: 'pg1', ChannelId: 'ch1', Name: 'The Game', EpisodeTitle: 'Week 12', StartDate: new Date(now - hr / 2).toISOString(), EndDate: new Date(now + hr).toISOString(), Overview: 'Football', ImageTags: { Primary: 'q' }, IsNew: true, Genres: ['Sports'] },
+        { Id: 'pg2', ChannelId: 'ch1', Name: 'Postgame', StartDate: new Date(now + hr).toISOString(), EndDate: new Date(now + 2 * hr).toISOString() },
+        { Id: 'pg3', ChannelId: 'ch2', Name: 'Evening News', StartDate: new Date(now - hr).toISOString(), EndDate: new Date(now + hr).toISOString() },
+      ];
+      return json({ Items: all.filter((x) => ids.includes(x.ChannelId)) });
+    }
+    if (p === '/LiveStreams/Close') { res.writeHead(204); return res.end(); }
     if (p.startsWith('/Sessions/Playing') || p === '/Videos/ActiveEncodings') { res.writeHead(204); return res.end(); }
     json({ error: 'not found' }, 404);
   });

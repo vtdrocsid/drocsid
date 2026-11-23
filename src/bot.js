@@ -71,7 +71,7 @@ async function titleCard(item) {
 
 /** Live TV: channel as the header, then the programme on now with start/end/time left, poster and description. */
 async function liveCard(item) {
-  const info = await plex.liveNow(item.channelId).catch(() => null);
+  const info = await sources.liveNow(item.channelId).catch(() => null);
   const files = [];
   const chName = info?.channel ? [info.channel.number, info.channel.callSign || info.channel.name].filter(Boolean).join(' · ') : item.title;
   const logo = await attach(files, info?.channel?.thumb, 'logo.png', 120, 90);

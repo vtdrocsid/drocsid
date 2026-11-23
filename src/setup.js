@@ -249,7 +249,7 @@ export function setupRoutes(app, { wrap, tokenOf }) {
         d.mediaServers.push({ id, addedAt: Date.now(), ...rec });
       }
     });
-    if (b.type === 'plex') plex.clearLiveCache();
+    sources.clearLiveCache();
     console.log(`[connections] ${b.type} server ${name} at ${t.url} ${b.serverId ? 'updated' : 'added'}`);
     res.json(connectionsView());
   }));
@@ -259,7 +259,7 @@ export function setupRoutes(app, { wrap, tokenOf }) {
     if (!srv) return res.status(404).json({ error: 'Not found' });
     if (conn.isConfigured() && conn.get().mediaServers.length === 1) return res.status(400).json({ error: 'This is the only media server. Add another before removing it.' });
     conn.update((d) => { d.mediaServers = d.mediaServers.filter((x) => x.id !== srv.id); });
-    if (srv.type === 'plex') plex.clearLiveCache();
+    sources.clearLiveCache();
     console.log(`[connections] ${srv.type} server ${srv.name} removed`);
     res.json(connectionsView());
   });

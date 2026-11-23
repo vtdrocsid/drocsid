@@ -5,7 +5,7 @@
 - Plex: Sign in with Plex or address + token. Jellyfin/Emby: username + password, or an API key (browses as the first administrator).
 - Each server's movie and TV libraries appear as their own tabs on Browse (the server is named when two libraries share a name). Admin → Libraries shows which server each library is on.
 - Search, hover cards, details, posters, cast photos, play, resume, seek, lineup and "now playing" posts work for every server. Jellyfin/Emby streams are transcoded by that server to H.264/AAC HLS; tokens stay on the drocsid server.
-- Live TV still comes from the first Plex server.
+- **Live TV from every server** (Plex DVR, Jellyfin and Emby Live TV). Each server's Live TV appears in Admin → Libraries as a "Live TV" entry you turn on or off like a library; the guide shows channels from every server that's on (named by server when there are several). Installs that had picked specific libraries keep Plex Live TV on. The Live TV tab hides when no server's Live TV is on.
 - Play history, lineup and resume points from earlier versions keep working (old item keys belong to the first Plex server).
 
 ## 0.3.0 — 2026-11-23

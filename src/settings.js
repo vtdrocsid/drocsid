@@ -57,6 +57,14 @@ if (current.approvedUserIds || current.approvedRoleIds) {
   }
 }
 
+// 0.4.0: Live TV became an on/off entry in the library list ("live" for the first Plex server).
+// Installs that had picked libraries keep Live TV on.
+if (!current.liveInSections) {
+  if (current.librarySections.length && !current.librarySections.includes('live')) current.librarySections = [...current.librarySections, 'live'];
+  current.liveInSections = true;
+  try { fs.mkdirSync(config.dataDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify(current, null, 2)); } catch {}
+}
+
 export const settings = () => current;
 export const findPreset = (id) => QUALITY_PRESETS.find((p) => p.id === id) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
 

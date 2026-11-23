@@ -255,7 +255,7 @@ export async function startStream(srv, id, { startSeconds = 0, preset }) {
   if (!ms?.TranscodingUrl) throw new Error(`${label(srv)} could not start a stream for this title${j.ErrorCode ? ` (${j.ErrorCode})` : ''}`);
   const u = new URL(ms.TranscodingUrl, 'http://x');
   for (const k of [...u.searchParams.keys()]) if (/^(api_key|apikey|x-emby-token)$/i.test(k)) u.searchParams.delete(k);
-  return { masterPath: u.pathname + u.search, playSessionId: j.PlaySessionId, mediaSourceId: ms.Id };
+  return { masterPath: u.pathname + u.search, playSessionId: j.PlaySessionId, mediaSourceId: ms.Id, liveStreamId: ms.LiveStreamId || null };
 }
 
 /** Is this a path the browser may fetch through our proxy (stream playlists and segments only)? */
@@ -290,4 +290,72 @@ export function report(srv, kind, { itemId, mediaSourceId, playSessionId, positi
 
 export async function stopStream(srv, playSessionId) {
   await call(srv, '/Videos/ActiveEncodings', { method: 'DELETE', params: { deviceId: deviceId(), playSessionId } }).catch(() => {});
+}
+
+// ---------------- Live TV ----------------
+const liveCache = new Map(); // server id -> { at, channels }
+
+/** Channels in number order: { id, number, name, callSign, thumb }. Cached for 10 minutes. */
+export async function liveChannels(srv) {
+  const hit = liveCache.get(srv.id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.channels;
+  const j = await call(srv, '/LiveTv/Channels', { params: { UserId: srv.userId, EnableImages: true, EnableUserData: false, SortBy: 'SortName' } });
+  const channels = (j.Items || []).map((c) => ({
+    id: c.Id,
+    number: c.ChannelNumber || c.Number || '',
+    name: c.Name,
+    callSign: '',
+    hd: false,
+    thumb: c.ImageTags?.Primary ? `img:${c.Id}` : '',
+  })).sort((a, b) => (parseFloat(a.number) || 9e9) - (parseFloat(b.number) || 9e9) || a.name.localeCompare(b.name));
+  liveCache.set(srv.id, { at: Date.now(), channels });
+  return channels;
+}
+export const clearLiveCache = () => { liveCache.clear(); guideCache.clear(); };
+
+const guideCache = new Map(); // `${server}|${from}|${to}|${ids}` -> { at, rows }
+/** Guide rows for channels between from and to (ms), in the same shape as Plex's. */
+export async function guide(srv, from, to, onlyIds = null) {
+  const channels = (await liveChannels(srv)).filter((c) => !onlyIds || onlyIds.includes(c.id));
+  if (!channels.length) return [];
+  // Round the window so the cache is useful while the guide scrolls.
+  const f = Math.floor(from / 1_800_000) * 1_800_000, t = Math.ceil(to / 1_800_000) * 1_800_000;
+  const key = `${srv.id}|${f}|${t}|${onlyIds ? onlyIds.join(',') : '*'}`;
+  const hit = guideCache.get(key);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.rows;
+  const progs = [];
+  for (let i = 0; i < channels.length; i += 40) {
+    const j = await call(srv, '/LiveTv/Programs', {
+      params: {
+        UserId: srv.userId, ChannelIds: channels.slice(i, i + 40).map((c) => c.id).join(','),
+        MinEndDate: new Date(f).toISOString(), MaxStartDate: new Date(t).toISOString(),
+        SortBy: 'StartDate', Fields: 'Overview,Genres', EnableImages: true, Limit: 5000,
+      },
+      timeout: 30_000,
+    });
+    progs.push(...(j.Items || []));
+  }
+  const byCh = new Map(channels.map((c) => [c.id, []]));
+  for (const p of progs) {
+    const list = byCh.get(p.ChannelId);
+    if (!list) continue;
+    list.push({
+      start: Date.parse(p.StartDate), stop: Date.parse(p.EndDate),
+      title: p.Name, subtitle: p.EpisodeTitle || '', desc: p.Overview || '',
+      thumb: p.ImageTags?.Primary ? `img:${p.Id}` : '',
+      season: p.ParentIndexNumber ?? null, episode: p.IndexNumber ?? null,
+      year: p.ProductionYear || null, contentRating: p.OfficialRating || '',
+      genres: (p.Genres || []).slice(0, 3), premiere: !!(p.IsPremiere || p.IsNew),
+    });
+  }
+  const rows = channels.map((c) => ({ ...c, programmes: (byCh.get(c.id) || []).sort((a, b) => a.start - b.start) }));
+  if (guideCache.size > 200) guideCache.clear();
+  guideCache.set(key, { at: Date.now(), rows });
+  return rows;
+}
+
+/** Close a live stream (frees the tuner). */
+export async function closeLive(srv, liveStreamId) {
+  if (!liveStreamId) return;
+  await call(srv, '/LiveStreams/Close', { method: 'POST', params: { LiveStreamId: liveStreamId } }).catch(() => {});
 }

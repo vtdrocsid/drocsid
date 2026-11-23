@@ -190,7 +190,10 @@ function showHover(el, i) {
 let libsLoaded = false, curLib = null, curLibEl = null, libStart = 0;
 async function loadLibraries() {
   libsLoaded = true;
-  const libs = await api('/api/libraries');
+  const all = await api('/api/libraries');
+  // Live TV entries (one per server) only decide whether the Live TV tab shows.
+  const libs = all.filter((l) => l.type !== 'live');
+  const hasLive = all.some((l) => l.type === 'live');
   const box = $('#libs');
   box.innerHTML = '';
   // Two servers can have a library with the same name: name the server only then.
@@ -208,9 +211,11 @@ async function loadLibraries() {
     box.append(c);
     if (i === 0) c.click();
   });
-  const live = h('<button class="live" data-live="1"><span class="ico" aria-hidden="true">📡</span>Live TV</button>');
-  live.onclick = () => showTab('live');
-  box.append(live);
+  if (hasLive) {
+    const live = h('<button class="live" data-live="1"><span class="ico" aria-hidden="true">📡</span>Live TV</button>');
+    live.onclick = () => showTab('live');
+    box.append(live);
+  } else if (location.hash === '#live') location.hash = '';
   if (!libs.length) box.prepend(h('<span class="muted small">No libraries available.</span>'));
   showTab(location.hash.slice(1) || 'libraries');
 }
@@ -514,8 +519,8 @@ function renderGuide() {
     .filter((c) => !f || c.name.toLowerCase().includes(f) || (c.number || '').startsWith(f) || (c.group || '').toLowerCase().includes(f))
     .forEach((c) => {
       const row = h(`<div class="g-row">
-        <div class="g-ch">${c.thumb ? `<img loading="lazy" src="/api/logo?id=${c.id}" alt="">` : ''}
-          <div class="nm"><div>${esc(c.name)}</div><div class="num">${esc(c.number || '')}</div></div>
+        <div class="g-ch">${c.thumb ? `<img loading="lazy" src="/api/logo?id=${encodeURIComponent(c.id)}" alt="">` : ''}
+          <div class="nm"><div>${esc(c.name)}</div><div class="num">${esc(c.number || '')}${c.serverName ? ` · ${esc(c.serverName)}` : ''}</div></div>
           <button class="btn sm primary" title="Watch live">▶</button></div>
         <div class="g-track" style="width:${width}px"></div></div>`);
       $('.g-ch button', row).onclick = () => choosePlay({ source: 'live', channelId: c.id, title: c.name });

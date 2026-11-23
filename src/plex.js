@@ -164,12 +164,14 @@ export function photoUrl(path, width = 300, height = 450) {
 }
 
 // ---------------- Live TV (Plex DVR) ----------------
-let liveCache = { at: 0, dvr: null, provider: null, channels: [] };
-const guideCache = new Map(); // `${gridKey}|${date}` -> { at, programmes }
+// Per Plex server (several can be connected, each with its own DVR).
+const liveCaches = new Map(); // server id -> { at, dvr, provider, channels }
+const guideCache = new Map(); // `${server}|${gridKey}|${date}` -> { at, programmes }
 
 /** Find the DVR and its guide provider, then the channel lineup. Cached for 10 minutes. */
 async function liveSetup() {
-  if (Date.now() - liveCache.at < 10 * 60_000 && liveCache.dvr) return liveCache;
+  const hit = liveCaches.get(cur().id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit;
   const dvrs = await plexGet('/livetv/dvrs');
   const list = dvrs.MediaContainer?.Dvr || dvrs.MediaContainer?.DVR || [];
   const dvr = list[0];
@@ -197,11 +199,12 @@ async function liveSetup() {
     thumb: c.thumb || '',
   })).sort((a, b) => (parseFloat(a.number) || 9e9) - (parseFloat(b.number) || 9e9));
 
-  liveCache = { at: Date.now(), dvr: { key: dvr.key, lineup: dvr.lineup }, provider, channels };
-  return liveCache;
+  const entry = { at: Date.now(), dvr: { key: dvr.key, lineup: dvr.lineup }, provider, channels };
+  liveCaches.set(cur().id, entry);
+  return entry;
 }
 
-export function clearLiveCache() { liveCache = { at: 0, dvr: null, provider: null, channels: [] }; guideCache.clear(); }
+export function clearLiveCache() { liveCaches.clear(); guideCache.clear(); }
 
 export async function liveChannels() { return (await liveSetup()).channels; }
 
@@ -270,7 +273,7 @@ function onChannel(media, ch) {
 
 async function gridFor(provider, ch, date) {
   const gridKey = ch.gridKey;
-  const key = `${gridKey}|${date}`;
+  const key = `${cur().id}|${gridKey}|${date}`;
   const hit = guideCache.get(key);
   if (hit && Date.now() - hit.at < 15 * 60_000) return hit.programmes;
   const data = await plexGet(`/${provider}/grid`, { channelGridKey: gridKey, date });

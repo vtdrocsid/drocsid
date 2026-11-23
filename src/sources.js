@@ -52,6 +52,7 @@ export async function libraries({ all = false } = {}) {
       return [];
     }
   }));
+  lists.push(await liveEntries(servers, multi));
   const { librarySections: allowed, libraryOrder: order, librarySort: sorts } = settings();
   const pos = (id) => { const i = order.indexOf(id); return i === -1 ? 1e6 : i; };
   return lists.flat()
@@ -168,3 +169,110 @@ export async function health(srv) {
     return { ok: false, error: e.name === 'TimeoutError' ? 'No answer' : e.message };
   }
 }
+
+// ---------------- Live TV (every server that has it) ----------------
+// Each server's Live TV is listed in Admin → Libraries as "Live TV" and turned on or off like a
+// library. Its key is "live" for the first Plex server (as before) and "<server id>~live" otherwise.
+// Channel ids carry the server the same way as item keys.
+export const liveKey = (srv) => prefix(srv, 'live');
+const noLive = new Map(); // server id -> time we learned it has no Live TV (rechecked after 5 minutes)
+
+async function rawChannels(srv) {
+  return run(srv, () => plex.liveChannels(), () => jf.liveChannels(srv));
+}
+
+/** Servers with Live TV, as Libraries entries: { id, title: 'Live TV', type: 'live', ... }. */
+async function liveEntries(servers, multi) {
+  const out = await Promise.all(servers.map(async (srv, si) => {
+    const miss = noLive.get(srv.id);
+    if (miss && Date.now() - miss < 5 * 60_000) return null;
+    try {
+      const ch = await rawChannels(srv);
+      if (!ch.length) throw new Error('no channels');
+      noLive.delete(srv.id);
+      return { id: liveKey(srv), title: 'Live TV', type: 'live', channels: ch.length, server: srv.id, serverName: srv.name, serverType: srv.type, multi, rank: 1e5 + si };
+    } catch {
+      noLive.set(srv.id, Date.now());
+      return null;
+    }
+  }));
+  return out.filter(Boolean);
+}
+
+const liveEnabled = (srv) => {
+  const allowed = settings().librarySections;
+  return !allowed.length || allowed.includes(liveKey(srv));
+};
+/** Servers whose Live TV is turned on (and that have it). */
+async function liveServers() {
+  const servers = conn.servers().filter(liveEnabled);
+  const live = await liveEntries(servers, false);
+  return servers.filter((s) => live.some((l) => l.server === s.id));
+}
+
+const tagChannel = (srv, c, multi) => ({
+  ...c, id: prefix(srv, c.id), server: srv.id, serverName: multi ? srv.name : undefined,
+  thumb: c.thumb ? (srv.type === 'plex' ? prefix(srv, c.thumb) : `${srv.id}~${c.thumb}`) : '',
+});
+const tagProgramme = (srv, p) => ({ ...p, thumb: p.thumb ? (srv.type === 'plex' ? prefix(srv, p.thumb) : `${srv.id}~${p.thumb}`) : '' });
+
+/** Every enabled channel, server by server. */
+export async function liveChannels() {
+  const servers = await liveServers();
+  const lists = await Promise.all(servers.map((srv) => rawChannels(srv).then((cs) => cs.map((c) => tagChannel(srv, c, servers.length > 1))).catch(() => [])));
+  return lists.flat();
+}
+
+/** Guide rows for every enabled channel (or just onlyIds) between from and to. */
+export async function guide(from, to, onlyIds = null) {
+  const servers = await liveServers();
+  const lists = await Promise.all(servers.map(async (srv) => {
+    const mine = onlyIds ? onlyIds.map((k) => parseKey(k)).filter((p) => p.srv?.id === srv.id).map((p) => p.id) : null;
+    if (mine && !mine.length) return [];
+    try {
+      const rows = await run(srv, () => plex.guide(from, to, mine), () => jf.guide(srv, from, to, mine));
+      return rows.map((r) => ({ ...tagChannel(srv, r, servers.length > 1), programmes: r.programmes.map((p) => tagProgramme(srv, p)) }));
+    } catch (e) {
+      console.warn(`[sources] guide from ${srv.name}: ${e.message}`);
+      return [];
+    }
+  }));
+  return lists.flat();
+}
+
+/** One channel as a playable item. */
+export async function liveChannel(key) {
+  const { srv, id } = need(key);
+  if (!liveEnabled(srv)) throw Object.assign(new Error('Live TV is turned off for that server'), { status: 403 });
+  const c = (await rawChannels(srv)).find((ch) => ch.id === id);
+  if (!c) throw Object.assign(new Error('Channel not found'), { status: 404 });
+  return { source: 'live', kind: 'channel', channelId: prefix(srv, c.id), number: c.number, server: srv.id, serverType: srv.type, title: `${c.number ? c.number + ' ' : ''}${c.name}`, duration: 0, thumb: null };
+}
+
+/** A channel plus what's on now and next, for "now playing" posts and history. */
+export async function liveNow(key) {
+  const { srv } = parseKey(key);
+  if (!srv) return null;
+  const t = Date.now();
+  const row = (await guide(t - 6 * 3600_000, t + 6 * 3600_000, [safeKey(key)]))[0];
+  if (!row) return null;
+  const progs = row.programmes || [];
+  const i = progs.findIndex((p) => p.start <= t && p.stop > t);
+  const { programmes, ...channel } = row;
+  return { channel, now: i >= 0 ? progs[i] : null, next: i >= 0 ? progs[i + 1] || null : progs.find((p) => p.start > t) || null };
+}
+
+/** Live TV status of every server, for the Admin page. */
+export async function liveStatus() {
+  return Promise.all(conn.servers().map(async (srv) => {
+    try {
+      const ch = await rawChannels(srv);
+      const extra = srv.type === 'plex' ? await plex.withServer(srv, () => plex.liveStatus()) : {};
+      return { server: srv.id, serverName: srv.name, serverType: srv.type, key: liveKey(srv), enabled: liveEnabled(srv), available: ch.length > 0, channels: ch.length, provider: extra.provider || '' };
+    } catch (e) {
+      return { server: srv.id, serverName: srv.name, serverType: srv.type, key: liveKey(srv), enabled: liveEnabled(srv), available: false, error: e.message };
+    }
+  }));
+}
+
+export function clearLiveCache() { plex.clearLiveCache(); jf.clearLiveCache(); noLive.clear(); }

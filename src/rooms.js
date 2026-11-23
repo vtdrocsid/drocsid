@@ -57,7 +57,7 @@ const emit = (room) => events.emit('update', room);
 
 /** The media server a room streams from: live TV is the first Plex server; titles carry theirs in the key. */
 function serverOf(room) {
-  const srv = room.item.source === 'live' ? conn.plexServer() : parseKey(room.item.ratingKey).srv;
+  const srv = parseKey(room.item.source === 'live' ? room.item.channelId : room.item.ratingKey).srv;
   if (!srv) throw Object.assign(new Error('That media server is no longer connected'), { status: 404 });
   return srv;
 }
@@ -69,6 +69,7 @@ async function releasePlex(room) {
     room.jfSession = null;
     await jf.report(room.srv, 'stop', { ...s, position: position(room), paused: !room.playing });
     await jf.stopStream(room.srv, s.playSessionId);
+    await jf.closeLive(room.srv, s.liveStreamId); // frees the tuner
     return;
   }
   if (!room.plexSession) return;
@@ -93,13 +94,13 @@ async function load(room, seconds) {
 
 /** Jellyfin/Emby: the server makes an HLS stream spanning the whole title; players seek within it. */
 async function loadJellyfin(room, seconds) {
-  const id = parseKey(room.item.ratingKey).id;
+  const id = parseKey(room.item.source === 'live' ? room.item.channelId : room.item.ratingKey).id;
   // The playlist always covers the whole title from 0 (stream time == title time), like Plex's.
   const s = await jf.startStream(room.srv, id, { startSeconds: 0, preset: findPreset(room.quality) });
   const res = await jf.streamFetch(room.srv, s.masterPath);
   if (!res.ok) throw new Error(`${room.srv.name} answered ${res.status} for the stream`);
   room.masterPlaylist = jf.rewriteMaster(room.srv, s.masterPath, await res.text());
-  room.jfSession = { itemId: id, mediaSourceId: s.mediaSourceId, playSessionId: s.playSessionId };
+  room.jfSession = { itemId: id, mediaSourceId: s.mediaSourceId, playSessionId: s.playSessionId, liveStreamId: s.liveStreamId };
   jf.report(room.srv, 'start', { ...room.jfSession, position: seconds, paused: false });
   room.offsetBase = 0;
   room.playlistVersion = ++streamVersion;
@@ -109,7 +110,7 @@ async function loadJellyfin(room, seconds) {
 async function loadPlex(room, seconds) {
   const sessionId = crypto.randomUUID();
   if (room.item.source === 'live') {
-    const tuned = await plex.tune(room.item, sessionId);
+    const tuned = await plex.tune({ ...room.item, channelId: parseKey(room.item.channelId).id }, sessionId);
     room.plexKey = tuned.key;
     room.plexRatingKey = tuned.ratingKey;
     room.masterPlaylist = await plex.startTranscode({ path: tuned.key, sessionId, preset: findPreset(room.quality) });

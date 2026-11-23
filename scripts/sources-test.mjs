@@ -160,6 +160,53 @@ await check('Emby stream uses the Emby token header', async () => {
   assert.ok(embyMock.log.some((x) => x.startsWith('POST /Items/m2/PlaybackInfo')));
 });
 
+console.log('Live TV');
+await check('Live TV listed per server in libraries', async () => {
+  settings.update({ librarySections: [] });
+  const libs = await sources.libraries({ all: true });
+  const live = libs.filter((l) => l.type === 'live').map((l) => l.id);
+  assert.ok(live.includes('jellyfin-aa~live') && live.includes('emby-bb~live'), live.join(','));
+});
+await check('guide merges servers, keyed by server', async () => {
+  const rows = await sources.guide(Date.now() - 3600_000, Date.now() + 3 * 3600_000);
+  const ids = rows.map((r) => r.id);
+  assert.ok(ids.includes('jellyfin-aa~ch1') && ids.includes('emby-bb~ch2'), ids.join(','));
+  const jfRows = rows.filter((r) => r.server === 'jellyfin-aa');
+  assert.deepEqual(jfRows.map((r) => r.number), ['5', '12']); // channel number order
+  const sports = jfRows[0];
+  assert.equal(sports.programmes[0].title, 'The Game');
+  assert.equal(sports.programmes[0].subtitle, 'Week 12');
+  assert.equal(sports.programmes[0].premiere, true);
+  assert.equal(sports.programmes[0].thumb, 'jellyfin-aa~img:pg1');
+  assert.equal(jfRows[1].thumb, 'jellyfin-aa~img:ch2');
+  assert.equal(sports.serverName, 'MockJF');
+});
+await check('turning a server\'s Live TV off hides it', async () => {
+  settings.update({ librarySections: ['jellyfin-aa~movies', 'emby-bb~live'] });
+  const rows = await sources.guide(Date.now(), Date.now() + 3600_000);
+  assert.ok(rows.every((r) => r.server === 'emby-bb'), rows.map((r) => r.id).join(','));
+  await assert.rejects(() => sources.liveChannel('jellyfin-aa~ch1'), /turned off/);
+  settings.update({ librarySections: [] });
+});
+await check('now and next for a channel', async () => {
+  const n = await sources.liveNow('jellyfin-aa~ch1');
+  assert.equal(n.now.title, 'The Game');
+  assert.equal(n.next.title, 'Postgame');
+  assert.equal(n.channel.name, 'Sports');
+});
+await check('watching a channel opens and closes the live stream', async () => {
+  const item = await sources.liveChannel('jellyfin-aa~ch1');
+  assert.equal(item.title, '5 Sports');
+  const room = await rooms.start('room3', 'g1', item, { id: 'u3', name: 'U3' }, '1080-8000', 0);
+  assert.match(room.masterPlaylist, /\/media\/jf\/jellyfin-aa\/videos\/ch1\//);
+  await rooms.stop('room3', false, 'test');
+  assert.ok(jfMock.log.some((x) => x.startsWith('POST /LiveStreams/Close?LiveStreamId=ls-ch1')));
+});
+await check('old settings keep Live TV on', async () => {
+  const st = JSON.parse(fs.readFileSync(path.join(dataDir, 'settings.json'), 'utf8'));
+  assert.equal(st.liveInSections, true);
+});
+
 console.log('Several Plex servers');
 const plex = await import('../src/plex.js');
 await check('calls go to the chosen Plex server', async () => {
