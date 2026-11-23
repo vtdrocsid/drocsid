@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 — 2026-11-23
+- Access by server: **Approved users** first, then **Approved roles**, then **Admins**. The wording now says plainly that approved users and roles can browse the libraries and play content in that server.
+- Connections, Libraries, Live TV and Super admins panels are hidden from the start and only shown to super admins (regular admins never see them, even briefly; the server already refused them).
+
 ## 0.5.0 — 2026-11-23
 - **Choose your Discord after signing in.** People in more than one server with drocsid pick which one they're watching in; the top bar shows it and switches it. Voice channels, Watching Now, Upcoming Lineup and Play History are for that server. Super admins also get **All servers**. One server: picked automatically.
 - **Admins are per server.** Admin → Access by server has each server's approved roles, approved users, **admins**, and its own "viewers must be approved" and "now playing in voice chat" settings. A regular admin sees and changes only the server they're signed into; super admins see every server.
