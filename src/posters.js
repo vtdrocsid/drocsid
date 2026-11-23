@@ -54,6 +54,7 @@ async function fetchAndSave(ref, w, h) {
   const buf = Buffer.from(await r.arrayBuffer());
   if (!buf.length) return { status: 502 };
   try { write(hashOf(ref, w, h), buf, type); } catch (e) { console.warn('[posters] could not save:', e.message); }
+  missing.delete(hashOf(ref, w, h)); // it has one now
   return { buf, type };
 }
 

@@ -14,7 +14,7 @@ document.addEventListener('error', (e) => {
   const img = e.target;
   if (img?.tagName !== 'IMG' || !img.src.includes('/api/thumb?')) return;
   const n = Number(img.dataset.retry || 0);
-  if (n >= 2) return;
+  if (n >= 2) { img.remove(); return; } // no poster: leave the plain grey box, not a broken-image icon
   img.dataset.retry = n + 1;
   setTimeout(() => { img.src = img.src.replace(/&r=\d+$/, '') + `&r=${n + 1}`; }, (n + 1) * 3000);
 }, true);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.6 — 2026-11-23
+- Titles whose media server has no poster show the plain grey box instead of a broken-image icon.
+- A poster found by "Refresh now" or the nightly refresh shows right away, even if the title had no poster earlier.
+
 ## 0.4.5 — 2026-11-23
 - Fixed Jellyfin/Emby titles with no poster on Browse: their library lists sometimes leave out poster info, and drocsid treated that as "no poster". It now always asks for the title's poster (seasons/episodes without their own use the show's). Titles that truly have none are remembered for 6 hours, and the poster cache counts them as "without a poster" instead of failures.
 
