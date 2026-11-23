@@ -35,7 +35,7 @@ const doneFor = {
   invite: () => (currentApp()?.guilds || []).length > 0,
   signin: () => (st.ownerIds || []).length > 0,
   plex: () => (st.plexServers || []).length > 0,
-  done: () => st.configured,
+  done: () => !mode && st.configured,
 };
 
 async function refresh() {
