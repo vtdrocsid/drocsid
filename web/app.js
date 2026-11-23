@@ -384,7 +384,16 @@ async function choosePlay(target) {
   const dlg = $('#playDlg');
   $('#playTitle').textContent = `Play: ${target.title}`;
   $('#playErr').textContent = '';
-  const { current, channels, textChannels = [] } = await api('/api/voice');
+  const [{ current, channels, textChannels = [] }, prog] = await Promise.all([
+    api('/api/voice'),
+    target.source === 'plex' && target.ratingKey ? api(`/api/progress/${target.ratingKey}`).catch(() => null) : null,
+  ]);
+  // Resume where this user left off, or start over.
+  $('#resumeBox').hidden = !prog;
+  if (prog) {
+    $('#resumeLabel').textContent = `Resume from ${fmt(prog.pos)} (of ${fmt(prog.duration)})`;
+    $('#resumeBox input[value=resume]').checked = true;
+  }
   const sel = $('#voiceSel');
   sel.innerHTML = channels.map((c) => `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>🔊 ${esc(c.name)}${c.members.length ? ` (${c.members.length})` : ''}${c.nowPlaying.active ? ' — playing' : ''}</option>`).join('');
   $('#voiceHint').textContent = current ? 'Defaulted to the channel you are in.' : "Tip: join a voice channel in Discord first, then open Activities (🚀) to watch.";
@@ -407,7 +416,8 @@ async function choosePlay(target) {
   const start = async (extra = {}) => {
     const announceChannelId = annOn.checked ? annSel.value : undefined;
     try { localStorage.setItem('drocsid.announce', JSON.stringify({ on: annOn.checked, channel: annSel.value })); } catch {}
-    await api('/api/play', { method: 'POST', body: JSON.stringify({ ...target, voiceChannelId: sel.value, announceChannelId, ...extra }) });
+    const startAt = prog && $('#resumeBox input[value=resume]').checked ? prog.pos : 0;
+    await api('/api/play', { method: 'POST', body: JSON.stringify({ ...target, voiceChannelId: sel.value, announceChannelId, startAt, ...extra }) });
     dlg.close();
     $('#detail').close();
     toast('Started. Open Activities (🚀) in that voice channel to watch.');

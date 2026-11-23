@@ -14,6 +14,7 @@ import * as rooms from './rooms.js';
 import { announce, announceNowPlaying } from './bot.js';
 import { groupPlaylist, parseGroup, GROUP } from './hlsgroup.js';
 import * as history from './history.js';
+import * as progress from './progress.js';
 import * as schedule from './schedule.js';
 import { readFileSync } from 'node:fs';
 
@@ -229,7 +230,7 @@ app.get('/api/voice', needSession, needApproved, (req, res) => {
 });
 
 app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
-  const { source, ratingKey, channelId: liveId, voiceChannelId, replace = false, stopMine = false, announceChannelId } = req.body || {};
+  const { source, ratingKey, channelId: liveId, voiceChannelId, replace = false, stopMine = false, announceChannelId, startAt = 0 } = req.body || {};
   const channels = auth.voiceChannels();
   const channel = channels.find((c) => c.id === voiceChannelId);
   if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
@@ -258,7 +259,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
   }
 
   const item = await resolveItem(source, ratingKey, liveId);
-  await startStream(channel, item, me);
+  await startStream(channel, item, me, { startAt: Number(startAt) || 0 });
   if (announceChannelId && auth.textChannels().some((c) => c.id === announceChannelId)) {
     announceNowPlaying(announceChannelId, { item, voiceChannelId: channel.id, startedBy: me.name });
   }
@@ -273,8 +274,8 @@ async function resolveItem(source, ratingKey, liveId) {
 }
 
 /** Start a stream in a voice channel, record it in play history, and announce it. */
-async function startStream(channel, item, user, { scheduled = false } = {}) {
-  await rooms.start(channel.id, config.guildId, item, user, settings().quality);
+async function startStream(channel, item, user, { scheduled = false, startAt = 0 } = {}) {
+  await rooms.start(channel.id, config.guildId, item, user, settings().quality, startAt);
   const room = rooms.get(channel.id);
   room.historyId = history.begin({ item, voiceChannelId: channel.id, voiceChannelName: channel.name, startedBy: user.name, startedById: user.id, scheduled });
   // Anyone already watching in the Activity counts as a watcher of the new title.
@@ -291,6 +292,19 @@ async function startStream(channel, item, user, { scheduled = false } = {}) {
     ? `📅 Scheduled showing: **${item.title}** (scheduled by ${user.name}) is starting now. Open **Activities** (🚀) in this voice channel to watch.`
     : `▶️ **${item.title}** started by ${user.name}. Open **Activities** (🚀) in this voice channel to watch.`);
 }
+
+// ---------- watch progress (resume where you left off) ----------
+app.get('/api/progress/:key', needSession, needApproved, (req, res) => {
+  res.json(progress.get(req.session.userId, String(req.params.key).replace(/\D/g, '')) || null);
+});
+// Every 20 s, remember the position for everyone who has the player open on a library title.
+setInterval(() => {
+  for (const room of rooms.all()) {
+    if (room.item.source !== 'plex' || !room.item.duration || !room.item.ratingKey) continue;
+    const st = rooms.publicState(room);
+    for (const ws of subs.get(room.id) || []) progress.record(ws.userId, String(room.item.ratingKey), st.position, room.item.duration);
+  }
+}, 20_000).unref();
 
 // ---------- Watching Now (left rail) ----------
 // Every voice channel with a stream: what's on, how far along, and who has the player open.

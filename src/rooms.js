@@ -88,7 +88,7 @@ async function load(room, seconds) {
   room.playlist = `room/${room.id}/master.m3u8?v=${room.playlistVersion}`; // client prefixes /media/t/<token>/
 }
 
-export async function start(roomId, guildId, item, user, quality) {
+export async function start(roomId, guildId, item, user, quality, startAt = 0) {
   await stop(roomId, false, 'replaced by a new title');
   const room = {
     id: roomId, guildId, item, startedBy: user.name, startedById: user.id, quality: findPreset(quality).id,
@@ -97,9 +97,11 @@ export async function start(roomId, guildId, item, user, quality) {
     plexSession: null, plexKey: null, plexRatingKey: null,
     viewers: 0, idleSince: now(),
   };
+  const from = item.source === 'plex' && startAt > 0 ? Math.min(startAt, (item.duration || startAt) - 5) : 0;
+  room.anchorPos = from;
   rooms.set(roomId, room);
   try {
-    await load(room, 0);
+    await load(room, from);
   } catch (e) {
     rooms.delete(roomId);
     throw e;

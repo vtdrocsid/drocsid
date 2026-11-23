@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.27 — 2026-11-22
+- Watch progress per user: while someone has the player open on a movie or episode, their position is
+  saved every 20 s (data/progress.json). Pressing Play on that title later offers "Resume from h:mm:ss"
+  (default) or "Start from the beginning". Under a minute in, or past 95%, isn't kept.
+
 ## 0.2.26 — 2026-11-22
 - When everyone closes the Activity player, the stream pauses (after a 10-second grace for reloads);
   when someone opens it again it carries on. If nobody comes back within 3 minutes, the stream ends.
