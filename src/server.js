@@ -5,8 +5,6 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { readFileSync } from 'node:fs';
-const APP_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 import { config } from './config.js';
 import { settings, update as updateSettings, VALID, QUALITY_PRESETS } from './settings.js';
 import * as settingsMod from './settings.js';
@@ -143,7 +141,7 @@ app.post('/api/token', wrap(async (req, res) => {
 
 // ---------- portal API ----------
 app.get('/api/me', needSession, wrap(async (req, res) => {
-  res.json({ id: req.session.userId, name: req.session.username, approved: await approved(req.session), admin: auth.isAdmin(req.session.userId), superAdmin: auth.isSuperAdmin(req.session.userId), version: APP_VERSION });
+  res.json({ id: req.session.userId, name: req.session.username, approved: await approved(req.session), admin: auth.isAdmin(req.session.userId), superAdmin: auth.isSuperAdmin(req.session.userId), version: VERSION });
 }));
 
 app.get('/api/libraries', needSession, needApproved, wrap(async (req, res) => res.json(await plex.libraries())));
