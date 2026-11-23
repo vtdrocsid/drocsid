@@ -1,7 +1,15 @@
 // Everything Plex: libraries, metadata, Live TV (DVR tuner + guide) and the universal transcoder.
 // No media is processed here — Plex does all tuning and transcoding; we only proxy its HLS output.
 import crypto from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { config } from './config.js';
+import * as conn from './connections.js';
+
+// Several Plex servers can be connected. Calls run against the server set with withServer();
+// outside of that (Live TV, old item keys) they use the first Plex server.
+const ctx = new AsyncLocalStorage();
+export const withServer = (srv, fn) => ctx.run(srv, fn);
+const cur = () => ctx.getStore() || conn.plexServer() || { id: '', url: '', token: '' };
 import { settings } from './settings.js';
 
 // Plex device identity, kept stable across restarts (stored with the connections).
@@ -9,7 +17,7 @@ const clientId = () => config.plexClientId;
 
 const baseHeaders = () => ({
   Accept: 'application/json',
-  'X-Plex-Token': config.plexToken,
+  'X-Plex-Token': cur().token,
   'X-Plex-Client-Identifier': clientId(),
   'X-Plex-Product': 'Drocsid',
   'X-Plex-Version': '1.0.0',
@@ -19,8 +27,8 @@ const baseHeaders = () => ({
 });
 
 async function plexFetch(path, { params = {}, method = 'GET', headers = {} } = {}) {
-  if (!config.plexUrl) throw Object.assign(new Error('No Plex server is connected yet'), { status: 503 });
-  const url = new URL(config.plexUrl + path);
+  if (!cur().url) throw Object.assign(new Error('No Plex server is connected'), { status: 503 });
+  const url = new URL(cur().url + path);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
   const res = await fetch(url, { method, headers: { ...baseHeaders(), ...headers } });
   if (!res.ok) throw Object.assign(new Error(`Plex ${res.status} on ${path}`), { status: res.status });
@@ -71,23 +79,17 @@ function rtScore(m) {
   return null;
 }
 
-export async function libraries({ all = false } = {}) {
+/** Movie and TV libraries on this server, in Plex's order. (Filtering and order: sources.js.) */
+export async function libraries() {
   const data = await plexGet('/library/sections');
-  const { librarySections: allowed, libraryOrder: order, librarySort: sorts } = settings();
-  const rank = (id) => { const i = order.indexOf(id); return i === -1 ? 1e6 : i; };
   return (data.MediaContainer?.Directory || [])
     .filter((d) => ['movie', 'show'].includes(d.type))
-    .filter((d) => all || !allowed.length || allowed.includes(String(d.key)))
-    .map((d, i) => ({ id: String(d.key), title: d.title, type: d.type, defaultSort: sorts[String(d.key)] || 'title', plexIndex: i }))
-    .sort((a, b) => rank(a.id) - rank(b.id) || a.plexIndex - b.plexIndex)
-    .map(({ plexIndex, ...l }) => l);
+    .map((d) => ({ id: String(d.key), title: d.title, type: d.type }));
 }
 
 const SORTS = { title: 'titleSort', added: 'addedAt:desc', year: 'year:desc', released: 'originallyAvailableAt:desc' };
 
 export async function libraryItems(sectionId, { start = 0, size = 60, sort = 'title' } = {}) {
-  const allowed = settings().librarySections;
-  if (allowed.length && !allowed.includes(String(sectionId))) throw new Error('Library not allowed');
   const data = await plexGet(`/library/sections/${encodeURIComponent(sectionId)}/all`, {
     sort: SORTS[sort] || SORTS.title,
     'X-Plex-Container-Start': start,
@@ -99,8 +101,6 @@ export async function libraryItems(sectionId, { start = 0, size = 60, sort = 'ti
 
 /** How many titles start with each character, in A–Z sort order (for the letter jump bar). */
 export async function libraryLetters(sectionId) {
-  const allowed = settings().librarySections;
-  if (allowed.length && !allowed.includes(String(sectionId))) throw new Error('Library not allowed');
   const data = await plexGet(`/library/sections/${encodeURIComponent(sectionId)}/firstCharacter`);
   return (data.MediaContainer?.Directory || []).map((d) => ({ key: String(d.key ?? d.title), title: String(d.title ?? d.key), size: Number(d.size) || 0 }));
 }
@@ -158,8 +158,8 @@ export async function info(ratingKey) {
 }
 
 export function photoUrl(path, width = 300, height = 450) {
-  const url = new URL(config.plexUrl + '/photo/:/transcode');
-  url.search = new URLSearchParams({ width, height, minSize: 1, upscale: 1, url: path, 'X-Plex-Token': config.plexToken }).toString();
+  const url = new URL(cur().url + '/photo/:/transcode');
+  url.search = new URLSearchParams({ width, height, minSize: 1, upscale: 1, url: path, 'X-Plex-Token': cur().token }).toString();
   return url;
 }
 
@@ -419,7 +419,7 @@ export async function startTranscode({ path, offset, mediaIndex = 0, sessionId, 
   const text = await res.text();
   // Variant URLs are relative ("session/<id>/base/index.m3u8"); route them through our proxy.
   return text.split('\n').map((line) => (line && !line.startsWith('#') && !/^https?:/.test(line)
-    ? `/media/plex/video/:/transcode/universal/${line.trim()}`
+    ? `/media/plex/${cur().id}/video/:/transcode/universal/${line.trim()}`
     : line)).join('\n');
 }
 
@@ -441,8 +441,8 @@ export async function timeline({ key, ratingKey, state, timeMs = 0, durationMs =
 
 /** Proxy target for transcoder playlists/segments, with the token added server-side. */
 export function plexProxyUrl(pathAndQuery) {
-  const url = new URL(config.plexUrl + pathAndQuery);
-  url.searchParams.set('X-Plex-Token', config.plexToken);
+  const url = new URL(cur().url + pathAndQuery);
+  url.searchParams.set('X-Plex-Token', cur().token);
   url.searchParams.set('X-Plex-Client-Identifier', clientId());
   return url;
 }

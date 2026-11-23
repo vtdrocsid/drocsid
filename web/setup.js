@@ -1,5 +1,5 @@
 // Setup wizard. Also used after setup by super admins (from Admin → Connections) to add or
-// change a Discord app (?add=discord[&app=<id>]) or change the Plex server (?add=plex).
+// change a Discord app (?add=discord[&app=<id>]) or add/edit a media server (?add=media[&server=<id>]).
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function api(path, opts = {}) {
@@ -11,7 +11,10 @@ async function api(path, opts = {}) {
 const copy = (text) => `<div class="copy"><span>${esc(text)}</span><button type="button" data-copy="${esc(text)}">COPY</button></div>`;
 
 const params = new URLSearchParams(location.search);
-const mode = params.get('add'); // null = first-time setup
+const mode = params.get('add') === 'plex' ? 'media' : params.get('add'); // null = first-time setup
+const editServer = params.get('server') || null; // media server being edited
+let mediaType = null;   // plex | jellyfin | emby
+let mediaSaved = false; // a server was added/saved in this visit
 let st = null;          // /api/setup/status
 let appId = params.get('app') || null; // Discord app being set up
 let pollTimer = null;
@@ -22,10 +25,13 @@ const STEPS = {
   discord: { label: 'Discord app' },
   invite: { label: 'Add to server' },
   signin: { label: 'Sign in' },
-  plex: { label: 'Media server' },
+  mtype: { label: 'Server type' },
+  media: { label: 'Connect' },
   done: { label: 'Done' },
 };
-const order = mode === 'discord' ? ['discord', 'invite', 'done'] : mode === 'plex' ? ['plex', 'done'] : Object.keys(STEPS);
+const order = mode === 'discord' ? ['discord', 'invite', 'done']
+  : mode === 'media' ? (editServer ? ['media', 'done'] : ['mtype', 'media', 'done'])
+  : Object.keys(STEPS);
 let step = order[0];
 
 const currentApp = () => st.discordApps?.find((a) => a.id === appId) || (mode ? null : st.discordApps?.find((a) => a.primary)) || null;
@@ -34,19 +40,21 @@ const doneFor = {
   discord: () => !!currentApp(),
   invite: () => (currentApp()?.guilds || []).length > 0,
   signin: () => (st.ownerIds || []).length > 0,
-  plex: () => (st.plexServers || []).length > 0,
+  mtype: () => !!mediaType || (!mode && (st.mediaServers || []).length > 0),
+  media: () => mediaSaved || (!mode && (st.mediaServers || []).length > 0),
   done: () => !mode && st.configured,
 };
 
 async function refresh() {
   st = await api('/api/setup/status');
   if (st.configured && !mode) location.href = '/browse/admin.html#connections';
+  if (editServer && !mediaType) mediaType = st.mediaServers?.find((x) => x.id === editServer)?.type || null;
 }
 
 function drawSteps() {
   $('#steps').innerHTML = order.map((k) => `<div class="${k === step ? 'on' : doneFor[k]() ? 'done' : ''}">${STEPS[k].label}</div>`).join('');
   $('#back').style.visibility = order.indexOf(step) > 0 ? 'visible' : 'hidden';
-  $('#mode').textContent = mode === 'discord' ? 'Add a Discord app' : mode === 'plex' ? 'Media server' : 'Setup';
+  $('#mode').textContent = mode === 'discord' ? 'Add a Discord app' : mode === 'media' ? (editServer ? 'Edit media server' : 'Add a media server') : 'Setup';
 }
 
 function go(k) {
@@ -128,27 +136,63 @@ const render = {
     $('#next').disabled = !(st.ownerIds || []).length;
   },
 
-  plex() {
-    const saved = st.plexServers?.[0];
-    $('#body').innerHTML = `<h2>Connect your Plex server</h2>
-      <p class="lead">Sign in with Plex to pick a server, or enter its address and token yourself.</p>
-      ${saved ? `<div class="srv"><span class="ic plex">▶</span><div class="grow"><div class="n">${esc(saved.name)}</div><div class="m">${esc(saved.url)}</div></div><span class="ok">✓ Connected</span></div><p class="hint">Connecting another server below replaces this one. (Several servers at once is coming.)</p>` : ''}
-      <button class="btn plex" id="plexSignin">Sign in with Plex</button> <span id="pinMsg" class="hint"></span>
-      <div id="servers"></div>
-      <div class="or">— or enter it yourself —</div>
+  mtype() {
+    const cards = [
+      ['plex', 'Plex', 'Sign in with Plex, or address + token', '<div class="logo" style="background:#1f1f1f;color:#e5a00d">▶</div>'],
+      ['jellyfin', 'Jellyfin', 'Address + username and password, or an API key', '<div class="logo" style="background:linear-gradient(135deg,#aa5cc3,#00a4dc);color:#fff">J</div>'],
+      ['emby', 'Emby', 'Address + username and password, or an API key', '<div class="logo" style="background:#52b54b;color:#fff">E</div>'],
+    ];
+    $('#body').innerHTML = `<h2>What kind of server?</h2>
+      <p class="lead">${mode ? 'Add as many as you like.' : 'You can add more later from Admin → Connections.'} Each one's libraries show up on the Browse page.</p>
+      <div class="pick">${cards.map(([k, n, m, logo]) => `<button class="card ${mediaType === k ? 'on' : ''}" data-type="${k}">${logo}<div class="n">${n}</div><div class="m">${m}</div></button>`).join('')}</div>
+      ${(st.mediaServers || []).length && !mode ? `<p class="hint">Already connected: ${st.mediaServers.map((x) => esc(x.name)).join(', ')}.</p>` : ''}`;
+    document.querySelectorAll('[data-type]').forEach((b) => { b.onclick = () => { mediaType = b.dataset.type; render.mtype(); drawSteps(); }; });
+    $('#next').disabled = !mediaType && !(!mode && (st.mediaServers || []).length);
+  },
+
+  media() {
+    if (!mediaType) {
+      if (!mode && (st.mediaServers || []).length) return go('done');
+      return go('mtype');
+    }
+    const ex = editServer ? st.mediaServers?.find((x) => x.id === editServer) : null;
+    const nameField = `<div class="field"><label>Name <span class="hint">(optional, shown on Browse)</span></label><input id="srvName" value="${esc(ex?.name || '')}" placeholder="e.g. VAULT"></div>`;
+    if (mediaType === 'plex') {
+      $('#body').innerHTML = `<h2>${ex ? `Edit ${esc(ex.name)}` : 'Connect Plex'}</h2>
+        <p class="lead">Sign in with Plex to pick a server, or enter its address and token yourself.</p>
+        <button class="btn plex" id="plexSignin">Sign in with Plex</button> <span id="pinMsg" class="hint"></span>
+        <div id="servers"></div>
+        <div class="or">— or enter it yourself —</div>
+        <div class="row">
+          <div class="field"><label>Server address</label><input id="plexUrl" value="${esc(ex?.url || '')}" placeholder="http://192.168.1.10:32400"><div class="hint">As reached from the drocsid container.</div></div>
+          <div class="field"><label>Plex token</label><input id="plexToken" type="password" autocomplete="off" placeholder="${ex?.hasToken ? 'Saved (leave blank to keep)' : ''}"><div class="hint"><a href="https://support.plex.tv/articles/204059436" target="_blank" rel="noopener">Finding your token</a></div></div>
+        </div>
+        ${nameField}
+        <button class="btn" id="plexManual">Test &amp; save</button> <span id="manualMsg"></span>`;
+      $('#plexSignin').onclick = plexSignin;
+      $('#plexManual').onclick = () => saveServer({ url: $('#plexUrl').value, token: $('#plexToken').value, name: $('#srvName').value }, $('#manualMsg'));
+      $('#next').disabled = !mediaSaved && !(ex && mode);
+      return;
+    }
+    const brand = mediaType === 'emby' ? 'Emby' : 'Jellyfin';
+    $('#body').innerHTML = `<h2>${ex ? `Edit ${esc(ex.name)}` : `Connect ${brand}`}</h2>
+      <p class="lead">The address as reached from the drocsid container.</p>
+      <div class="field"><label>Server address</label><input id="jfUrl" value="${esc(ex?.url || '')}" placeholder="http://192.168.1.10:8096"></div>
       <div class="row">
-        <div class="field"><label>Server address</label><input id="plexUrl" placeholder="http://192.168.1.10:32400"><div class="hint">As reached from the drocsid container.</div></div>
-        <div class="field"><label>Plex token</label><input id="plexToken" type="password" autocomplete="off"><div class="hint"><a href="https://support.plex.tv/articles/204059436" target="_blank" rel="noopener">Finding your token</a></div></div>
+        <div class="field"><label>Username</label><input id="jfUser" autocomplete="off" placeholder="${esc(ex?.username || '')}"></div>
+        <div class="field"><label>Password</label><input id="jfPass" type="password" autocomplete="off"></div>
       </div>
-      <button class="btn" id="plexManual">Test &amp; connect</button> <span id="manualMsg"></span>`;
-    $('#plexSignin').onclick = plexSignin;
-    $('#plexManual').onclick = () => savePlex({ url: $('#plexUrl').value, token: $('#plexToken').value }, $('#manualMsg'));
-    $('#next').disabled = !saved;
+      <div class="field"><label>Or an API key</label><input id="jfKey" type="password" autocomplete="off"><div class="hint">${brand} → Dashboard → API Keys. ${ex ? 'Leave all three blank to keep the saved sign-in. ' : ''}A dedicated user that can see only the libraries you want to share is best.</div></div>
+      ${nameField}
+      <button class="btn" id="jfTest">Test</button> <span id="jfMsg"></span>`;
+    $('#jfTest').onclick = testServer;
   },
 
   done() {
     if (mode) {
-      $('#body').innerHTML = `<h2>All set</h2><p class="lead">${mode === 'plex' ? 'Your media server is connected.' : 'The Discord app is saved. Invite it to more servers from Admin → Connections any time.'}</p>
+      $('#body').innerHTML = mode === 'media'
+        ? `<h2>All set</h2><p class="lead">The media server is saved.</p><p>Choose which of its libraries appear on the Browse page, and their order, under <b>Admin → Libraries</b>.</p>`
+        : `<h2>All set</h2><p class="lead">The Discord app is saved. Invite it to more servers from Admin → Connections any time.</p>
         <p>New servers start with nobody approved. Approve roles or people for each server under <b>Admin → Access by server</b>.</p>`;
       $('#next').textContent = 'Back to Admin';
       return;
@@ -160,7 +204,7 @@ const render = {
         <div>🌐 ${esc(st.publicUrl)}</div>
         <div>🤖 ${esc(a?.name || '')} in ${(a?.guilds || []).map((g) => esc(g.name)).join(', ') || 'no servers yet'}</div>
         <div>👑 ${(st.ownerIds || []).length} owner(s)</div>
-        <div>🎬 ${esc(st.plexServers?.[0]?.name || '')} at ${esc(st.plexServers?.[0]?.url || '')}</div>
+        ${(st.mediaServers || []).map((x) => `<div>🎬 ${esc(x.name)} (${esc({ plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' }[x.type] || x.type)}) at ${esc(x.url)}</div>`).join('')}
       </div>
       <p>Next: in <b>Admin</b>, approve the Discord roles or people who can start streams in each server.</p>`;
     $('#next').textContent = 'Finish';
@@ -232,19 +276,36 @@ function showServers(pinId, servers) {
       const i = Number(b.dataset.use);
       let url = document.querySelector(`input[name=conn${i}]:checked`)?.value;
       if (url === 'custom') url = document.querySelector(`.custom[data-for="${i}"]`).value;
-      savePlex({ url, pinId, machineId: servers[i].machineId, name: servers[i].name }, $(`#useMsg${i}`));
+      savePlex({ url, pinId, machineId: servers[i].machineId, name: $('#srvName')?.value || servers[i].name }, $(`#useMsg${i}`));
     };
   });
 }
 
-async function savePlex(body, msgEl) {
+const savePlex = (body, msgEl) => saveServer(body, msgEl);
+
+/** Save the server (add, or update when editing), then move on. */
+async function saveServer(body, msgEl) {
   err();
   msgEl.innerHTML = '<span class="wait">Testing…</span>';
   try {
-    st = { ...st, ...(await api('/api/connections/plex', { method: 'POST', body: JSON.stringify(body) })) };
+    st = { ...st, ...(await api('/api/connections/media', { method: 'POST', body: JSON.stringify({ type: mediaType, serverId: editServer || undefined, ...body }) })) };
     msgEl.innerHTML = '<span class="ok">✓ Connected</span>';
-    go(order[order.indexOf('plex') + 1]);
+    mediaSaved = true;
+    go(order[order.indexOf('media') + 1]);
   } catch (e) { msgEl.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+
+const jfFields = () => ({ url: $('#jfUrl').value.trim(), username: $('#jfUser').value.trim(), password: $('#jfPass').value, apiKey: $('#jfKey').value.trim(), name: $('#srvName').value.trim() });
+async function testServer() {
+  err();
+  $('#jfMsg').innerHTML = '<span class="wait">Checking…</span>';
+  try {
+    const t = await api('/api/connections/media/test', { method: 'POST', body: JSON.stringify({ type: mediaType, serverId: editServer || undefined, ...jfFields() }) });
+    $('#jfMsg').innerHTML = t.ok
+      ? `<span class="ok">✓ ${esc({ jellyfin: 'Jellyfin', emby: 'Emby' }[mediaType])} ${esc(t.version)} · "${esc(t.name)}" · ${t.libraries} movie/TV ${t.libraries === 1 ? 'library' : 'libraries'}${t.username ? ` · as ${esc(t.username)}` : ''}</span>`
+      : `<span class="bad">${esc(t.error)}</span>`;
+    return t.ok;
+  } catch (e) { $('#jfMsg').textContent = ''; err(e.message); return false; }
 }
 
 // What "Continue" does on each step.
@@ -270,7 +331,23 @@ const next = {
   },
   async invite() { await refresh(); return true; },
   async signin() { return (st.ownerIds || []).length > 0; },
-  async plex() { return (st.plexServers || []).length > 0; },
+  async mtype() {
+    if (!mediaType && !mode && (st.mediaServers || []).length) { go('done'); return false; }
+    if (!mediaType) throw new Error('Pick a server type');
+    return true;
+  },
+  async media() {
+    if (mediaSaved || (!mode && (st.mediaServers || []).length && mediaType === 'plex')) return true;
+    if (mediaType === 'plex') {
+      if (editServer) return true; // nothing changed
+      throw new Error('Sign in with Plex or enter the address and token first');
+    }
+    const f = jfFields();
+    const r = await api('/api/connections/media', { method: 'POST', body: JSON.stringify({ type: mediaType, serverId: editServer || undefined, ...f }) });
+    st = { ...st, ...r };
+    mediaSaved = true;
+    return true;
+  },
   async done() {
     if (mode) { location.href = '/browse/admin.html#connections'; return false; }
     await api('/api/setup/finish', { method: 'POST', body: '{}' });

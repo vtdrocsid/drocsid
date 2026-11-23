@@ -1,0 +1,177 @@
+// Media sources test (no npm packages needed): a mock Jellyfin and a mock Emby server next to
+// an imported Plex server. Checks sign-in, keys, libraries, items, search, info, images,
+// playback (tokens never reach the playlist), and the 0.3.0 → 0.4.0 data migration.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { startMockJellyfin } from './mockjf.mjs';
+
+let failures = 0;
+const check = async (name, fn) => {
+  try { await fn(); console.log(`  ✓ ${name}`); } catch (e) { failures++; console.log(`  ✗ ${name}: ${e.stack || e.message}`); }
+};
+
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'drocsid-src-'));
+process.env.DATA_DIR = dataDir;
+// A 0.3.0 connections file with one Plex server in plexServers.
+fs.writeFileSync(path.join(dataDir, 'connections.json'), JSON.stringify({
+  publicUrl: 'https://tv.example.com', setupComplete: true, ownerIds: ['1'], discordApps: [],
+  plexServers: [{ id: 'plex1', name: 'VAULT', url: 'http://127.0.0.1:1', token: 'plain-old', machineId: '' }],
+  plexClientId: 'drocsid-test',
+}));
+
+const jfMock = await startMockJellyfin(3911);
+const embyMock = await startMockJellyfin(3912, { product: 'Emby Server', token: 'emby-tok' });
+const conn = await import('../src/connections.js');
+const jf = await import('../src/jellyfin.js');
+const sources = await import('../src/sources.js');
+const settings = await import('../src/settings.js');
+
+console.log('Migration');
+await check('plexServers moved to mediaServers', async () => {
+  const raw = JSON.parse(fs.readFileSync(path.join(dataDir, 'connections.json'), 'utf8'));
+  assert.equal(raw.plexServers, undefined);
+  assert.equal(raw.mediaServers[0].type, 'plex');
+  assert.equal(conn.plexServer().id, 'plex1');
+});
+await check('old bare keys belong to the first Plex server', async () => {
+  assert.equal(sources.parseKey('12345').srv.id, 'plex1');
+  assert.equal(sources.parseKey('12345').id, '12345');
+});
+
+console.log('Jellyfin');
+await check('wrong password refused', async () => {
+  const r = await jf.connect({ type: 'jellyfin', url: jfMock.url, username: 'drocsid', password: 'nope' });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /password/);
+});
+await check('Emby server refused as Jellyfin', async () => {
+  const r = await jf.connect({ type: 'jellyfin', url: embyMock.url, username: 'drocsid', password: 'pw' });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Emby/);
+});
+let jfConn;
+await check('sign in with username and password', async () => {
+  jfConn = await jf.connect({ type: 'jellyfin', url: jfMock.url + '/', username: 'drocsid', password: 'pw' });
+  assert.equal(jfConn.ok, true, jfConn.error);
+  assert.equal(jfConn.userId, 'u1');
+  assert.equal(jfConn.libraries, 2); // movies + tvshows, not music
+});
+await check('sign in with an API key picks an admin user', async () => {
+  const r = await jf.connect({ type: 'jellyfin', url: jfMock.url, apiKey: 'tok-123' });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.userId, 'u1');
+});
+conn.update((d) => {
+  d.mediaServers.push({ id: 'jellyfin-aa', type: 'jellyfin', name: 'MockJF', url: jfConn.url, token: conn.seal(jfConn.token), userId: 'u1' });
+  d.mediaServers.push({ id: 'emby-bb', type: 'emby', name: 'MockEmby', url: embyMock.url, token: conn.seal('emby-tok'), userId: 'u1' });
+});
+await check('tokens stored encrypted', async () => {
+  const raw = fs.readFileSync(path.join(dataDir, 'connections.json'), 'utf8');
+  assert.ok(!raw.includes('tok-123') && !raw.includes('emby-tok'));
+});
+await check('libraries from every server, keyed by server', async () => {
+  const libs = await sources.libraries({ all: true }); // the Plex one is unreachable and skipped
+  const ids = libs.map((l) => l.id);
+  assert.ok(ids.includes('jellyfin-aa~movies') && ids.includes('emby-bb~shows'), ids.join(','));
+  assert.equal(libs.find((l) => l.id === 'jellyfin-aa~movies').serverName, 'MockJF');
+});
+await check('library filter and order from settings', async () => {
+  settings.update({ librarySections: ['jellyfin-aa~shows', 'jellyfin-aa~movies'], libraryOrder: ['jellyfin-aa~shows', 'jellyfin-aa~movies'], librarySort: { 'jellyfin-aa~shows': 'added' } });
+  const libs = await sources.libraries();
+  assert.deepEqual(libs.map((l) => l.id), ['jellyfin-aa~shows', 'jellyfin-aa~movies']);
+  assert.equal(libs[0].defaultSort, 'added');
+  await assert.rejects(() => sources.libraryItems('emby-bb~movies', {}), /not allowed/);
+});
+await check('library items', async () => {
+  const r = await sources.libraryItems('jellyfin-aa~movies', { start: 0, size: 60, sort: 'title' });
+  assert.equal(r.total, 2);
+  const a = r.items[0];
+  assert.equal(a.ratingKey, 'jellyfin-aa~m1');
+  assert.equal(a.title, 'Alpha Movie (2001)');
+  assert.equal(a.kind, 'movie');
+  assert.equal(a.duration, 3600);
+  assert.equal(a.thumb, 'jellyfin-aa~img:m1');
+  assert.deepEqual(a.rt, { kind: 'critic', score: 91, fresh: true });
+});
+await check('A–Z jump bar counts', async () => {
+  const L = await sources.libraryLetters('jellyfin-aa~movies');
+  assert.deepEqual(L.map((x) => [x.key, x.size]), [['A', 1], ['B', 1]]);
+});
+await check('show → seasons → episodes', async () => {
+  const seasons = await sources.children('jellyfin-aa~s1');
+  assert.equal(seasons[0].kind, 'season');
+  assert.equal(seasons[0].thumb, 'jellyfin-aa~img:s1'); // series poster
+  const eps = await sources.children(seasons[0].ratingKey);
+  assert.equal(eps[0].title, 'Some Show S01E01 — Pilot');
+});
+await check('search across servers', async () => {
+  const r = await sources.search('movie');
+  const keys = r.map((x) => x.ratingKey);
+  assert.ok(keys.includes('jellyfin-aa~m1') && keys.includes('emby-bb~m1'), keys.join(','));
+});
+await check('hover info with cast photo', async () => {
+  const i = await sources.info('jellyfin-aa~m1');
+  assert.equal(i.tagline, 'A tagline');
+  assert.deepEqual(i.directors, ['Dee Director']);
+  assert.ok(i.cast[0].face);
+  const img = await sources.faceImage(i.cast[0].face);
+  assert.equal(await img.text(), 'JPEGDATA');
+});
+await check('posters through the server', async () => {
+  const r = await sources.image('jellyfin-aa~img:m1', 300, 450);
+  assert.equal(r.status, 200);
+  assert.equal(await sources.image('jellyfin-aa~img:../../x'), null);
+  assert.equal(await sources.image('nope~img:m1'), null);
+});
+
+console.log('Playback');
+const rooms = await import('../src/rooms.js');
+await check('stream starts and playlists carry no token', async () => {
+  const item = await sources.metadata('jellyfin-aa~m1');
+  const room = await rooms.start('room1', 'g1', item, { id: 'u', name: 'U' }, '1080-8000', 120);
+  assert.match(room.masterPlaylist, /\/media\/jf\/jellyfin-aa\/videos\/m1\/main\.m3u8\?PlaySessionId=ps1/);
+  assert.ok(!/api_key|tok-123/.test(room.masterPlaylist), room.masterPlaylist);
+  assert.equal(room.anchorPos, 120);
+  const variant = room.masterPlaylist.split('\n').find((l) => l.startsWith('/media/jf/')).replace('/media/jf/jellyfin-aa', '');
+  assert.ok(jf.allowedStreamPath(variant));
+  const srv = conn.server('jellyfin-aa');
+  const main = await (await jf.streamFetch(srv, variant)).text();
+  assert.match(main, /hls1\/main\/0\.ts/);
+  assert.ok(jf.allowedStreamPath('/videos/m1/hls1/main/0.ts?PlaySessionId=ps1'));
+  assert.ok(!jf.allowedStreamPath('/Users/u1/Items'));
+  assert.ok(!jf.allowedStreamPath('/System/Info'));
+  const seg = Buffer.from(await (await jf.streamFetch(srv, '/videos/m1/hls1/main/0.ts')).arrayBuffer());
+  assert.equal(seg[0], 0x47);
+});
+await check('seek and stop report to the server', async () => {
+  await rooms.seek('room1', 600);
+  await rooms.stop('room1', false, 'test');
+  const l = jfMock.log.join('\n');
+  assert.match(l, /POST \/Sessions\/Playing\b/);
+  assert.match(l, /POST \/Sessions\/Playing\/Stopped/);
+  assert.match(l, /DELETE \/Videos\/ActiveEncodings\?deviceId=.*playSessionId=ps1/);
+});
+await check('Emby stream uses the Emby token header', async () => {
+  const item = await sources.metadata('emby-bb~m2');
+  await rooms.start('room2', 'g1', item, { id: 'u2', name: 'U2' }, '720-4000', 0);
+  await rooms.stop('room2', false, 'test');
+  assert.ok(embyMock.log.some((x) => x.startsWith('POST /Items/m2/PlaybackInfo')));
+});
+
+console.log('Several Plex servers');
+const plex = await import('../src/plex.js');
+await check('calls go to the chosen Plex server', async () => {
+  conn.update((d) => { d.mediaServers.push({ id: 'plex-cc', type: 'plex', name: 'Second', url: 'http://10.9.9.9:32400', token: conn.seal('second-tok') }); });
+  assert.match(String(plex.photoUrl('/library/metadata/1/thumb')), /127\.0\.0\.1:1/);
+  const u = String(plex.withServer(conn.server('plex-cc'), () => plex.photoUrl('/library/metadata/1/thumb')));
+  assert.match(u, /10\.9\.9\.9/);
+  assert.match(u, /second-tok/);
+  assert.equal(sources.parseKey('plex-cc~55').srv.id, 'plex-cc');
+});
+
+jfMock.close();
+embyMock.close();
+console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
+process.exit(failures ? 1 : 0);

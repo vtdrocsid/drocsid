@@ -7,6 +7,7 @@ import { settings } from './settings.js';
 import * as discord from './discord.js';
 import * as rooms from './rooms.js';
 import * as plex from './plex.js';
+import * as sources from './sources.js';
 
 /** Post a message in a voice channel's built-in text chat. */
 export async function announce(channelId, content) {
@@ -40,8 +41,8 @@ const clip = (t, n) => (t && t.length > n ? t.slice(0, n - 1).trimEnd() + '…' 
 /** Fetch an image (Plex path or URL) through Plex's photo transcoder and attach it to the message. */
 async function attach(files, src, name, w, h) {
   if (!src) return null;
-  const url = src.startsWith('/') || /^https?:/.test(src) ? plex.photoUrl(src, w, h) : null;
-  const r = url && await fetch(url).catch(() => null);
+  // Images go through their media server (Plex's photo transcoder, or Jellyfin/Emby's image API).
+  const r = await sources.anyImage(src, w, h);
   if (!r?.ok) {
     // Logos on the LAN or odd hosts: try them directly.
     const d = /^https?:/.test(src) ? await fetch(src).catch(() => null) : null;

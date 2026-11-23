@@ -60,6 +60,8 @@ if (current.approvedUserIds || current.approvedRoleIds) {
 export const settings = () => current;
 export const findPreset = (id) => QUALITY_PRESETS.find((p) => p.id === id) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
 
+// Library ids: Plex section numbers, or "<server id>~<id>" for other servers.
+const LIB_ID = /^[A-Za-z0-9~_.:-]{1,120}$/;
 const ids = (v) => (Array.isArray(v) ? v : []).map(String).filter((s) => /^\d{5,25}$/.test(s));
 
 /** Validate and save a partial update. */
@@ -82,11 +84,11 @@ export function update(patch) {
     }
   }
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);
-  if ('libraryOrder' in patch) next.libraryOrder = (patch.libraryOrder || []).map(String).filter((id) => /^\d+$/.test(id));
+  if ('libraryOrder' in patch) next.libraryOrder = (patch.libraryOrder || []).map(String).filter((id) => LIB_ID.test(id));
   if (patch.librarySort && typeof patch.librarySort === 'object') {
     next.librarySort = { ...current.librarySort };
     for (const [id, sort] of Object.entries(patch.librarySort)) {
-      if (/^\d+$/.test(id) && VALID.librarySort.includes(sort)) next.librarySort[id] = sort;
+      if (LIB_ID.test(id) && VALID.librarySort.includes(sort)) next.librarySort[id] = sort;
     }
   }
   if ('viewRequiresApproval' in patch) next.viewRequiresApproval = !!patch.viewRequiresApproval;

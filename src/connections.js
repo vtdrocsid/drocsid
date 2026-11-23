@@ -56,7 +56,7 @@ const blank = () => ({
   setupComplete: false,
   ownerIds: [],
   discordApps: [], // { id (client id), name, botUser, clientSecret*, botToken*, primary, addedAt }
-  plexServers: [], // { id, name, url, token*, machineId, addedAt }
+  mediaServers: [], // { id, type: plex|jellyfin|emby, name, url, token*, userId, machineId, addedAt }
   plexClientId: 'drocsid-' + crypto.randomBytes(6).toString('hex'),
   legacyGuildId: '',
 });
@@ -82,18 +82,24 @@ function importFromEnv() {
     primary: true, addedAt: Date.now(),
   });
   if (e.PLEX_URL && e.PLEX_TOKEN) {
-    d.plexServers.push({ id: 'plex1', name: 'Plex', url: e.PLEX_URL.replace(/\/$/, ''), token: seal(e.PLEX_TOKEN), machineId: '', addedAt: Date.now() });
+    d.mediaServers.push({ id: 'plex1', type: 'plex', name: 'Plex', url: e.PLEX_URL.replace(/\/$/, ''), token: seal(e.PLEX_TOKEN), machineId: '', addedAt: Date.now() });
   }
   // Keep the same Plex device identity the old version used, so Plex doesn't see a new device.
   d.plexClientId = 'drocsid-' + crypto.createHash('sha1').update(e.DISCORD_CLIENT_ID).digest('hex').slice(0, 12);
   d.legacyGuildId = e.DISCORD_GUILD_ID || '';
-  d.setupComplete = !!(d.publicUrl && d.ownerIds.length && d.plexServers.length && e.DISCORD_CLIENT_SECRET);
+  d.setupComplete = !!(d.publicUrl && d.ownerIds.length && d.mediaServers.length && e.DISCORD_CLIENT_SECRET);
   return d;
 }
 
 function load() {
   try {
     data = { ...blank(), ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+    // 0.3.0 kept a single Plex server in plexServers; now every kind of server is in mediaServers.
+    if (Array.isArray(data.plexServers)) {
+      if (!data.mediaServers.length) data.mediaServers = data.plexServers.map((x) => ({ type: 'plex', userId: '', ...x }));
+      delete data.plexServers;
+      save();
+    }
     return;
   } catch (e) {
     if (e.code !== 'ENOENT') { console.error('connections.json unreadable:', e.message); throw e; }
@@ -124,11 +130,11 @@ export const primaryApp = () => data.discordApps.find((a) => a.primary) || data.
 export const appSecret = (a) => open(a?.clientSecret);
 export const appToken = (a) => open(a?.botToken);
 
-/** The active Plex server (one for now; several are planned). */
-export const plexServer = () => {
-  const s = data.plexServers[0];
-  return s ? { ...s, token: open(s.token) } : null;
-};
+/** Media servers with their tokens decrypted (server side only). */
+export const servers = () => data.mediaServers.map((s) => ({ ...s, token: open(s.token) }));
+export const server = (id) => servers().find((s) => s.id === id) || null;
+/** The first Plex server: Live TV comes from here, and plain (unprefixed) item keys belong to it. */
+export const plexServer = () => servers().find((s) => s.type === 'plex') || null;
 
 /** Safe to send to a browser: no secrets, just whether they are set. */
 export function publicView() {
@@ -140,6 +146,6 @@ export function publicView() {
       id: a.id, name: a.name, botUser: a.botUser, primary: !!a.primary, addedAt: a.addedAt,
       hasSecret: !!a.clientSecret, hasToken: !!a.botToken,
     })),
-    plexServers: data.plexServers.map((s) => ({ id: s.id, name: s.name, url: s.url, machineId: s.machineId, hasToken: !!s.token })),
+    mediaServers: data.mediaServers.map((s) => ({ id: s.id, type: s.type, name: s.name, url: s.url, machineId: s.machineId, hasToken: !!s.token, username: s.username || '' })),
   };
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-11-23
+- **Several media servers, of any kind:** Plex, Jellyfin and Emby. Admin → Connections lists them with Test, Edit and Remove, and **+ Add server** asks which kind, then connects it.
+- Plex: Sign in with Plex or address + token. Jellyfin/Emby: username + password, or an API key (browses as the first administrator).
+- Each server's movie and TV libraries appear as their own tabs on Browse (the server is named when two libraries share a name). Admin → Libraries shows which server each library is on.
+- Search, hover cards, details, posters, cast photos, play, resume, seek, lineup and "now playing" posts work for every server. Jellyfin/Emby streams are transcoded by that server to H.264/AAC HLS; tokens stay on the drocsid server.
+- Live TV still comes from the first Plex server.
+- Play history, lineup and resume points from earlier versions keep working (old item keys belong to the first Plex server).
+
 ## 0.3.0 — 2026-11-23
 - **Setup wizard** at `/setup/`: setup code from the container log, public address, Discord app (with checks for the bot token, client secret, Server Members Intent, Activities and the sign-in redirect), inviting the bot, owner sign-in, and Plex (Sign in with Plex or address + token).
 - **Several Discord apps (bots)**, each invitable to any servers you manage. The Activity signs in with whichever app it was launched from.

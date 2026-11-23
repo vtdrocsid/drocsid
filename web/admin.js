@@ -115,7 +115,7 @@ function render() {
     const row = document.createElement('div');
     row.className = 'li';
     row.innerHTML = `<input type="checkbox" ${s.librarySections.includes(l.id) ? 'checked' : ''} title="Show on Browse page">
-      <div class="grow"><div>${esc(l.title)}</div><div class="sub">${l.type === 'show' ? 'TV' : 'Movies'}</div></div>
+      <div class="grow"><div>${esc(l.title)}</div><div class="sub">${l.type === 'show' ? 'TV' : 'Movies'}${l.serverName ? ` · ${esc(l.serverName)} (${esc({ plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' }[l.serverType] || l.serverType)})` : ''}</div></div>
       <select title="Default sort">${valid.librarySort.map((v) => `<option value="${v}" ${v === (s.librarySort[l.id] || 'title') ? 'selected' : ''}>${sortNames[v]}</option>`).join('')}</select>
       <button class="btn sm" data-move="-1" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
       <button class="btn sm" data-move="1" ${i === state.libraries.length - 1 ? 'disabled' : ''} title="Move down">↓</button>`;
@@ -162,6 +162,7 @@ $('#userAddBtn').onclick = () => {
 // ---------- Connections (super admins) ----------
 function renderConnections() {
   if (!conns) return;
+  const firstPlex = conns.mediaServers.find((x) => x.type === 'plex')?.id;
   $('#pubUrl').textContent = conns.publicUrl || 'Not set';
   const icon = (g) => (g.icon ? `<img src="${esc(g.icon)}" alt="">` : `<span class="gi">${esc((g.name || '?')[0])}</span>`);
   const apps = $('#apps');
@@ -187,25 +188,33 @@ function renderConnections() {
     apps.append(el);
   });
   const media = $('#media');
-  media.innerHTML = conns.plexServers.length ? '' : '<p class="muted">No media server connected.</p>';
-  conns.plexServers.forEach((p) => {
+  media.innerHTML = conns.mediaServers.length ? '' : '<p class="muted">No media server connected.</p>';
+  const TYPE = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
+  conns.mediaServers.forEach((p) => {
+    const [typeName, cls, letter] = TYPE[p.type] || [p.type, '', '?'];
     const el = document.createElement('div');
     el.className = 'li';
     const h = plexHealth[p.id];
-    el.innerHTML = `<span class="ic plex">▶</span>
-      <div class="grow"><div><b>${esc(p.name)}</b> <span class="muted small">Plex</span> ${h ? (h.ok ? '<span class="pill">Online</span>' : '<span class="pill off">Offline</span>') : '<span class="pill wait">Checking</span>'}</div>
-        <div class="sub">${esc(p.url)}${h?.ok ? ` · ${h.libraries} libraries · Plex ${esc(h.version)} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}</div></div>
-      <div class="acts"><button class="btn sm" data-act="test">Test</button></div>`;
+    el.innerHTML = `<span class="ic ${cls}">${letter}</span>
+      <div class="grow"><div><b>${esc(p.name)}</b> <span class="muted small">${typeName}</span> ${h ? (h.ok ? '<span class="pill">Online</span>' : '<span class="pill off">Offline</span>') : '<span class="pill wait">Checking</span>'}</div>
+        <div class="sub">${esc(p.url)}${p.username ? ` · as ${esc(p.username)}` : ''}${h?.ok ? ` · ${h.libraries} movie/TV ${h.libraries === 1 ? 'library' : 'libraries'} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}${p.id === firstPlex ? ' · Live TV' : ''}</div></div>
+      <div class="acts">
+        <button class="btn sm" data-act="test">Test</button>
+        <a class="btn sm" href="/setup/?add=media&server=${encodeURIComponent(p.id)}">Edit</a>
+        <button class="btn sm danger" data-act="remove">Remove</button>
+      </div>`;
     el.querySelector('[data-act=test]').onclick = () => checkPlex(p, true);
+    el.querySelector('[data-act=remove]').onclick = () => {
+      if (confirm(`Remove ${p.name}? Its libraries disappear from Browse, and anything playing from it stops working.`)) connAct(`/api/connections/media/${encodeURIComponent(p.id)}`, 'DELETE');
+    };
     media.append(el);
   });
-  $('#plexChange').textContent = conns.plexServers.length ? 'Change Plex server' : '+ Connect Plex';
 }
 const plexHealth = {};
 async function checkPlex(p, announce = false) {
-  try { plexHealth[p.id] = await api('/api/connections/plex/test', { method: 'POST', body: JSON.stringify({ url: p.url, serverId: p.id }) }); }
+  try { plexHealth[p.id] = await api(`/api/connections/media/${encodeURIComponent(p.id)}/health`); }
   catch (e) { plexHealth[p.id] = { ok: false, error: e.message }; }
-  if (announce) toast(plexHealth[p.id].ok ? 'Plex is online' : plexHealth[p.id].error);
+  if (announce) toast(plexHealth[p.id].ok ? `${p.name} is online` : plexHealth[p.id].error);
   renderConnections();
 }
 async function connAct(url, method, body) {
@@ -243,7 +252,7 @@ async function load() {
     if (state.role === 'super') {
       const first = !conns;
       conns = await api('/api/connections').catch(() => conns);
-      if (first) conns?.plexServers.forEach((p) => checkPlex(p));
+      if (first) conns?.mediaServers.forEach((p) => checkPlex(p));
     }
     $('#msg').hidden = true;
     $('#admin').hidden = false;

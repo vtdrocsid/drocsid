@@ -10,6 +10,8 @@ import { settings, update as updateSettings, VALID, QUALITY_PRESETS } from './se
 import * as settingsMod from './settings.js';
 import * as auth from './auth.js';
 import * as plex from './plex.js';
+import * as sources from './sources.js';
+import * as jf from './jellyfin.js';
 import * as rooms from './rooms.js';
 import { announce, announceNowPlaying } from './bot.js';
 import { groupPlaylist, parseGroup, GROUP } from './hlsgroup.js';
@@ -162,10 +164,10 @@ app.get('/api/me', needSession, wrap(async (req, res) => {
   res.json({ id: req.session.userId, name: req.session.username, approved: await approved(req.session), admin: auth.isAdmin(req.session.userId), superAdmin: auth.isSuperAdmin(req.session.userId), version: VERSION });
 }));
 
-app.get('/api/libraries', needSession, needApproved, wrap(async (req, res) => res.json(await plex.libraries())));
+app.get('/api/libraries', needSession, needApproved, wrap(async (req, res) => res.json(await sources.libraries())));
 
 app.get('/api/libraries/:id/items', needSession, needApproved, wrap(async (req, res) => {
-  res.json(await plex.libraryItems(req.params.id, {
+  res.json(await sources.libraryItems(req.params.id, {
     start: Math.max(0, Number(req.query.start) || 0),
     size: Math.min(300, Number(req.query.size) || 60),
     sort: String(req.query.sort || 'title'),
@@ -173,27 +175,26 @@ app.get('/api/libraries/:id/items', needSession, needApproved, wrap(async (req, 
 }));
 
 app.get('/api/libraries/:id/letters', needSession, needApproved, wrap(async (req, res) => {
-  res.json(await plex.libraryLetters(req.params.id));
+  res.json(await sources.libraryLetters(req.params.id));
 }));
 
 app.get('/api/search', needSession, needApproved, wrap(async (req, res) => {
   const q = String(req.query.q || '').trim();
-  res.json(q ? await plex.search(q) : []);
+  res.json(q ? await sources.search(q) : []);
 }));
 
 app.get('/api/item/:key', needSession, needApproved, wrap(async (req, res) => {
-  const key = req.params.key.replace(/\D/g, '');
-  const item = await plex.metadata(key);
-  const kids = ['show', 'season'].includes(item.kind) ? await plex.children(key) : [];
+  const key = sources.safeKey(req.params.key);
+  const item = await sources.metadata(key);
+  const kids = ['show', 'season'].includes(item.kind) ? await sources.children(key) : [];
   res.json({ item, children: kids });
 }));
 
 app.get('/api/thumb', needSession, needApproved, wrap(async (req, res) => {
-  const p = String(req.query.path || '');
-  if (!/^\/library\/metadata\/\d+\/(thumb|art)(\/\d+)?$/.test(p)) return res.status(400).end();
   const w = Math.min(1280, Number(req.query.w) || 300);
   const h = Math.min(1280, Number(req.query.h) || 450);
-  const upstream = await fetch(plex.photoUrl(p, w, h));
+  const upstream = await sources.image(String(req.query.path || ''), w, h);
+  if (!upstream) return res.status(400).end();
   if (!upstream.ok) return res.status(upstream.status).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
   res.set('Cache-Control', 'private, max-age=86400');
@@ -203,18 +204,17 @@ app.get('/api/thumb', needSession, needApproved, wrap(async (req, res) => {
 // Hover card: compact details for one poster, cached briefly so sweeping the mouse over the grid is cheap.
 const infoCache = new Map(); // key -> { at, data }
 app.get('/api/info/:key', needSession, needApproved, wrap(async (req, res) => {
-  const key = req.params.key.replace(/\D/g, '');
+  const key = sources.safeKey(req.params.key);
   const hit = infoCache.get(key);
   if (hit && Date.now() - hit.at < 10 * 60_000) return res.json(hit.data);
-  const data = await plex.info(key);
+  const data = await sources.info(key);
   if (infoCache.size > 1000) infoCache.clear();
   infoCache.set(key, { at: Date.now(), data });
   res.json(data);
 }));
 app.get('/api/face/:id', needSession, needApproved, wrap(async (req, res) => {
-  const url = plex.faceUrl(String(req.params.id));
-  if (!url) return res.status(404).end();
-  const upstream = await fetch(plex.photoUrl(url, 120, 120));
+  const upstream = await sources.faceImage(String(req.params.id));
+  if (!upstream) return res.status(404).end();
   if (!upstream.ok) return res.status(upstream.status).end();
   res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
   res.set('Cache-Control', 'private, max-age=86400');
@@ -289,7 +289,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
 
 /** Look up a playable item from the client's request (library title or live channel). */
 async function resolveItem(source, ratingKey, liveId) {
-  const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await plex.metadata(String(ratingKey).replace(/\D/g, ''));
+  const item = source === 'live' ? await plex.liveChannel(String(liveId)) : await sources.metadata(sources.safeKey(ratingKey));
   if (item.source === 'plex' && !['movie', 'episode'].includes(item.kind)) throw Object.assign(new Error('Pick a movie or an episode'), { status: 400 });
   return item;
 }
@@ -316,7 +316,7 @@ async function startStream(channel, item, user, { scheduled = false, startAt = 0
 
 // ---------- watch progress (resume where you left off) ----------
 app.get('/api/progress/:key', needSession, needApproved, (req, res) => {
-  res.json(progress.get(req.session.userId, String(req.params.key).replace(/\D/g, '')) || null);
+  res.json(progress.get(req.session.userId, sources.safeKey(req.params.key)) || null);
 });
 // Every 20 s, remember the position for everyone who has the player open on a library title.
 setInterval(() => {
@@ -465,7 +465,7 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   const guildList = auth.guildList();
   const [dirs, libs] = await Promise.all([
     Promise.all(guildList.map((g) => auth.guildDirectory(g.id).catch(() => ({ roles: [], members: [] })))),
-    sup ? plex.libraries({ all: true }).catch(() => []) : [],
+    sup ? sources.libraries({ all: true }).catch(() => []) : [],
   ]);
   // Everyone the bots can see, once each, for the name pickers.
   const everyone = new Map();
@@ -534,7 +534,8 @@ const pathSession = (req, res, next) => {
 app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, res) => {
   const room = rooms.get(req.params.id);
   if (!room?.masterPlaylist) return res.status(404).end();
-  const body = room.masterPlaylist.replaceAll('/media/plex/', `/media/t/${encodeURIComponent(req.params.token)}/plex/`);
+  const t = encodeURIComponent(req.params.token);
+  const body = room.masterPlaylist.replaceAll('/media/plex/', `/media/t/${t}/plex/`).replaceAll('/media/jf/', `/media/t/${t}/jf/`);
   console.log(`[media] ${req.session.username} loaded master playlist for ${room.item.title}:\n${body.replace(/\/media\/t\/[^/]+\//g, '/media/t/<token>/')}`);
   res.type('application/vnd.apple.mpegurl').set('Cache-Control', 'no-store').send(body);
 });
@@ -573,8 +574,33 @@ async function fetchPiece(pathName, timeoutMs = 30_000) {
   return null;
 }
 
+// Jellyfin/Emby streams: only video playlist/segment paths are proxied, with the token added here.
+app.use('/media/t/:token/jf/:src', pathSession, needViewer, wrap(async (req, res) => {
+  const srv = conn.server(req.params.src);
+  if (req.method !== 'GET' || !srv || srv.type === 'plex' || !jf.allowedStreamPath(req.url)) return res.status(403).end();
+  res.set('Cache-Control', 'no-store');
+  const upstream = await jf.streamFetch(srv, req.url).catch(() => null);
+  if (!upstream) return res.status(502).end();
+  if (!upstream.ok) console.warn(`[jf proxy] ${upstream.status} for ${req.url.split('?')[0]}`);
+  if (upstream.ok && req.url.split('?')[0].endsWith('.m3u8')) {
+    // Strip any token the server put in segment URLs; we add it ourselves.
+    const text = (await upstream.text()).replace(/([?&])(api_key|ApiKey)=[^&\s]*&?/g, '$1').replace(/[?&]$/gm, '');
+    return res.type('application/vnd.apple.mpegurl').send(text);
+  }
+  res.status(upstream.status);
+  for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
+  if (upstream.body) Readable.fromWeb(upstream.body).pipe(res);
+  else res.end();
+}));
+
 // Only the transcoder session paths are proxied; the rest of the Plex API stays private.
-app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) => {
+// The path names the Plex server (several can be connected).
+app.use('/media/t/:token/plex/:src', pathSession, needViewer, (req, res, next) => {
+  const srv = conn.server(req.params.src);
+  if (!srv || srv.type !== 'plex') return res.status(404).end();
+  plex.withServer(srv, () => plexProxy(req, res, next));
+});
+const plexProxy = wrap(async (req, res) => {
   if (req.method !== 'GET' || !req.url.startsWith('/video/:/transcode/universal/session/')) return res.status(403).end();
   const shortPath = req.url.split('?')[0];
   const dir = shortPath.slice(0, shortPath.lastIndexOf('/') + 1);
@@ -627,7 +653,7 @@ app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) =
   for (const h of ['content-type', 'content-length']) if (upstream.headers.get(h)) res.set(h, upstream.headers.get(h));
   if (upstream.body) Readable.fromWeb(upstream.body).pipe(res);
   else res.end();
-}));
+});
 
 // ---------- setup wizard & Admin → Connections ----------
 setupRoutes(app, { wrap, tokenOf });

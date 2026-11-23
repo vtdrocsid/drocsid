@@ -9,6 +9,8 @@ import * as conn from './connections.js';
 import * as discord from './discord.js';
 import * as plexSetup from './plexsetup.js';
 import * as plex from './plex.js';
+import * as jf from './jellyfin.js';
+import * as sources from './sources.js';
 import * as auth from './auth.js';
 import { config } from './config.js';
 
@@ -186,8 +188,8 @@ export function setupRoutes(app, { wrap, tokenOf }) {
     res.json({ done: true, servers: list.map(({ token, ...s }) => s) });
   }));
 
-  /** Work out the token from what the browser sent: a finished Plex sign-in, the saved server, or a pasted token. */
-  async function plexToken(b) {
+  /** Plex token from what the browser sent: a finished Plex sign-in, the saved server, or a pasted token. */
+  async function plexToken(b, existing) {
     if (b.token) return String(b.token).trim();
     if (b.pinId && b.machineId) {
       const account = plexSetup.pinToken(b.pinId);
@@ -195,26 +197,78 @@ export function setupRoutes(app, { wrap, tokenOf }) {
       const srv = (await plexSetup.servers(account)).find((s) => s.machineId === b.machineId);
       return srv?.token || account;
     }
-    if (b.serverId) return conn.plexServer()?.id === b.serverId ? conn.plexServer().token : '';
-    return '';
+    return existing?.token || '';
   }
 
-  app.post('/api/connections/plex/test', needManage, wrap(async (req, res) => {
-    res.json(await plexSetup.testServer(req.body?.url, await plexToken(req.body || {})));
+  /** Check a server with what the browser sent. Returns the test result, including the token (server side only). */
+  async function tryServer(b) {
+    const type = String(b.type || '');
+    const existing = b.serverId ? conn.server(String(b.serverId)) : null;
+    if (existing && existing.type !== type) return { ok: false, error: 'Server type mismatch' };
+    if (type === 'plex') {
+      const token = await plexToken(b, existing);
+      const t = await plexSetup.testServer(b.url || existing?.url, token);
+      return t.ok ? { ...t, token, userId: '' } : t;
+    }
+    if (type === 'jellyfin' || type === 'emby') {
+      const fresh = b.username || b.apiKey;
+      return jf.connect({
+        type, url: b.url || existing?.url,
+        username: b.username, password: b.password, apiKey: b.apiKey,
+        // Editing without new credentials keeps the saved sign-in.
+        token: fresh ? undefined : existing?.token, userId: fresh ? undefined : existing?.userId,
+      });
+    }
+    return { ok: false, error: 'Pick Plex, Jellyfin or Emby' };
+  }
+  const strip = ({ token, userId, ...t }) => t;
+
+  app.post('/api/connections/media/test', needManage, wrap(async (req, res) => {
+    res.json(strip(await tryServer(req.body || {})));
   }));
 
-  app.post('/api/connections/plex', needManage, wrap(async (req, res) => {
+  /** Add a server, or save changes to one (serverId). */
+  app.post('/api/connections/media', needManage, wrap(async (req, res) => {
     const b = req.body || {};
-    const token = await plexToken(b);
-    const t = await plexSetup.testServer(b.url, token);
+    const t = await tryServer(b);
     if (!t.ok) return res.status(400).json({ error: t.error });
-    // One Plex server for now: saving replaces it. (Several servers are planned.)
+    const name = String(b.name || t.name || b.type).trim().slice(0, 60);
     conn.update((d) => {
-      d.plexServers = [{ id: d.plexServers[0]?.id || 'plex1', name: String(b.name || t.name).slice(0, 60), url: t.url, token: conn.seal(token), machineId: t.machineId, addedAt: Date.now() }];
+      const rec = {
+        type: b.type, name, url: t.url, token: conn.seal(t.token), userId: t.userId || '',
+        username: t.username || '', machineId: t.machineId || '',
+      };
+      const i = d.mediaServers.findIndex((x) => x.id === b.serverId);
+      if (i >= 0) {
+        d.mediaServers[i] = { ...d.mediaServers[i], ...rec };
+      } else {
+        if (d.mediaServers.some((x) => x.type === b.type && x.machineId && x.machineId === t.machineId)) {
+          throw Object.assign(new Error(`${name} is already connected`), { status: 409 });
+        }
+        const id = b.type === 'plex' && !d.mediaServers.some((x) => x.id === 'plex1') ? 'plex1' : `${b.type}-${crypto.randomBytes(3).toString('hex')}`;
+        d.mediaServers.push({ id, addedAt: Date.now(), ...rec });
+      }
     });
-    plex.clearLiveCache();
-    console.log(`[connections] Plex server ${t.name} at ${t.url}`);
+    if (b.type === 'plex') plex.clearLiveCache();
+    console.log(`[connections] ${b.type} server ${name} at ${t.url} ${b.serverId ? 'updated' : 'added'}`);
     res.json(connectionsView());
+  }));
+
+  app.delete('/api/connections/media/:id', needManage, (req, res) => {
+    const srv = conn.server(req.params.id);
+    if (!srv) return res.status(404).json({ error: 'Not found' });
+    if (conn.isConfigured() && conn.get().mediaServers.length === 1) return res.status(400).json({ error: 'This is the only media server. Add another before removing it.' });
+    conn.update((d) => { d.mediaServers = d.mediaServers.filter((x) => x.id !== srv.id); });
+    if (srv.type === 'plex') plex.clearLiveCache();
+    console.log(`[connections] ${srv.type} server ${srv.name} removed`);
+    res.json(connectionsView());
+  });
+
+  /** Online check for the Connections panel. */
+  app.get('/api/connections/media/:id/health', needManage, wrap(async (req, res) => {
+    const srv = conn.server(req.params.id);
+    if (!srv) return res.status(404).json({ error: 'Not found' });
+    res.json(await sources.health(srv));
   }));
 
   // ---- finish ----
@@ -224,7 +278,7 @@ export function setupRoutes(app, { wrap, tokenOf }) {
       !d.publicUrl && 'the public address',
       !d.discordApps.length && 'a Discord app',
       !d.ownerIds.length && 'an owner (sign in with Discord)',
-      !d.plexServers.length && 'a Plex server',
+      !d.mediaServers.length && 'a media server',
     ].filter(Boolean);
     if (missing.length) return res.status(400).json({ error: `Still needed: ${missing.join(', ')}.` });
     conn.update((x) => { x.setupComplete = true; });

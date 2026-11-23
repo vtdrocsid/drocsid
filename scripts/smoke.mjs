@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { startMockJellyfin } from './mockjf.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
@@ -75,7 +76,41 @@ console.log('Fresh install');
     assert.ok(r.body.checks.some((c) => c.id === 'token' && !c.ok));
   });
   await check('bad Discord app not saved', async () => assert.equal((await json(base, '/api/connections/discord', 'POST', { clientId: '123456789012345678', clientSecret: 'x', botToken: 'y' }, cookie)).status, 400));
-  await check('Plex test rejects bad address', async () => assert.equal((await json(base, '/api/connections/plex/test', 'POST', { url: 'nope', token: 't' }, cookie)).body.ok, false));
+  await check('Plex test rejects bad address', async () => assert.equal((await json(base, '/api/connections/media/test', 'POST', { type: 'plex', url: 'nope', token: 't' }, cookie)).body.ok, false));
+  const mock = await startMockJellyfin(3913);
+  await check('Jellyfin test signs in (no token returned)', async () => {
+    const r = await json(base, '/api/connections/media/test', 'POST', { type: 'jellyfin', url: mock.url, username: 'drocsid', password: 'pw' }, cookie);
+    assert.equal(r.body.ok, true, JSON.stringify(r.body));
+    assert.equal(r.body.token, undefined);
+    assert.equal(r.body.libraries, 2);
+  });
+  let jfId;
+  await check('Jellyfin server added', async () => {
+    const r = await json(base, '/api/connections/media', 'POST', { type: 'jellyfin', url: mock.url, username: 'drocsid', password: 'pw' }, cookie);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const srv = r.body.mediaServers.find((x) => x.type === 'jellyfin');
+    jfId = srv.id;
+    assert.equal(srv.name, 'MockJF');
+    assert.equal(srv.token, undefined);
+  });
+  await check('same server not added twice', async () => assert.equal((await json(base, '/api/connections/media', 'POST', { type: 'jellyfin', url: mock.url, username: 'drocsid', password: 'pw' }, cookie)).status, 409));
+  await check('edit keeps the saved sign-in', async () => {
+    const r = await json(base, '/api/connections/media', 'POST', { type: 'jellyfin', serverId: jfId, name: 'Basement' }, cookie);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.mediaServers.find((x) => x.id === jfId).name, 'Basement');
+    assert.equal(r.body.mediaServers.length, 1);
+  });
+  await check('health check', async () => {
+    const r = await json(base, `/api/connections/media/${jfId}/health`, 'GET', null, cookie);
+    assert.equal(r.body.ok, true);
+    assert.equal(r.body.libraries, 2);
+  });
+  await check('removed', async () => {
+    const r = await json(base, `/api/connections/media/${jfId}`, 'DELETE', null, cookie);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.mediaServers.length, 0);
+  });
+  mock.close();
   await check('finish lists what is missing', async () => {
     const r = await json(base, '/api/setup/finish', 'POST', {}, cookie);
     assert.equal(r.status, 400);
@@ -112,7 +147,8 @@ console.log('Existing install (.env import)');
     const c = JSON.parse(raw);
     assert.equal(c.setupComplete, true);
     assert.equal(c.discordApps[0].id, '111111111111111111');
-    assert.equal(c.plexServers[0].url, 'http://127.0.0.1:1');
+    assert.equal(c.mediaServers[0].url, 'http://127.0.0.1:1');
+    assert.equal(c.mediaServers[0].type, 'plex');
     assert.deepEqual(c.ownerIds, ['333333333333333333']);
     assert.ok(fs.existsSync(path.join(dataDir, 'secret.key')));
   });

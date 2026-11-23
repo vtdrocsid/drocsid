@@ -193,12 +193,14 @@ async function loadLibraries() {
   const libs = await api('/api/libraries');
   const box = $('#libs');
   box.innerHTML = '';
+  // Two servers can have a library with the same name: name the server only then.
+  const dup = (l) => libs.filter((x) => x.title === l.title).length > 1;
   libs.forEach((l, i) => {
-    const c = h(`<button>${esc(l.title)}</button>`);
+    const c = h(`<button title="${esc(l.serverName || '')}">${esc(l.title)}${l.serverName && dup(l) ? ` <small>· ${esc(l.serverName)}</small>` : ''}</button>`);
     c.onclick = (ev) => {
       curLib = l.id;
       curLibEl = c;
-      $('#secTitle').textContent = l.title;
+      $('#secTitle').textContent = l.serverName && dup(l) ? `${l.title} · ${l.serverName}` : l.title;
       $('#sort').value = l.defaultSort || 'title'; // admin's default for this library; viewers can still change it
       if (ev?.isTrusted || $('#tab-live').hidden) showTab('libraries');
       loadItems(true);

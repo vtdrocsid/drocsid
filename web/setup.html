@@ -46,6 +46,12 @@
     .err { color: #c0392b; font-weight: bold; min-height: 1.2em; margin-top: 8px; }
     .or { margin: 16px 0 6px; font: bold 10px Verdana; letter-spacing: 1.5px; color: #6b7682; text-transform: uppercase; }
     code { background: #eef2f6; padding: 1px 4px; }
+    .pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+    .card { border: 2px solid #d3d8de; padding: 16px; text-align: center; background: #fff; cursor: pointer; font: inherit; color: inherit; }
+    .card:hover { border-color: #8cc2ee; } .card.on { border-color: #1a86d8; background: #f1f8ff; }
+    .logo { width: 56px; height: 56px; margin: 0 auto 8px; border-radius: 12px; display: grid; place-items: center; font: 900 26px Arial, sans-serif; }
+    .card .n { font: bold 15px Arial, sans-serif; } .card .m { font-size: 11px; color: #6b7682; margin-top: 4px; }
+    @media (max-width: 640px) { .pick { grid-template-columns: 1fr; } }
     @media (max-width: 640px) { .shell { margin: 0; } .steps div { font-size: 8px; letter-spacing: 0; } }
   </style>
 </head>

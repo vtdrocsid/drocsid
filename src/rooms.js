@@ -2,6 +2,9 @@
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import * as plex from './plex.js';
+import * as jf from './jellyfin.js';
+import * as conn from './connections.js';
+import { parseKey } from './sources.js';
 import { findPreset } from './settings.js';
 import * as history from './history.js';
 
@@ -52,20 +55,58 @@ export async function setQuality(roomId, quality) {
 }
 const emit = (room) => events.emit('update', room);
 
+/** The media server a room streams from: live TV is the first Plex server; titles carry theirs in the key. */
+function serverOf(room) {
+  const srv = room.item.source === 'live' ? conn.plexServer() : parseKey(room.item.ratingKey).srv;
+  if (!srv) throw Object.assign(new Error('That media server is no longer connected'), { status: 404 });
+  return srv;
+}
+const onServer = (room, fn) => (room.srv?.type === 'plex' ? plex.withServer(room.srv, fn) : fn());
+
 async function releasePlex(room) {
+  if (room.jfSession) {
+    const s = room.jfSession;
+    room.jfSession = null;
+    await jf.report(room.srv, 'stop', { ...s, position: position(room), paused: !room.playing });
+    await jf.stopStream(room.srv, s.playSessionId);
+    return;
+  }
   if (!room.plexSession) return;
   const sessionId = room.plexSession;
   room.plexSession = null;
-  await plex.stopTranscode(sessionId);
-  if (room.plexKey) {
-    // "stopped" tells Plex the playback ended; for live TV this frees the tuner.
-    await plex.timeline({ key: room.plexKey, ratingKey: room.plexRatingKey, state: 'stopped', timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId });
-  }
+  await onServer(room, async () => {
+    await plex.stopTranscode(sessionId);
+    if (room.plexKey) {
+      // "stopped" tells Plex the playback ended; for live TV this frees the tuner.
+      await plex.timeline({ key: room.plexKey, ratingKey: room.plexRatingKey, state: 'stopped', timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId });
+    }
+  });
 }
 
-/** (Re)start the shared Plex stream at `seconds` into the title (ignored for live TV). */
+/** (Re)start the shared stream at `seconds` into the title (ignored for live TV). */
 async function load(room, seconds) {
   await releasePlex(room);
+  room.srv = serverOf(room);
+  if (room.srv.type !== 'plex') return loadJellyfin(room, seconds);
+  return plex.withServer(room.srv, () => loadPlex(room, seconds));
+}
+
+/** Jellyfin/Emby: the server makes an HLS stream spanning the whole title; players seek within it. */
+async function loadJellyfin(room, seconds) {
+  const id = parseKey(room.item.ratingKey).id;
+  // The playlist always covers the whole title from 0 (stream time == title time), like Plex's.
+  const s = await jf.startStream(room.srv, id, { startSeconds: 0, preset: findPreset(room.quality) });
+  const res = await jf.streamFetch(room.srv, s.masterPath);
+  if (!res.ok) throw new Error(`${room.srv.name} answered ${res.status} for the stream`);
+  room.masterPlaylist = jf.rewriteMaster(room.srv, s.masterPath, await res.text());
+  room.jfSession = { itemId: id, mediaSourceId: s.mediaSourceId, playSessionId: s.playSessionId };
+  jf.report(room.srv, 'start', { ...room.jfSession, position: seconds, paused: false });
+  room.offsetBase = 0;
+  room.playlistVersion = ++streamVersion;
+  room.playlist = `room/${room.id}/master.m3u8?v=${room.playlistVersion}`;
+}
+
+async function loadPlex(room, seconds) {
   const sessionId = crypto.randomUUID();
   if (room.item.source === 'live') {
     const tuned = await plex.tune(room.item, sessionId);
@@ -74,10 +115,11 @@ async function load(room, seconds) {
     room.masterPlaylist = await plex.startTranscode({ path: tuned.key, sessionId, preset: findPreset(room.quality) });
     room.offsetBase = 0;
   } else {
-    room.plexKey = `/library/metadata/${room.item.ratingKey}`;
-    room.plexRatingKey = room.item.ratingKey;
+    const nativeKey = parseKey(room.item.ratingKey).id;
+    room.plexKey = `/library/metadata/${nativeKey}`;
+    room.plexRatingKey = nativeKey;
     const preset = findPreset(room.quality);
-    const mediaIndex = await plex.pickMediaIndex(room.item.ratingKey, preset);
+    const mediaIndex = await plex.pickMediaIndex(nativeKey, preset);
     room.masterPlaylist = await plex.startTranscode({ path: room.plexKey, offset: seconds, mediaIndex, sessionId, preset });
     // Plex's playlist always spans the whole title (EXT-X-START marks where this transcode begins),
     // so stream time == title time; the player seeks straight to the position.
@@ -210,12 +252,15 @@ export function setViewers(roomId, count) {
 setInterval(() => {
   for (const room of [...rooms.values()]) {
     if (room.plexSession) {
-      plex.pingTranscode(room.plexSession);
-      plex.timeline({
-        key: room.plexKey, ratingKey: room.plexRatingKey, state: room.playing ? 'playing' : 'paused',
-        timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId: room.plexSession,
+      onServer(room, () => {
+        plex.pingTranscode(room.plexSession);
+        plex.timeline({
+          key: room.plexKey, ratingKey: room.plexRatingKey, state: room.playing ? 'playing' : 'paused',
+          timeMs: position(room) * 1000, durationMs: room.item.duration * 1000, sessionId: room.plexSession,
+        });
       });
     }
+    if (room.jfSession) jf.report(room.srv, 'progress', { ...room.jfSession, position: position(room), paused: !room.playing });
     if (room.item.duration && position(room) >= room.item.duration - 1) { stop(room.id, true, 'reached the end'); continue; }
     if (room.hadViewers && room.idleSince && now() - room.idleSince > EMPTY_END_MS) { stop(room.id, true, 'everyone left the player for 3 minutes'); continue; }
     if (!room.hadViewers && room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id, true, 'nobody opened the player for 10 minutes');
