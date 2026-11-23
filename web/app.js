@@ -27,6 +27,7 @@ let me = null;
 async function boot() {
   $('#today').textContent = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).replace(/,/g, '');
   try { me = await api('/api/me'); } catch { $('#signin').hidden = false; return; }
+  if (me.version) $('#today').textContent += ` · v${me.version}`;
   $('#who').innerHTML = `<span>Signed in as <b>${esc(me.name)}</b></span><button class="btn sm" id="logout">Sign out</button>`;
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.reload(); };
   if (!me.approved) { $('#denied').hidden = false; return; }
