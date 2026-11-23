@@ -386,6 +386,17 @@ function showEpisodes(eps) {
 }
 
 // ---------- play dialog ----------
+/** Voice channel <option>s; grouped by Discord server when there is more than one. */
+function voiceOptions(channels, current, label) {
+  const multi = new Set(channels.map((c) => c.guildId)).size > 1;
+  let last = null, out = '';
+  for (const c of channels) {
+    if (multi && c.guildId !== last) { out += `${last !== null ? '</optgroup>' : ''}<optgroup label="${esc(c.guildName)}">`; last = c.guildId; }
+    out += `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>${label(c)}</option>`;
+  }
+  return out + (multi && last !== null ? '</optgroup>' : '');
+}
+
 async function choosePlay(target) {
   const dlg = $('#playDlg');
   $('#playTitle').textContent = `Play: ${target.title}`;
@@ -401,21 +412,29 @@ async function choosePlay(target) {
     $('#resumeBox input[value=resume]').checked = true;
   }
   const sel = $('#voiceSel');
-  sel.innerHTML = channels.map((c) => `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>🔊 ${esc(c.name)}${c.members.length ? ` (${c.members.length})` : ''}${c.nowPlaying.active ? ' — playing' : ''}</option>`).join('');
+  sel.innerHTML = voiceOptions(channels, current, (c) => `🔊 ${esc(c.name)}${c.members.length ? ` (${c.members.length})` : ''}${c.nowPlaying.active ? ' — playing' : ''}`);
   $('#voiceHint').textContent = current ? 'Defaulted to the channel you are in.' : "Tip: join a voice channel in Discord first, then open Activities (🚀) to watch.";
   // Optional "now playing" post in a text channel; the last choice is remembered on this browser.
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem('drocsid.announce') || '{}'); } catch {}
   const annOn = $('#annOn'), annSel = $('#annSel');
-  $('#annBox').hidden = !textChannels.length;
-  let lastCat = null;
-  annSel.innerHTML = textChannels.map((c) => {
-    const head = c.category !== lastCat ? `${lastCat !== null ? '</optgroup>' : ''}<optgroup label="${esc(c.category || 'Text channels')}">` : '';
-    lastCat = c.category;
-    return `${head}<option value="${c.id}">#${esc(c.name)}</option>`;
-  }).join('') + (textChannels.length ? '</optgroup>' : '');
-  if (textChannels.some((c) => c.id === saved.channel)) annSel.value = saved.channel;
-  annOn.checked = !!saved.on && textChannels.length > 0;
+  // Announcements go to a text channel in the same server as the voice channel.
+  const fillText = () => {
+    const gid = channels.find((c) => c.id === sel.value)?.guildId;
+    const list = textChannels.filter((c) => !c.guildId || c.guildId === gid);
+    $('#annBox').hidden = !list.length;
+    let lastCat = null;
+    annSel.innerHTML = list.map((c) => {
+      const head = c.category !== lastCat ? `${lastCat !== null ? '</optgroup>' : ''}<optgroup label="${esc(c.category || 'Text channels')}">` : '';
+      lastCat = c.category;
+      return `${head}<option value="${c.id}">#${esc(c.name)}</option>`;
+    }).join('') + (list.length ? '</optgroup>' : '');
+    if (list.some((c) => c.id === saved.channel)) annSel.value = saved.channel;
+    return list.length;
+  };
+  const anyText = fillText();
+  sel.onchange = fillText;
+  annOn.checked = !!saved.on && anyText > 0;
   annSel.disabled = !annOn.checked;
   annOn.onchange = () => { annSel.disabled = !annOn.checked; };
   dlg.showModal();
@@ -746,7 +765,7 @@ async function openSchedule(target = null, at = null) {
   $('#schedErr').textContent = '';
   $('#schedRes').hidden = true;
   const { current, channels } = await api('/api/voice');
-  $('#schedVoice').innerHTML = channels.map((c) => `<option value="${c.id}" ${c.id === current ? 'selected' : ''}>🔊 ${esc(c.name)}</option>`).join('');
+  $('#schedVoice').innerHTML = voiceOptions(channels, current, (c) => `🔊 ${esc(c.name)}`);
   const nextHalfHour = Math.ceil((Date.now() + 5 * 60_000) / 1_800_000) * 1_800_000;
   $('#schedAt').value = localInput(at || nextHalfHour);
   $('#schedAt').min = localInput(Date.now() + 60_000);

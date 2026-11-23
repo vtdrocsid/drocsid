@@ -1,0 +1,246 @@
+// Setup wizard and Admin → Connections: public URL, Discord apps (bots), Plex server.
+// Before setup is finished, only the wizard is reachable, and it is unlocked with a one-time
+// setup code printed in the container log. Afterwards, only super admins can change connections.
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import * as conn from './connections.js';
+import * as discord from './discord.js';
+import * as plexSetup from './plexsetup.js';
+import * as plex from './plex.js';
+import * as auth from './auth.js';
+import { config } from './config.js';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SETUP_COOKIE = 'pc_setup';
+
+// ---------- setup code ----------
+let setupCode = null;
+const unlocked = new Set(); // setup cookie tokens
+let lastLogged = 0;
+function code() {
+  if (!setupCode) {
+    const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const pick = () => Array.from(crypto.randomBytes(4), (b) => abc[b % abc.length]).join('');
+    setupCode = `${pick()}-${pick()}`;
+  }
+  return setupCode;
+}
+export function logSetupCode(force = false) {
+  if (conn.isConfigured() || (!force && Date.now() - lastLogged < 60_000)) return;
+  lastLogged = Date.now();
+  console.log('\n' + '='.repeat(52) + `\n  drocsid setup code:  ${code()}\n  Open ${config.publicUrl || 'http://<this server>:' + config.port}/setup/ to finish setup.\n` + '='.repeat(52) + '\n');
+}
+
+const cookieOf = (req, name) => (req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).find(([k]) => k === name)?.[1];
+const isUnlocked = (req) => unlocked.has(cookieOf(req, SETUP_COOKIE) || '');
+
+/** During setup, whoever signs in with the setup code unlocked becomes an owner. */
+export function claimOwner(req, user) {
+  if (conn.isConfigured() || !isUnlocked(req)) return;
+  if (!conn.get().ownerIds.includes(user.id)) {
+    conn.update((d) => { d.ownerIds.push(user.id); });
+    console.log(`[setup] ${user.username} (${user.id}) is now an owner`);
+  }
+}
+
+// Paths that work before setup is finished.
+const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/];
+
+/** Until setup is finished, send everything else to the wizard. */
+export function setupGate(req, res, next) {
+  if (conn.isConfigured() || OPEN.some((r) => r.test(req.path))) return next();
+  if (req.path.startsWith('/api/') || req.path.startsWith('/media/') || req.path === '/ws') return res.status(503).json({ error: 'Setup is not finished yet', setup: true });
+  res.redirect('/setup/');
+}
+
+export function setupRoutes(app, { wrap, tokenOf }) {
+  /** Who may change connections: the setup-code holder during setup, super admins afterwards. */
+  const canManage = (req) => {
+    const s = auth.getSession(tokenOf(req));
+    if (s && auth.isSuperAdmin(s.userId)) return true;
+    return !conn.isConfigured() && isUnlocked(req);
+  };
+  const needManage = (req, res, next) => (canManage(req) ? next() : res.status(403).json({ error: conn.isConfigured() ? 'Super admins only' : 'Enter the setup code first' }));
+
+  // ---- pages ----
+  app.get(['/setup', '/setup/'], (req, res) => {
+    // After setup, the wizard is still used by super admins to add a bot or change the Plex server.
+    if (conn.isConfigured() && !req.query.add) return res.redirect('/browse/admin.html#connections');
+    logSetupCode();
+    res.set('Cache-Control', 'no-store').type('html').send(readFileSync(path.join(root, 'web/setup.html'), 'utf8'));
+  });
+  app.get('/setup/setup.js', (req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(root, 'web/setup.js')));
+
+  // ---- status ----
+  app.get('/api/setup/status', (req, res) => {
+    const manage = canManage(req);
+    const s = auth.getSession(tokenOf(req));
+    res.json({
+      configured: conn.isConfigured(),
+      unlocked: manage,
+      signedIn: s ? { id: s.userId, name: s.username, owner: config.ownerIds.includes(s.userId) } : null,
+      suggestedUrl: `${req.protocol}://${req.get('host')}`,
+      ...(manage ? connectionsView() : {}),
+    });
+  });
+
+  // Wrong guesses are limited so the code can't be brute-forced.
+  let tries = [];
+  app.post('/api/setup/unlock', (req, res) => {
+    if (conn.isConfigured()) return res.status(400).json({ error: 'Setup is already finished' });
+    tries = tries.filter((t) => Date.now() - t < 60_000);
+    if (tries.length >= 10) return res.status(429).json({ error: 'Too many tries. Wait a minute.' });
+    const given = String(req.body?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (given !== code().replace('-', '')) {
+      tries.push(Date.now());
+      logSetupCode(true);
+      return res.status(403).json({ error: 'That code is not right. Check the container log for the current one.' });
+    }
+    const t = crypto.randomBytes(24).toString('base64url');
+    unlocked.add(t);
+    res.cookie(SETUP_COOKIE, t, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 24 * 3600_000 });
+    res.json({ ok: true });
+  });
+
+  // ---- connections overview (Admin → Connections and the wizard) ----
+  app.get('/api/connections', needManage, (req, res) => res.json(connectionsView()));
+
+  app.put('/api/connections/public-url', needManage, (req, res) => {
+    let url = String(req.body?.publicUrl || '').trim().replace(/\/+$/, '');
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) return res.status(400).json({ error: 'Use the https:// address people open, with no path (e.g. https://tv.example.com)' });
+    conn.update((d) => { d.publicUrl = url.toLowerCase(); });
+    res.json(connectionsView());
+  });
+
+  // ---- Discord apps ----
+  const appInput = (b) => {
+    const clientId = String(b.clientId || '').trim();
+    const existing = conn.app(clientId);
+    return {
+      clientId,
+      clientSecret: String(b.clientSecret || '').trim() || conn.appSecret(existing),
+      botToken: String(b.botToken || '').trim().replace(/^Bot\s+/i, '') || conn.appToken(existing),
+      existing,
+    };
+  };
+
+  app.post('/api/connections/discord/test', needManage, wrap(async (req, res) => {
+    const { clientId, clientSecret, botToken } = appInput(req.body || {});
+    res.json(await discord.testApp({ clientId, clientSecret, botToken, redirectUri: config.publicUrl ? `${config.publicUrl}/auth/callback` : null }));
+  }));
+
+  app.post('/api/connections/discord', needManage, wrap(async (req, res) => {
+    const { clientId, clientSecret, botToken, existing } = appInput(req.body || {});
+    const test = await discord.testApp({ clientId, clientSecret, botToken });
+    const must = test.checks.filter((c) => ['id', 'token', 'secret'].includes(c.id) && !c.ok);
+    if (must.length) return res.status(400).json({ error: must.map((c) => c.hint || c.label).join(' '), test });
+    conn.update((d) => {
+      const rec = d.discordApps.find((a) => a.id === clientId);
+      const fields = { name: test.app?.name || rec?.name || 'Discord app', clientSecret: conn.seal(clientSecret), botToken: conn.seal(botToken) };
+      if (rec) Object.assign(rec, fields);
+      else d.discordApps.push({ id: clientId, botUser: '', primary: d.discordApps.length === 0, addedAt: Date.now(), ...fields });
+    });
+    console.log(`[connections] Discord app ${test.app?.name || clientId} ${existing ? 'updated' : 'added'}`);
+    await discord.sync();
+    res.json({ ...connectionsView(), test });
+  }));
+
+  app.post('/api/connections/discord/:id/members-intent', needManage, wrap(async (req, res) => {
+    const a = conn.app(req.params.id);
+    const token = String(req.body?.botToken || '').trim() || conn.appToken(a);
+    if (!token) return res.status(400).json({ error: 'Paste the bot token first' });
+    await discord.enableMembersIntent(token);
+    if (a) await discord.restart(a.id); // the running bot reconnects to receive member data
+    res.json({ ok: true });
+  }));
+
+  app.post('/api/connections/discord/:id/primary', needManage, (req, res) => {
+    if (!conn.app(req.params.id)) return res.status(404).json({ error: 'Not found' });
+    conn.update((d) => d.discordApps.forEach((a) => { a.primary = a.id === req.params.id; }));
+    res.json(connectionsView());
+  });
+
+  app.delete('/api/connections/discord/:id', needManage, wrap(async (req, res) => {
+    const a = conn.app(req.params.id);
+    if (!a) return res.status(404).json({ error: 'Not found' });
+    if (conn.isConfigured() && conn.apps().length === 1) return res.status(400).json({ error: 'This is the only Discord app. Add another before removing it.' });
+    conn.update((d) => {
+      d.discordApps = d.discordApps.filter((x) => x.id !== a.id);
+      if (d.discordApps.length && !d.discordApps.some((x) => x.primary)) d.discordApps[0].primary = true;
+    });
+    console.log(`[connections] Discord app ${a.name} removed`);
+    await discord.sync();
+    res.json(connectionsView());
+  }));
+
+  // ---- Plex ----
+  app.post('/api/connections/plex/pin', needManage, wrap(async (req, res) => {
+    res.json(await plexSetup.startPin(req.body?.returnUrl));
+  }));
+
+  app.get('/api/connections/plex/pin/:id', needManage, wrap(async (req, res) => {
+    if (!(await plexSetup.checkPin(req.params.id))) return res.json({ done: false });
+    const list = await plexSetup.servers(plexSetup.pinToken(req.params.id));
+    res.json({ done: true, servers: list.map(({ token, ...s }) => s) });
+  }));
+
+  /** Work out the token from what the browser sent: a finished Plex sign-in, the saved server, or a pasted token. */
+  async function plexToken(b) {
+    if (b.token) return String(b.token).trim();
+    if (b.pinId && b.machineId) {
+      const account = plexSetup.pinToken(b.pinId);
+      if (!account) throw Object.assign(new Error('Plex sign-in expired. Sign in again.'), { status: 400 });
+      const srv = (await plexSetup.servers(account)).find((s) => s.machineId === b.machineId);
+      return srv?.token || account;
+    }
+    if (b.serverId) return conn.plexServer()?.id === b.serverId ? conn.plexServer().token : '';
+    return '';
+  }
+
+  app.post('/api/connections/plex/test', needManage, wrap(async (req, res) => {
+    res.json(await plexSetup.testServer(req.body?.url, await plexToken(req.body || {})));
+  }));
+
+  app.post('/api/connections/plex', needManage, wrap(async (req, res) => {
+    const b = req.body || {};
+    const token = await plexToken(b);
+    const t = await plexSetup.testServer(b.url, token);
+    if (!t.ok) return res.status(400).json({ error: t.error });
+    // One Plex server for now: saving replaces it. (Several servers are planned.)
+    conn.update((d) => {
+      d.plexServers = [{ id: d.plexServers[0]?.id || 'plex1', name: String(b.name || t.name).slice(0, 60), url: t.url, token: conn.seal(token), machineId: t.machineId, addedAt: Date.now() }];
+    });
+    plex.clearLiveCache();
+    console.log(`[connections] Plex server ${t.name} at ${t.url}`);
+    res.json(connectionsView());
+  }));
+
+  // ---- finish ----
+  app.post('/api/setup/finish', needManage, (req, res) => {
+    const d = conn.get();
+    const missing = [
+      !d.publicUrl && 'the public address',
+      !d.discordApps.length && 'a Discord app',
+      !d.ownerIds.length && 'an owner (sign in with Discord)',
+      !d.plexServers.length && 'a Plex server',
+    ].filter(Boolean);
+    if (missing.length) return res.status(400).json({ error: `Still needed: ${missing.join(', ')}.` });
+    conn.update((x) => { x.setupComplete = true; });
+    unlocked.clear();
+    console.log('[setup] finished');
+    res.json({ ok: true });
+  });
+}
+
+/** Everything the wizard and Connections panel show (no secrets). */
+function connectionsView() {
+  const v = conn.publicView();
+  return {
+    ...v,
+    redirectUri: v.publicUrl ? `${v.publicUrl}/auth/callback` : '',
+    activityHost: v.publicUrl ? v.publicUrl.replace(/^https:\/\//, '') : '',
+    discordApps: v.discordApps.map((a) => ({ ...a, ...discord.status(a.id), invite: discord.inviteUrl(a.id) })),
+  };
+}

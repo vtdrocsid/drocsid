@@ -4,23 +4,25 @@ import crypto from 'node:crypto';
 import { config } from './config.js';
 import { settings } from './settings.js';
 
-const CLIENT_ID = 'drocsid-' + crypto.createHash('sha1').update(config.clientId).digest('hex').slice(0, 12);
+// Plex device identity, kept stable across restarts (stored with the connections).
+const clientId = () => config.plexClientId;
 
-const baseHeaders = {
+const baseHeaders = () => ({
   Accept: 'application/json',
   'X-Plex-Token': config.plexToken,
-  'X-Plex-Client-Identifier': CLIENT_ID,
+  'X-Plex-Client-Identifier': clientId(),
   'X-Plex-Product': 'Drocsid',
   'X-Plex-Version': '1.0.0',
   'X-Plex-Device': 'Discord Activity',
   'X-Plex-Device-Name': 'Drocsid',
   'X-Plex-Platform': 'Chrome',
-};
+});
 
 async function plexFetch(path, { params = {}, method = 'GET', headers = {} } = {}) {
+  if (!config.plexUrl) throw Object.assign(new Error('No Plex server is connected yet'), { status: 503 });
   const url = new URL(config.plexUrl + path);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
-  const res = await fetch(url, { method, headers: { ...baseHeaders, ...headers } });
+  const res = await fetch(url, { method, headers: { ...baseHeaders(), ...headers } });
   if (!res.ok) throw Object.assign(new Error(`Plex ${res.status} on ${path}`), { status: res.status });
   return res;
 }
@@ -441,6 +443,6 @@ export async function timeline({ key, ratingKey, state, timeMs = 0, durationMs =
 export function plexProxyUrl(pathAndQuery) {
   const url = new URL(config.plexUrl + pathAndQuery);
   url.searchParams.set('X-Plex-Token', config.plexToken);
-  url.searchParams.set('X-Plex-Client-Identifier', CLIENT_ID);
+  url.searchParams.set('X-Plex-Client-Identifier', clientId());
   return url;
 }

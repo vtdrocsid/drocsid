@@ -1,21 +1,18 @@
-// The bot has no commands. It provides presence in the server: voice-channel lookups,
+// The bots have no commands. They provide presence in each server: voice-channel lookups,
 // role checks, and "now playing" notices in each voice channel's text chat.
-import { Client, GatewayIntentBits, Events } from 'discord.js';
-import { config } from './config.js';
+// Each Discord app's bot is run by discord.js (see discord.js); messages go out through
+// whichever bot is in the channel's server.
+import { Events } from 'discord.js';
 import { settings } from './settings.js';
-import * as auth from './auth.js';
+import * as discord from './discord.js';
 import * as rooms from './rooms.js';
 import * as plex from './plex.js';
-
-export const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMembers],
-});
 
 /** Post a message in a voice channel's built-in text chat. */
 export async function announce(channelId, content) {
   if (!settings().announceInVoiceChat) return;
   try {
-    const ch = await client.channels.fetch(channelId);
+    const ch = discord.channel(channelId);
     if (ch?.isTextBased()) await ch.send({ content, allowedMentions: { parse: [] } });
   } catch (e) { console.warn('announce failed:', e.message); }
 }
@@ -26,7 +23,7 @@ export async function announce(channelId, content) {
  */
 export async function announceNowPlaying(textChannelId, { item, voiceChannelId, startedBy }) {
   try {
-    const ch = await client.channels.fetch(textChannelId);
+    const ch = discord.channel(textChannelId);
     if (!ch?.isTextBased()) return;
     const msg = item.source === 'live'
       ? await liveCard(item)
@@ -108,19 +105,21 @@ async function liveCard(item) {
   };
 }
 
-client.once(Events.ClientReady, (c) => console.log(`Discord bot logged in as ${c.user.tag}`));
-
 // If everyone leaves a voice channel, stop its stream after a one-minute grace period.
-client.on(Events.VoiceStateUpdate, (oldState) => {
-  const chId = oldState.channelId;
-  if (!chId || !rooms.get(chId)) return;
-  setTimeout(() => {
-    const ch = oldState.guild.channels.cache.get(chId);
-    if (ch && ch.members.filter((m) => !m.user.bot).size === 0) rooms.stop(chId, true, 'voice channel empty for 1 minute');
-  }, 60_000);
+const pendingEmpty = new Set();
+discord.onClient((client) => {
+  client.on(Events.VoiceStateUpdate, (oldState) => {
+    const chId = oldState.channelId;
+    if (!chId || !rooms.get(chId) || pendingEmpty.has(chId)) return; // several bots can share a server
+    pendingEmpty.add(chId);
+    setTimeout(() => {
+      pendingEmpty.delete(chId);
+      const ch = discord.channel(chId);
+      if (ch && ch.members.filter((m) => !m.user.bot).size === 0) rooms.stop(chId, true, 'voice channel empty for 1 minute');
+    }, 60_000);
+  });
 });
 
 export async function startBot() {
-  auth.setClient(client);
-  await client.login(config.botToken);
+  await discord.sync();
 }

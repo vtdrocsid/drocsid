@@ -1,25 +1,20 @@
-// Static config (secrets and URLs) from environment variables — see .env.example.
-// Everything adjustable at runtime lives in settings.js and is edited on the Admin page.
-const req = (name) => {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var ${name}`);
-  return v;
-};
+// Live view of the connection settings (see connections.js). Everything here is set up in the
+// browser now; the old .env variables are only read once, to import an existing install.
+// Everything else adjustable at runtime lives in settings.js.
+import * as conn from './connections.js';
+
 export const list = (v) => (v || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 export const config = {
-  publicUrl: req('PUBLIC_URL').replace(/\/$/, ''),
-
-  clientId: req('DISCORD_CLIENT_ID'),
-  clientSecret: req('DISCORD_CLIENT_SECRET'),
-  botToken: req('DISCORD_BOT_TOKEN'),
-  guildId: req('DISCORD_GUILD_ID'),
-  // Bootstrap admins (always admin, can't be removed in the UI). Comma-separated Discord user IDs.
-  ownerIds: list(req('OWNER_USER_IDS')),
-
-  plexUrl: req('PLEX_URL').replace(/\/$/, ''),
-  plexToken: req('PLEX_TOKEN'),
-
-  dataDir: process.env.DATA_DIR || '/data',
+  get publicUrl() { return (conn.get().publicUrl || process.env.PUBLIC_URL || '').replace(/\/$/, ''); },
+  /** The primary Discord app: used for the web portal's "Sign in with Discord". */
+  get clientId() { return conn.primaryApp()?.id || ''; },
+  get clientSecret() { return conn.appSecret(conn.primaryApp()); },
+  /** Owners are permanent super admins (set during setup). */
+  get ownerIds() { return conn.get().ownerIds; },
+  get plexUrl() { return conn.plexServer()?.url || ''; },
+  get plexToken() { return conn.plexServer()?.token || ''; },
+  get plexClientId() { return conn.get().plexClientId; },
+  dataDir: conn.dataDir,
   port: Number(process.env.PORT || 3000),
 };

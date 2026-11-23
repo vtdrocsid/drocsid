@@ -23,7 +23,7 @@ function save() {
 }
 
 /** Record a new stream; returns its history id. */
-export function begin({ item, voiceChannelId, voiceChannelName, startedBy, startedById, scheduled = false }) {
+export function begin({ item, guildId = null, voiceChannelId, voiceChannelName, startedBy, startedById, scheduled = false }) {
   const entry = {
     id: crypto.randomUUID(),
     title: item.title,
@@ -31,6 +31,7 @@ export function begin({ item, voiceChannelId, voiceChannelName, startedBy, start
     ratingKey: item.ratingKey || null,
     channelId: item.channelId || null,
     thumb: item.thumb || null,
+    guildId,
     voiceChannelId,
     voiceChannelName,
     startedBy,

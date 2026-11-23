@@ -375,3 +375,23 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .resume { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; background: #fff7e6; border: 1px solid #e8c27a; }
 .resume[hidden] { display: none; }
 .resume .chk { flex-direction: row; align-items: center; gap: 7px; cursor: pointer; font-weight: bold; }
+
+/* ---------- admin: access by server, connections ---------- */
+.gtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; border-bottom: 2px solid var(--navy3); }
+.gtabs button { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line2); border-bottom: 0; background: linear-gradient(#fff, #e3e7ec);
+  padding: 4px 10px; cursor: pointer; font: bold 11px var(--tiny); color: var(--navy); border-radius: 3px 3px 0 0; }
+.gtabs button img, .gtabs button .gi { width: 18px; height: 18px; border-radius: 50%; background: #5865f2; color: #fff; display: inline-grid; place-items: center; font-size: 10px; }
+.gtabs button.active { background: linear-gradient(#2a8fe0, #135ea8); color: #fff; border-color: var(--navy); }
+.gtabs button .cnt { font-weight: normal; opacity: .8; }
+.access-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 800px) { .access-cols { grid-template-columns: 1fr; } }
+.access-cols .sub-h:first-child { margin-top: 0; }
+.pill { font: bold 9px var(--tiny); padding: 2px 7px; border-radius: 9px; background: #e6f4e6; color: #2f7a2f; border: 1px solid #b8deb8; white-space: nowrap; }
+.pill.off { background: #fdeaea; color: #c0392b; border-color: #f0b9b9; }
+.pill.wait { background: #fff4dc; color: #b7791f; border-color: #ecd29b; }
+.gchips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.gchip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: var(--soft); border: 1px solid var(--line); padding: 1px 6px 1px 2px; border-radius: 10px; }
+.gchip img, .gchip .gi { width: 14px; height: 14px; border-radius: 50%; background: #5865f2; color: #fff; display: inline-grid; place-items: center; font-size: 8px; }
+.li .ic { width: 32px; height: 32px; border-radius: 50%; background: #5865f2; color: #fff; display: grid; place-items: center; font: 900 14px Arial; flex: none; }
+.li .ic.plex { border-radius: 6px; background: #1f1f1f; color: #e5a00d; }
+.li .acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }

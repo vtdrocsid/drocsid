@@ -19,6 +19,8 @@ function toast(msg) {
 }
 
 let state;
+let conns = null;      // Admin → Connections (super admins only)
+let selGuild = null;   // server shown in Access by server
 
 async function save(patch) {
   try {
@@ -56,24 +58,36 @@ function render() {
     const el = document.createElement('div');
     el.className = 'li';
     el.innerHTML = `<div class="grow"><div><b>${esc(st.title)}</b> ${st.playing ? '' : '(paused)'}</div>
-      <div class="sub">🔊 ${esc(st.voiceChannel)} · ${st.viewers} watching · started by ${esc(st.startedBy)} · ${esc(st.qualityLabel)} · ${st.duration ? `${fmt(st.position)} / ${fmt(st.duration)}` : 'LIVE'}</div></div>
+      <div class="sub">🔊 ${esc(st.voiceChannel)}${st.guildName && (state.guilds || []).length > 1 ? ` (${esc(st.guildName)})` : ''} · ${st.viewers} watching · started by ${esc(st.startedBy)} · ${esc(st.qualityLabel)} · ${st.duration ? `${fmt(st.position)} / ${fmt(st.duration)}` : 'LIVE'}</div></div>
       <button class="btn sm danger">Stop</button>`;
     $('button', el).onclick = async () => { await api('/api/admin/stop', { method: 'POST', body: JSON.stringify({ voiceChannelId: st.voiceChannelId }) }); load(); };
     streams.append(el);
   });
 
-  // roles
-  $('#roles').innerHTML = directory.roles.map((r) => `<label class="row"><input type="checkbox" value="${r.id}" ${s.approvedRoleIds.includes(r.id) ? 'checked' : ''}>
-    <span style="color:${r.color === '#000000' ? 'inherit' : r.color}">${esc(r.name)}</span></label>`).join('') || '<p class="muted">No roles found.</p>';
-  $('#roles').onchange = () => save({ approvedRoleIds: [...document.querySelectorAll('#roles input:checked')].map((i) => i.value) });
+  // access by server: tabs, then that server's approved roles and users
+  const guilds = state.guilds || [];
+  $('#noGuilds').hidden = guilds.length > 0;
+  $('#guildAccess').hidden = $('#guildTabs').hidden = !guilds.length;
+  if (!guilds.some((g) => g.id === selGuild)) selGuild = guilds[0]?.id || null;
+  const icon = (g, cls = 'gi') => (g.icon ? `<img src="${esc(g.icon)}" alt="">` : `<span class="${cls}">${esc((g.name || '?')[0])}</span>`);
+  $('#guildTabs').innerHTML = guilds.map((g) => `<button data-g="${g.id}" class="${g.id === selGuild ? 'active' : ''}">${icon(g)} ${esc(g.name)}
+    <span class="cnt">· ${g.roleIds.length + g.approvedUsers.length}</span></button>`).join('');
+  $('#guildTabs').querySelectorAll('[data-g]').forEach((b) => { b.onclick = () => { selGuild = b.dataset.g; render(); }; });
+  const g = guilds.find((x) => x.id === selGuild);
+  if (g) {
+    $('#roles').innerHTML = g.roles.map((r) => `<label class="row"><input type="checkbox" value="${r.id}" ${g.roleIds.includes(r.id) ? 'checked' : ''}>
+      <span style="color:${r.color === '#000000' ? 'inherit' : r.color}">${esc(r.name)}</span></label>`).join('') || '<p class="muted">No roles found.</p>';
+    $('#roles').onchange = () => save({ guildAccess: { [g.id]: { roleIds: [...document.querySelectorAll('#roles input:checked')].map((i) => i.value) } } });
+    const users = $('#users');
+    users.innerHTML = g.approvedUsers.length ? '' : '<p class="muted">None yet.</p>';
+    const ids = g.approvedUsers.map((u) => u.id);
+    g.approvedUsers.forEach((u) => users.append(person(u, true, () => save({ guildAccess: { [g.id]: { userIds: ids.filter((id) => id !== u.id) } } }))));
+    const inGuild = new Set(g.memberIds);
+    $('#guildMemberList').innerHTML = directory.members.filter((m) => inGuild.has(m.id)).map((m) => `<option value="${esc(`${m.name} (@${m.username})`)}">`).join('');
+  }
 
-  // members datalist
+  // members datalist (everyone the bots can see, for the admin pickers)
   $('#memberList').innerHTML = directory.members.map((m) => `<option value="${esc(`${m.name} (@${m.username})`)}">`).join('');
-
-  // users
-  const users = $('#users');
-  users.innerHTML = state.approvedUsers.length ? '' : '<p class="muted">None yet.</p>';
-  state.approvedUsers.forEach((u) => users.append(person(u, true, () => save({ approvedUserIds: s.approvedUserIds.filter((id) => id !== u.id) }))));
 
   // admins: super admins (owners + promoted) and regular admins
   const isSuper = state.role === 'super';
@@ -86,6 +100,7 @@ function render() {
   const admins = $('#admins');
   admins.innerHTML = state.admins.length ? '' : '<p class="muted">None yet.</p>';
   state.admins.forEach((u) => admins.append(person(u, true, () => save({ adminUserIds: s.adminUserIds.filter((id) => id !== u.id) }))));
+  if (isSuper) renderConnections();
   if (!isSuper) {
     $('#viewRequiresApproval').checked = s.viewRequiresApproval;
     $('#announceInVoiceChat').checked = s.announceInVoiceChat;
@@ -133,7 +148,74 @@ const addUser = (input, key) => {
   $(input).value = '';
   save({ [key]: [...state.settings[key], id] });
 };
-$('#userAddBtn').onclick = () => addUser('#userAdd', 'approvedUserIds');
+$('#userAddBtn').onclick = () => {
+  const g = (state.guilds || []).find((x) => x.id === selGuild);
+  if (!g) return;
+  const id = resolveUser($('#userAdd').value);
+  if (!id) return toast('Pick someone from the list or paste a user ID');
+  const ids = g.approvedUsers.map((u) => u.id);
+  if (ids.includes(id)) return toast('Already approved in this server');
+  $('#userAdd').value = '';
+  save({ guildAccess: { [g.id]: { userIds: [...ids, id] } } });
+};
+
+// ---------- Connections (super admins) ----------
+function renderConnections() {
+  if (!conns) return;
+  $('#pubUrl').textContent = conns.publicUrl || 'Not set';
+  const icon = (g) => (g.icon ? `<img src="${esc(g.icon)}" alt="">` : `<span class="gi">${esc((g.name || '?')[0])}</span>`);
+  const apps = $('#apps');
+  apps.innerHTML = conns.discordApps.length ? '' : '<p class="muted">No Discord apps.</p>';
+  conns.discordApps.forEach((a) => {
+    const pill = a.status === 'online' ? '<span class="pill">Online</span>' : a.status === 'error' ? '<span class="pill off">Error</span>' : '<span class="pill wait">Starting</span>';
+    const el = document.createElement('div');
+    el.className = 'li';
+    el.innerHTML = `${a.user?.avatar ? `<img src="${esc(a.user.avatar)}" alt="" style="border-radius:50%">` : `<span class="ic">${esc((a.name || '?')[0])}</span>`}
+      <div class="grow"><div><b>${esc(a.name)}</b> ${pill} ${a.primary ? '<span class="pill wait" title="Used for Sign in with Discord on the website">Web sign-in</span>' : ''}</div>
+        <div class="sub">${esc(a.user?.tag || a.botUser || '')} · App ID ${esc(a.id)}${a.error ? ` · <span class="error">${esc(a.error)}</span>` : ''}</div>
+        <div class="gchips">${a.guilds.length ? a.guilds.map((g) => `<span class="gchip">${icon(g)}${esc(g.name)}</span>`).join('') : '<span class="sub">Not in any server yet</span>'}</div></div>
+      <div class="acts">
+        <a class="btn sm" href="${esc(a.invite)}" target="_blank" rel="noopener">Invite to server</a>
+        <a class="btn sm" href="/setup/?add=discord&app=${encodeURIComponent(a.id)}">Edit</a>
+        ${a.primary ? '' : '<button class="btn sm" data-act="primary">Use for web sign-in</button>'}
+        <button class="btn sm danger" data-act="remove">Remove</button>
+      </div>`;
+    el.querySelector('[data-act=primary]')?.addEventListener('click', () => connAct(`/api/connections/discord/${a.id}/primary`, 'POST'));
+    el.querySelector('[data-act=remove]').onclick = () => {
+      if (confirm(`Remove ${a.name}? Its bot goes offline and streams in its servers stop working.`)) connAct(`/api/connections/discord/${a.id}`, 'DELETE');
+    };
+    apps.append(el);
+  });
+  const media = $('#media');
+  media.innerHTML = conns.plexServers.length ? '' : '<p class="muted">No media server connected.</p>';
+  conns.plexServers.forEach((p) => {
+    const el = document.createElement('div');
+    el.className = 'li';
+    const h = plexHealth[p.id];
+    el.innerHTML = `<span class="ic plex">▶</span>
+      <div class="grow"><div><b>${esc(p.name)}</b> <span class="muted small">Plex</span> ${h ? (h.ok ? '<span class="pill">Online</span>' : '<span class="pill off">Offline</span>') : '<span class="pill wait">Checking</span>'}</div>
+        <div class="sub">${esc(p.url)}${h?.ok ? ` · ${h.libraries} libraries · Plex ${esc(h.version)} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}</div></div>
+      <div class="acts"><button class="btn sm" data-act="test">Test</button></div>`;
+    el.querySelector('[data-act=test]').onclick = () => checkPlex(p, true);
+    media.append(el);
+  });
+  $('#plexChange').textContent = conns.plexServers.length ? 'Change Plex server' : '+ Connect Plex';
+}
+const plexHealth = {};
+async function checkPlex(p, announce = false) {
+  try { plexHealth[p.id] = await api('/api/connections/plex/test', { method: 'POST', body: JSON.stringify({ url: p.url, serverId: p.id }) }); }
+  catch (e) { plexHealth[p.id] = { ok: false, error: e.message }; }
+  if (announce) toast(plexHealth[p.id].ok ? 'Plex is online' : plexHealth[p.id].error);
+  renderConnections();
+}
+async function connAct(url, method, body) {
+  try { conns = { ...conns, ...(await api(url, { method, body: body ? JSON.stringify(body) : undefined })) }; toast('Saved'); load(); }
+  catch (e) { toast(e.message); }
+}
+$('#pubEdit').onclick = () => {
+  const url = prompt('Public https address (no path):', conns?.publicUrl || '');
+  if (url) connAct('/api/connections/public-url', 'PUT', { publicUrl: url });
+};
 $('#adminAddBtn').onclick = () => {
   const id = resolveUser($('#adminAdd').value);
   if (id && (state.settings.superAdminUserIds.includes(id) || state.owners.some((o) => o.id === id))) return toast('Already a super admin');
@@ -158,6 +240,11 @@ async function load() {
     $('#today').textContent = `${d.toLocaleDateString('en-US', { weekday: 'long' })} ${d.toLocaleDateString('en-US', { month: 'long' })} ${d.getDate()}, ${d.getFullYear()}`;
     if (me.version) { const v = document.createElement('span'); v.className = 'ver'; v.textContent = ` · v${me.version}`; $('#today').append(v); }
     state = await api('/api/admin/state');
+    if (state.role === 'super') {
+      const first = !conns;
+      conns = await api('/api/connections').catch(() => conns);
+      if (first) conns?.plexServers.forEach((p) => checkPlex(p));
+    }
     $('#msg').hidden = true;
     $('#admin').hidden = false;
     if (!document.activeElement || !$('#admin').contains(document.activeElement) || document.activeElement.tagName === 'BUTTON') render();
@@ -166,5 +253,5 @@ async function load() {
     $('#msg').textContent = e.status === 403 ? 'Admins only.' : e.message;
   }
 }
-load();
+load().then(() => { if (location.hash === '#connections') $('#connections')?.scrollIntoView(); });
 setInterval(() => { if (!document.hidden) load(); }, 10_000);

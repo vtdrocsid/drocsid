@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-11-23
+- **Setup wizard** at `/setup/`: setup code from the container log, public address, Discord app (with checks for the bot token, client secret, Server Members Intent, Activities and the sign-in redirect), inviting the bot, owner sign-in, and Plex (Sign in with Plex or address + token).
+- **Several Discord apps (bots)**, each invitable to any servers you manage. The Activity signs in with whichever app it was launched from.
+- **Admin → Connections** (super admins only): public address, Discord apps with status, servers and invite links, and the Plex server with a live check.
+- **Access by server**: approved roles and users are now set per Discord server. Admins manage these; only super admins manage connections.
+- Voice and text channel pickers group channels by server when there is more than one; announcements go to a text channel in the same server.
+- Secrets (client secrets, bot tokens, Plex token) are stored encrypted in `/data/connections.json`, key in `/data/secret.key`.
+- Existing installs: settings are imported from the `.env` variables on first start, and approved roles and users move to your existing server. Nothing to click.
+
 ## 0.2.38 — 2026-11-23
 - Top bar: date reads "MONDAY NOVEMBER 23, 2026"; the version is white, like the Admin link.
 

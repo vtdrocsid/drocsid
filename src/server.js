@@ -16,6 +16,8 @@ import { groupPlaylist, parseGroup, GROUP } from './hlsgroup.js';
 import * as history from './history.js';
 import * as progress from './progress.js';
 import * as schedule from './schedule.js';
+import * as conn from './connections.js';
+import { setupRoutes, setupGate, claimOwner } from './setup.js';
 import { readFileSync } from 'node:fs';
 
 const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -40,7 +42,7 @@ app.use((req, res, next) => {
 });
 
 const COOKIE = 'pc_session';
-const REDIRECT_URI = `${config.publicUrl}/auth/callback`;
+const redirectUri = () => `${config.publicUrl}/auth/callback`;
 
 // ---------- helpers ----------
 function cookies(req) {
@@ -51,12 +53,19 @@ function tokenOf(req) {
   if (h.startsWith('Bearer ')) return h.slice(7);
   return cookies(req)[COOKIE] || req.query.token || null;
 }
-async function approved(session) {
-  if (session.approvedVer === settingsMod.version && Date.now() - session.approvedAt < 2 * 60_000) return session.approved;
-  session.approved = await auth.isApproved(session.userId);
+/** Servers the user is approved in (cached on the session briefly). Approved anywhere = may browse. */
+async function guildsOf(session) {
+  if (session.approvedVer === settingsMod.version && Date.now() - session.approvedAt < 2 * 60_000) return session.guilds;
+  session.guilds = await auth.approvedGuilds(session.userId);
   session.approvedAt = Date.now();
   session.approvedVer = settingsMod.version;
-  return session.approved;
+  return session.guilds;
+}
+async function approved(session) {
+  return auth.isAdmin(session.userId) || (await guildsOf(session)).length > 0;
+}
+async function approvedIn(session, guildId) {
+  return auth.isAdmin(session.userId) || (await guildsOf(session)).includes(guildId);
 }
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -85,6 +94,9 @@ const needViewer = wrap(async (req, res, next) => {
   next();
 });
 
+// Until setup is finished, only the setup wizard is reachable.
+app.use(setupGate);
+
 // ---------- entry points ----------
 // Discord loads the Activity at "/" with ?frame_id=...; browsers get the portal.
 app.get('/', (req, res) => {
@@ -107,19 +119,22 @@ app.use('/browse', express.static(path.join(root, 'web')));
 
 // ---------- web login (Discord OAuth2) ----------
 app.get('/auth/login', (req, res) => {
+  if (!config.clientId) return res.redirect('/setup/');
   const state = crypto.randomBytes(16).toString('hex');
   res.cookie('pc_state', state, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 600_000 });
   const url = new URL('https://discord.com/oauth2/authorize');
-  url.search = new URLSearchParams({ client_id: config.clientId, response_type: 'code', scope: 'identify', redirect_uri: REDIRECT_URI, state, prompt: 'none' });
+  url.search = new URLSearchParams({ client_id: config.clientId, response_type: 'code', scope: 'identify', redirect_uri: redirectUri(), state, prompt: 'none' });
   res.redirect(url.toString());
 });
 
 app.get('/auth/callback', wrap(async (req, res) => {
   if (!req.query.code || req.query.state !== cookies(req).pc_state) return res.status(400).send('Login failed, please try again.');
-  const { user } = await auth.exchangeCode(String(req.query.code), REDIRECT_URI);
+  const { user } = await auth.exchangeCode(String(req.query.code), redirectUri());
   const token = auth.createSession(user);
   res.clearCookie('pc_state');
   res.cookie(COOKIE, token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 12 * 3600_000 });
+  // During setup, whoever signs in with the setup code unlocked becomes an owner.
+  if (!conn.isConfigured()) { claimOwner(req, user); return res.redirect('/setup/'); }
   res.redirect('/browse/');
 }));
 
@@ -130,10 +145,13 @@ app.post('/auth/logout', (req, res) => {
 });
 
 // ---------- Activity login ----------
-app.get('/api/config', (req, res) => res.json({ clientId: config.clientId, publicUrl: config.publicUrl }));
+// The Activity runs at <application id>.discordsays.com, so each Discord app's Activity
+// says which app it is and signs in with that app's credentials.
+const appFor = (id) => (id && conn.app(String(id))) || conn.primaryApp();
+app.get('/api/config', (req, res) => res.json({ clientId: appFor(req.query.app)?.id || '', publicUrl: config.publicUrl, configured: conn.isConfigured() }));
 
 app.post('/api/token', wrap(async (req, res) => {
-  const { access_token, user } = await auth.exchangeCode(String(req.body.code || ''));
+  const { access_token, user } = await auth.exchangeCode(String(req.body.code || ''), null, appFor(req.body.clientId)?.id);
   const token = auth.createSession(user);
   const s = auth.getSession(token);
   res.json({ access_token, token, user: { id: user.id, name: s.username }, approved: await approved(s) });
@@ -220,20 +238,23 @@ app.get('/api/logo', needSession, needApproved, wrap(async (req, res) => {
   Readable.fromWeb(upstream.body).pipe(res);
 }));
 
-app.get('/api/voice', needSession, needApproved, (req, res) => {
+// Voice and text channels in the servers this user is approved in, grouped by server in the UI.
+app.get('/api/voice', needSession, needApproved, wrap(async (req, res) => {
+  const guilds = await guildsOf(req.session);
   res.json({
     current: auth.voiceChannelOf(req.session.userId),
     qualities: QUALITY_PRESETS.map(({ id, label }) => ({ id, label })),
-    channels: auth.voiceChannels().map((c) => ({ ...c, nowPlaying: rooms.publicState(rooms.get(c.id)) })),
-    textChannels: auth.textChannels(),
+    channels: auth.voiceChannels(guilds).map((c) => ({ ...c, nowPlaying: rooms.publicState(rooms.get(c.id)) })),
+    textChannels: auth.textChannels(guilds),
   });
-});
+}));
 
 app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
   const { source, ratingKey, channelId: liveId, voiceChannelId, replace = false, stopMine = false, announceChannelId, startAt = 0 } = req.body || {};
   const channels = auth.voiceChannels();
   const channel = channels.find((c) => c.id === voiceChannelId);
   if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
+  if (!(await approvedIn(req.session, channel.guildId))) return res.status(403).json({ error: `You aren't approved in ${channel.guildName}.` });
   const me = { id: req.session.userId, name: req.session.username };
   const isAdmin = auth.isAdmin(me.id);
 
@@ -260,7 +281,7 @@ app.post('/api/play', needSession, needApproved, wrap(async (req, res) => {
 
   const item = await resolveItem(source, ratingKey, liveId);
   await startStream(channel, item, me, { startAt: Number(startAt) || 0 });
-  if (announceChannelId && auth.textChannels().some((c) => c.id === announceChannelId)) {
+  if (announceChannelId && auth.textChannels([channel.guildId]).some((c) => c.id === announceChannelId)) {
     announceNowPlaying(announceChannelId, { item, voiceChannelId: channel.id, startedBy: me.name });
   }
   res.json({ ok: true, state: rooms.publicState(rooms.get(voiceChannelId)) });
@@ -275,9 +296,9 @@ async function resolveItem(source, ratingKey, liveId) {
 
 /** Start a stream in a voice channel, record it in play history, and announce it. */
 async function startStream(channel, item, user, { scheduled = false, startAt = 0 } = {}) {
-  await rooms.start(channel.id, config.guildId, item, user, settings().quality, startAt);
+  await rooms.start(channel.id, channel.guildId || null, item, user, settings().quality, startAt);
   const room = rooms.get(channel.id);
-  room.historyId = history.begin({ item, voiceChannelId: channel.id, voiceChannelName: channel.name, startedBy: user.name, startedById: user.id, scheduled });
+  room.historyId = history.begin({ item, guildId: channel.guildId || null, voiceChannelId: channel.id, voiceChannelName: channel.name, startedBy: user.name, startedById: user.id, scheduled });
   // Anyone already watching in the Activity counts as a watcher of the new title.
   subs.get(channel.id)?.forEach((ws) => history.addWatcher(room.historyId, ws.username));
   rooms.setViewers(channel.id, subs.get(channel.id)?.size || 0);
@@ -309,7 +330,8 @@ setInterval(() => {
 // ---------- Watching Now (left rail) ----------
 // Every voice channel with a stream: what's on, how far along, and who has the player open.
 app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
-  const list = rooms.all();
+  const mine = await guildsOf(req.session);
+  const list = rooms.all().filter((r) => !r.guildId || mine.includes(r.guildId));
   const voice = auth.voiceChannels();
   let guide = null;
   const liveIds = list.filter((r) => r.item.source === 'live').map((r) => r.item.channelId);
@@ -322,7 +344,7 @@ app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
     const seen = new Set();
     const viewers = [...(subs.get(room.id) || [])]
       .filter((ws) => ws.userId && !seen.has(ws.userId) && seen.add(ws.userId))
-      .map((ws) => auth.memberCard(ws.userId, ws.username));
+      .map((ws) => auth.memberCard(ws.userId, ws.username, room.guildId));
     const entry = {
       voiceChannelId: room.id, voiceChannelName: ch?.name || 'Voice channel',
       title: st.title, source: st.source, playing: st.playing, position: st.position, duration: st.duration,
@@ -339,12 +361,14 @@ app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
 }));
 
 // ---------- play history & lineup API ----------
-app.get('/api/history', needSession, needApproved, (req, res) => {
+app.get('/api/history', needSession, needApproved, wrap(async (req, res) => {
   const live = new Set(rooms.all().map((r) => r.historyId));
-  res.json(history.list(Math.min(100, Number(req.query.limit) || 30)).map(({ programThumb, ...e }) => ({
+  const mine = await guildsOf(req.session);
+  const limit = Math.min(100, Number(req.query.limit) || 30);
+  res.json(history.list(500).filter((e) => !e.guildId || mine.includes(e.guildId)).slice(0, limit).map(({ programThumb, ...e }) => ({
     ...e, playing: live.has(e.id), programPoster: programThumb ? `/api/history/${e.id}/poster` : null,
   })));
-});
+}));
 
 // Poster of the live programme recorded in a history entry (fetched through Plex's photo transcoder).
 app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, res) => {
@@ -357,14 +381,16 @@ app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, r
   Readable.fromWeb(upstream.body).pipe(res);
 }));
 
-app.get('/api/schedule', needSession, needApproved, (req, res) => {
-  res.json(schedule.upcoming().map((x) => ({ ...x, mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
-});
+app.get('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
+  const mine = await guildsOf(req.session);
+  res.json(schedule.upcoming().filter((x) => !x.guildId || mine.includes(x.guildId)).map((x) => ({ ...x, mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
+}));
 
 app.post('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
   const { source, ratingKey, channelId: liveId, voiceChannelId, at } = req.body || {};
   const channel = auth.voiceChannels().find((c) => c.id === voiceChannelId);
   if (!channel) return res.status(400).json({ error: 'Pick a voice channel' });
+  if (!(await approvedIn(req.session, channel.guildId))) return res.status(403).json({ error: `You aren't approved in ${channel.guildName}.` });
   const when = Number(at);
   if (!when || when < Date.now() + 60_000) return res.status(400).json({ error: 'Pick a time at least a minute from now' });
   if (when > Date.now() + 60 * 86400_000) return res.status(400).json({ error: 'Pick a time within the next 60 days' });
@@ -374,7 +400,7 @@ app.post('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
   const entry = schedule.add({
     at: when, source: item.source, ratingKey: item.ratingKey || null, channelId: item.channelId || null,
     title: item.title, thumb: item.thumb || null, duration: item.duration || 0,
-    voiceChannelId: channel.id, voiceChannelName: channel.name, by: req.session.username, byId: req.session.userId,
+    guildId: channel.guildId, voiceChannelId: channel.id, voiceChannelName: channel.name, by: req.session.username, byId: req.session.userId,
   });
   console.log(`[lineup] ${entry.by} scheduled ${entry.title} in ${entry.voiceChannelName} for ${new Date(entry.at).toISOString()}`);
   res.json(entry);
@@ -436,8 +462,19 @@ app.post('/api/control', needSession, needApproved, wrap(async (req, res) => {
 app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
   const s = settings();
   const sup = auth.isSuperAdmin(req.session.userId);
-  const [directory, libs] = await Promise.all([auth.guildDirectory(), sup ? plex.libraries({ all: true }).catch(() => []) : []]);
-  const named = (ids) => Promise.all(ids.map((id) => directory.members.find((m) => m.id === id) || auth.lookupUser(id)));
+  const guildList = auth.guildList();
+  const [dirs, libs] = await Promise.all([
+    Promise.all(guildList.map((g) => auth.guildDirectory(g.id).catch(() => ({ roles: [], members: [] })))),
+    sup ? plex.libraries({ all: true }).catch(() => []) : [],
+  ]);
+  // Everyone the bots can see, once each, for the name pickers.
+  const everyone = new Map();
+  dirs.forEach((d) => d.members.forEach((m) => everyone.has(m.id) || everyone.set(m.id, m)));
+  const named = (ids) => Promise.all(ids.map((id) => everyone.get(id) || auth.lookupUser(id)));
+  const guilds = await Promise.all(guildList.map(async (g, i) => {
+    const a = auth.accessFor(g.id);
+    return { ...g, roles: dirs[i].roles, memberIds: dirs[i].members.map((m) => m.id), roleIds: a.roleIds, approvedUsers: await named(a.userIds) };
+  }));
   res.json({
     role: sup ? 'super' : 'admin',
     settings: settingsFor(req.session.userId, s), // regular admins don't get library or Live TV details
@@ -445,13 +482,14 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
     owners: await named(config.ownerIds),
     superAdmins: await named(s.superAdminUserIds || []),
     admins: await named(s.adminUserIds),
-    approvedUsers: await named(s.approvedUserIds),
-    directory,
+    guilds,
+    directory: { members: [...everyone.values()].sort((a, b) => a.name.localeCompare(b.name)) },
     libraries: sup ? libs : undefined,
     live: sup ? await plex.liveStatus() : undefined,
     streams: rooms.all().map((r) => ({
       voiceChannelId: r.id,
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
+      guildName: auth.guildList().find((g) => g.id === r.guildId)?.name || '',
       viewers: r.viewers,
       ...rooms.publicState(r),
       qualityLabel: QUALITY_PRESETS.find((q) => q.id === r.quality)?.label || '',
@@ -591,6 +629,9 @@ app.use('/media/t/:token/plex', pathSession, needViewer, wrap(async (req, res) =
   else res.end();
 }));
 
+// ---------- setup wizard & Admin → Connections ----------
+setupRoutes(app, { wrap, tokenOf });
+
 app.use((err, req, res, _next) => {
   console.error(err);
   res.status(err.status || 500).json({ error: err.message || 'Server error' });
@@ -619,7 +660,8 @@ export function startServer() {
     console.log(`[ws] ${session.username} connected to ${roomId}`);
     ws.username = session.username;
     ws.userId = session.userId;
-    const isApproved = await approved(session);
+    const guildId = rooms.get(roomId)?.guildId || auth.voiceChannels().find((c) => c.id === roomId)?.guildId;
+    const isApproved = guildId ? await approvedIn(session, guildId) : await approved(session);
     const inChannel = auth.voiceChannelOf(session.userId) === roomId;
     if (!inChannel && !isApproved) return ws.close(4003, 'join the voice channel first');
     if (settings().viewRequiresApproval && !isApproved) return ws.close(4003, 'not approved');
@@ -655,5 +697,5 @@ export function startServer() {
     }
   }, 5000).unref();
 
-  server.listen(config.port, () => console.log(`Web server on :${config.port} (${config.publicUrl})`));
+  server.listen(config.port, () => console.log(`Web server on :${config.port} (${config.publicUrl || 'public URL not set yet'})`));
 }

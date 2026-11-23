@@ -25,28 +25,49 @@
         <div id="streams" class="list"></div>
       </section>
 
-      <section class="panel">
-        <h2>Approved roles</h2>
-        <p class="desc">Anyone with one of these Discord roles can browse and start streams.</p>
-        <div id="roles" class="checks"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Approved users</h2>
-        <p class="desc">Individual people approved regardless of role.</p>
-        <div class="row"><input id="userAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="userAddBtn">Add</button></div>
-        <div id="users" class="list"></div>
+      <section class="panel" style="grid-column: 1 / -1">
+        <h2>Access by server</h2>
+        <p class="desc">Who can browse and start streams, set separately for each Discord server a drocsid bot is in. Admins are approved everywhere.</p>
+        <div id="guildTabs" class="gtabs"></div>
+        <div id="guildAccess" class="access-cols">
+          <div>
+            <h3 class="sub-h">Approved roles</h3>
+            <p class="desc">Anyone with one of these roles in this server.</p>
+            <div id="roles" class="checks"></div>
+          </div>
+          <div>
+            <h3 class="sub-h">Approved users</h3>
+            <p class="desc">Individual people approved in this server regardless of role.</p>
+            <div class="row"><input id="userAdd" list="guildMemberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="userAddBtn">Add</button></div>
+            <div id="users" class="list"></div>
+          </div>
+        </div>
+        <p id="noGuilds" class="muted" hidden>No Discord servers yet. A super admin can invite a bot under Connections.</p>
       </section>
 
       <section class="panel">
         <h2>Admins</h2>
-        <p class="desc"><b>Super admins</b> can change everything, including libraries and Live TV. <b>Admins</b> manage users, roles, admins and access, but don't see library or Live TV settings. Owners are set in the container's environment and can't be removed here.</p>
+        <p class="desc"><b>Super admins</b> can change everything, including libraries, Live TV and connections (Discord bots and media servers). <b>Admins</b> manage who is approved in each server, admins and access, but don't see library, Live TV or connection settings. Owners were set during setup and can't be removed here.</p>
         <h3 class="sub-h">Super admins</h3>
         <div class="row" id="superAddRow"><input id="superAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="superAddBtn">Add</button></div>
         <div id="supers" class="list"></div>
         <h3 class="sub-h">Admins</h3>
         <div class="row"><input id="adminAdd" list="memberList" placeholder="Name or Discord user ID" style="flex:1"><button class="btn primary" id="adminAddBtn">Add</button></div>
         <div id="admins" class="list"></div>
+      </section>
+
+      <section class="panel super-only" style="grid-column: 1 / -1" id="connections">
+        <h2>Connections</h2>
+        <p class="desc">Discord apps (bots), the servers they're in, and your media servers. Only super admins see this.</p>
+        <h3 class="sub-h">Public address</h3>
+        <div class="li"><div class="grow"><div id="pubUrl"></div><div class="sub">Where people and Discord reach drocsid</div></div><button class="btn sm" id="pubEdit">Change</button></div>
+        <h3 class="sub-h">Discord apps</h3>
+        <div id="apps" class="list"></div>
+        <a class="btn" href="/setup/?add=discord">+ Add Discord app</a>
+        <h3 class="sub-h">Media servers</h3>
+        <div id="media" class="list"></div>
+        <a class="btn" href="/setup/?add=plex" id="plexChange">Change Plex server</a>
+        <span class="muted small">&nbsp; Jellyfin, Emby and more than one Plex server are coming.</span>
       </section>
 
       <section class="panel super-only">
@@ -71,6 +92,7 @@
   </main>
   </div>
   <datalist id="memberList"></datalist>
+  <datalist id="guildMemberList"></datalist>
   <script type="module" src="admin.js"></script>
 </body>
 </html>

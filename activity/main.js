@@ -26,7 +26,9 @@ function screen(title, html = '') {
 let sdk = null, cfg = null;
 async function signIn() {
   if (!sdk) {
-    cfg = await fetch('/api/config').then((r) => r.json());
+    // Each Discord app's Activity is served from <application id>.discordsays.com.
+    const appId = (location.hostname.match(/^(\d{15,25})\.discordsays\.com$/) || [])[1] || '';
+    cfg = await fetch(`/api/config?app=${appId}`).then((r) => r.json());
     publicUrl = cfg.publicUrl;
     sdk = new DiscordSDK(cfg.clientId);
     await sdk.ready();
@@ -34,7 +36,7 @@ async function signIn() {
   const { code } = await sdk.commands.authorize({
     client_id: cfg.clientId, response_type: 'code', state: '', prompt: 'none', scope: ['identify'],
   });
-  const res = await fetch('/api/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+  const res = await fetch('/api/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, clientId: cfg.clientId }) });
   if (!res.ok) throw new Error('Sign-in failed');
   const auth = await res.json();
   await sdk.commands.authenticate({ access_token: auth.access_token });

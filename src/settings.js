@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.js';
+import * as conn from './connections.js';
 
 const file = path.join(config.dataDir, 'settings.json');
 
@@ -26,8 +27,7 @@ export const VALID = { quality: QUALITY_PRESETS.map((p) => p.id), librarySort: [
 const defaults = {
   superAdminUserIds: [],       // full access incl. libraries & Live TV (in addition to OWNER_USER_IDS)
   adminUserIds: [],            // users, roles, admins, access; no library or Live TV settings
-  approvedUserIds: [],
-  approvedRoleIds: [],
+  guildAccess: {},             // Discord server id -> { userIds: [], roleIds: [] } approved in that server
   viewRequiresApproval: false,
   announceInVoiceChat: true,
   librarySections: [],         // empty = all movie/show libraries
@@ -43,6 +43,20 @@ try {
   current = { ...defaults, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
 } catch { /* first run */ }
 
+// Before per-server approval there was one list for the single server: move it to that server.
+if (current.approvedUserIds || current.approvedRoleIds) {
+  const gid = conn.get().legacyGuildId || process.env.DISCORD_GUILD_ID;
+  if (gid) {
+    if (!current.guildAccess[gid]) {
+      current.guildAccess = { ...current.guildAccess, [gid]: { userIds: current.approvedUserIds || [], roleIds: current.approvedRoleIds || [] } };
+      console.log(`Moved approved users and roles to server ${gid}`);
+    }
+    delete current.approvedUserIds;
+    delete current.approvedRoleIds;
+    try { fs.mkdirSync(config.dataDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify(current, null, 2)); } catch {}
+  }
+}
+
 export const settings = () => current;
 export const findPreset = (id) => QUALITY_PRESETS.find((p) => p.id === id) || QUALITY_PRESETS.find((p) => p.id === defaults.quality);
 
@@ -55,8 +69,18 @@ export function update(patch) {
   if ('adminUserIds' in patch) next.adminUserIds = ids(patch.adminUserIds);
   // Someone is either a super admin or an admin, not both.
   next.adminUserIds = next.adminUserIds.filter((id) => !next.superAdminUserIds.includes(id));
-  if ('approvedUserIds' in patch) next.approvedUserIds = ids(patch.approvedUserIds);
-  if ('approvedRoleIds' in patch) next.approvedRoleIds = ids(patch.approvedRoleIds);
+  // Per-server approval: { guildAccess: { <server id>: { userIds?, roleIds? } } }
+  if (patch.guildAccess && typeof patch.guildAccess === 'object') {
+    next.guildAccess = { ...current.guildAccess };
+    for (const [gid, a] of Object.entries(patch.guildAccess)) {
+      if (!/^\d{5,25}$/.test(gid) || !a || typeof a !== 'object') continue;
+      const was = next.guildAccess[gid] || { userIds: [], roleIds: [] };
+      next.guildAccess[gid] = {
+        userIds: 'userIds' in a ? ids(a.userIds) : was.userIds,
+        roleIds: 'roleIds' in a ? ids(a.roleIds) : was.roleIds,
+      };
+    }
+  }
   if ('librarySections' in patch) next.librarySections = (patch.librarySections || []).map(String);
   if ('libraryOrder' in patch) next.libraryOrder = (patch.libraryOrder || []).map(String).filter((id) => /^\d+$/.test(id));
   if (patch.librarySort && typeof patch.librarySort === 'object') {
