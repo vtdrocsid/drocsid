@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.2 — 2026-11-23
+- With more than one media server, Watching Now, Upcoming Lineup and Play History show which server each entry is from, with a small server icon.
+
 ## 0.4.1 — 2026-11-23
 - With more than one media server, a **Media Servers** section at the top of the left rail shows a tile for each one. Picking a server shows only its libraries (and its Live TV) in the tabs along the top, and its titles in the centre.
 - Admin → Connections: ↑ ↓ set the order of media servers. The first one is selected when Browse opens.

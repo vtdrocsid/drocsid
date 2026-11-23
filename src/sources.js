@@ -283,3 +283,12 @@ export async function liveStatus() {
 }
 
 export function clearLiveCache() { plex.clearLiveCache(); jf.clearLiveCache(); noLive.clear(); }
+
+/** Which server an entry (history, lineup, stream) is from, for the side rails. Only when several servers are set up. */
+export function serverTag(entry) {
+  if (conn.servers().length < 2 || !entry) return undefined;
+  const key = entry.source === 'live' ? entry.channelId : entry.ratingKey;
+  if (!key) return undefined;
+  const { srv } = parseKey(key);
+  return srv ? { id: srv.id, name: srv.name, type: srv.type } : undefined;
+}

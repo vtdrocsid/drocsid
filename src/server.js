@@ -351,6 +351,7 @@ app.get('/api/watching', needSession, needApproved, wrap(async (req, res) => {
       voiceChannelId: room.id, voiceChannelName: ch?.name || 'Voice channel',
       title: st.title, source: st.source, playing: st.playing, position: st.position, duration: st.duration,
       startedBy: st.startedBy, thumb: room.item.thumb || null, channelId: room.item.channelId || null, viewers,
+      server: sources.serverTag(room.item),
     };
     if (st.source === 'live' && guide) {
       const now = Date.now();
@@ -368,7 +369,7 @@ app.get('/api/history', needSession, needApproved, wrap(async (req, res) => {
   const mine = await guildsOf(req.session);
   const limit = Math.min(100, Number(req.query.limit) || 30);
   res.json(history.list(500).filter((e) => !e.guildId || mine.includes(e.guildId)).slice(0, limit).map(({ programThumb, ...e }) => ({
-    ...e, playing: live.has(e.id), programPoster: programThumb ? `/api/history/${e.id}/poster` : null,
+    ...e, playing: live.has(e.id), programPoster: programThumb ? `/api/history/${e.id}/poster` : null, server: sources.serverTag(e),
   })));
 }));
 
@@ -385,7 +386,7 @@ app.get('/api/history/:id/poster', needSession, needApproved, wrap(async (req, r
 
 app.get('/api/schedule', needSession, needApproved, wrap(async (req, res) => {
   const mine = await guildsOf(req.session);
-  res.json(schedule.upcoming().filter((x) => !x.guildId || mine.includes(x.guildId)).map((x) => ({ ...x, mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
+  res.json(schedule.upcoming().filter((x) => !x.guildId || mine.includes(x.guildId)).map((x) => ({ ...x, server: sources.serverTag(x), mine: x.byId === req.session.userId, canDelete: x.byId === req.session.userId || auth.isAdmin(req.session.userId) })));
 }));
 
 app.post('/api/schedule', needSession, needApproved, wrap(async (req, res) => {

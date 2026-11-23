@@ -730,6 +730,7 @@ async function loadWatching() {
       <div class="wn-text">
         <div class="wn-ch"><span class="wn-dot${w.playing ? '' : ' off'}"></span>🔊 ${esc(w.voiceChannelName)}${live ? ' <span class="tag-live">LIVE</span>' : ''}</div>
         <div class="wn-title">${esc(title)}</div>
+        ${srvLine(w, 'wn-srv')}
         ${left ? `<div class="wn-bar"><i style="width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%"></i></div>
         <div class="wn-meta"><span>${esc(left)}</span><span>${esc(right)}</span></div>` : ''}
         <div class="wn-who">${w.viewers.length ? `<span class="avs">${w.viewers.slice(0, 6).map(avatar).join('')}</span><em>${esc(names)}</em>`
@@ -740,6 +741,13 @@ async function loadWatching() {
   }
 }
 setInterval(() => { if (!document.hidden && me?.approved) loadWatching().catch(() => {}); }, 5000);
+
+/** Small server badge for rail entries (only sent when several servers are set up). */
+function srvLine(x, cls = 'r-meta') {
+  if (!x.server) return '';
+  const [typeName, ic, letter] = SERVER_TYPES[x.server.type] || [x.server.type, '', '?'];
+  return `<div class="${cls} r-srv" title="${esc(typeName)}"><span class="srv-mini ${ic}">${letter}</span>${esc(x.server.name || typeName)}</div>`;
+}
 
 async function refreshRails() {
   await Promise.all([loadWatching().catch(() => {}), loadLineup().catch(() => {}), loadHistory().catch(() => {})]);
@@ -756,7 +764,7 @@ async function loadLineup() {
     const row = h(`<div class="r-item">${railThumb(x)}
       <div class="r-text"><div class="r-time">${timeOf(x.at)}${x.source === 'live' ? ' <span class="tag-live">LIVE TV</span>' : ''}</div>
         <div class="r-title" title="${esc(x.title)}">${esc(x.title)}</div>
-        <div class="r-meta">🔊 ${esc(x.voiceChannelName)} · by ${esc(x.by)}</div></div>
+        <div class="r-meta">🔊 ${esc(x.voiceChannelName)} · by ${esc(x.by)}</div>${srvLine(x)}</div>
       ${x.canDelete ? '<button class="r-del" title="Remove from lineup">✕</button>' : ''}</div>`);
     const del = $('.r-del', row);
     if (del) del.onclick = async () => {
@@ -783,6 +791,7 @@ async function loadHistory() {
         ${prog ? `<div class="r-meta">📡 ${esc(x.title)}${x.subtitle ? ` · ${esc(x.subtitle)}` : ''}</div>` : ''}
         <div class="r-meta">${esc(when)} · started by <b>${esc(x.startedBy)}</b>${x.scheduled ? ' 📅' : ''}</div>
         <div class="r-meta">🔊 ${esc(x.voiceChannelName || '')}</div>
+        ${srvLine(x)}
         ${x.watchers?.length ? `<div class="r-who">👥 ${esc(x.watchers.join(', '))}</div>` : ''}</div></div>`));
   });
 }

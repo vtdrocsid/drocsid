@@ -412,3 +412,9 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .srv-tx b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .srv-tx small { color: var(--muted); font-size: 10px; }
 .srv-tile.active .srv-tx b { color: var(--azure); }
+.r-srv, .wn-srv { display: flex; align-items: center; gap: 5px; }
+.wn-srv { font-size: 10px; color: var(--muted); margin: -2px 0 4px; }
+.srv-mini { width: 13px; height: 13px; flex: none; border-radius: 3px; display: inline-grid; place-items: center; font: 900 8px Arial, sans-serif; line-height: 1; }
+.srv-mini.plex { background: #1f1f1f; color: #e5a00d; }
+.srv-mini.jf { background: linear-gradient(135deg, #aa5cc3, #00a4dc); color: #fff; }
+.srv-mini.emby { background: #52b54b; color: #fff; }
