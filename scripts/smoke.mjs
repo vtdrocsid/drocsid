@@ -97,7 +97,7 @@ console.log('Fresh install');
   await check('edit keeps the saved sign-in', async () => {
     const r = await json(base, '/api/connections/media', 'POST', { type: 'jellyfin', serverId: jfId, name: 'Basement' }, cookie);
     assert.equal(r.status, 200, JSON.stringify(r.body));
-    assert.equal(r.body.mediaServers.find((x) => x.id === jfId).name, 'Basement');
+    assert.equal(r.body.mediaServers.find((x) => x.id === jfId).name, 'MockJF'); // the server's own name, not a typed one
     assert.equal(r.body.mediaServers.length, 1);
   });
   await check('health check', async () => {
