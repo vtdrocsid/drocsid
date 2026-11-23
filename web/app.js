@@ -44,6 +44,7 @@ async function boot() {
   if (me.version) $('#today').append(h(`<span class="ver"> · v${esc(me.version)}</span>`));
   // Which Discord: a switcher in the top bar when there's more than one to pick from.
   const gIcon = (g) => (g.all ? '<span class="gi all">★</span>' : g.icon ? `<img class="gi" src="${esc(g.icon)}" alt="">` : `<span class="gi">${esc((g.name || '?')[0])}</span>`);
+  me.guilds = me.guilds || [];
   const sw = me.guilds.length && me.guild
     ? `<div class="gswitch"><button class="gsw-btn" id="gswBtn">${gIcon(me.guild.id === '*' ? { all: true } : me.guilds.find((g) => g.id === me.guild.id) || me.guild)}<b>${esc(me.guild.name)}</b> ▾</button>
         <div class="gsw-menu" id="gswMenu" hidden>${me.guilds.map((g) => `<button data-g="${esc(g.id)}" class="${g.id === me.guild.id ? 'cur' : ''}">${gIcon(g)}<span>${esc(g.name)}</span>${g.all ? '<em class="tag-super">SUPER</em>' : ''}</button>`).join('')}</div></div>`
@@ -218,7 +219,9 @@ function showHover(el, i) {
 // ---------- libraries ----------
 let libsLoaded = false, curLib = null, curLibEl = null, libStart = 0;
 let allLibs = [], curServer = null, guideServer = null;
-const SERVER_TYPES = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
+const SERVER_TYPES = { plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' };
+/** The media server's real logo (web/img), scaled by the class. */
+const srvLogo = (type, cls) => (SERVER_TYPES[type] ? `<img class="${cls}" src="/browse/img/${type}.svg" alt="${SERVER_TYPES[type]}" title="${SERVER_TYPES[type]}">` : '');
 
 async function loadLibraries() {
   libsLoaded = true;
@@ -228,10 +231,10 @@ async function loadLibraries() {
   for (const l of allLibs) if (!servers.some((x) => x.id === l.server)) servers.push({ id: l.server, name: l.serverName || '', type: l.serverType });
   $('#serversBox').hidden = servers.length < 2;
   $('#servers').innerHTML = servers.map((x) => {
-    const [typeName, cls, letter] = SERVER_TYPES[x.type] || [x.type, '', '?'];
+    const typeName = SERVER_TYPES[x.type] || x.type;
     const libs = allLibs.filter((l) => l.server === x.id);
     const n = libs.filter((l) => l.type !== 'live').length;
-    return `<button class="srv-tile" data-server="${esc(x.id)}"><span class="srv-ic ${cls}">${letter}</span>
+    return `<button class="srv-tile" data-server="${esc(x.id)}">${srvLogo(x.type, 'srv-logo')}
       <span class="srv-tx"><b>${esc(x.name || typeName)}</b><small>${typeName} · ${n} ${n === 1 ? 'library' : 'libraries'}${libs.some((l) => l.type === 'live') ? ' · Live TV' : ''}</small></span></button>`;
   }).join('');
   $('#servers').querySelectorAll('[data-server]').forEach((b) => { b.onclick = () => selectServer(b.dataset.server, true); });
@@ -583,7 +586,7 @@ function renderGuide() {
     .forEach((c) => {
       const row = h(`<div class="g-row">
         <div class="g-ch">${c.thumb ? `<img loading="lazy" src="/api/logo?id=${encodeURIComponent(c.id)}" alt="">` : ''}
-          <div class="nm"><div>${esc(c.name)}</div><div class="num">${esc(c.number || '')}${c.serverName ? ` · ${esc(c.serverName)}` : ''}</div></div>
+          <div class="nm"><div>${esc(c.name)}</div><div class="num">${esc(c.number || '')}${c.serverName ? ` · ${srvLogo(c.serverType, 'srv-logo mini')} ${esc(c.serverName)}` : ''}</div></div>
           <button class="btn sm primary" title="Watch live">▶</button></div>
         <div class="g-track" style="width:${width}px"></div></div>`);
       $('.g-ch button', row).onclick = () => choosePlay({ source: 'live', channelId: c.id, title: c.name });
@@ -773,15 +776,13 @@ setInterval(() => { if (!document.hidden && me?.approved) loadWatching().catch((
 /** Inline server icon + name for a search result (only present when several servers are set up). */
 function srvBadge(it) {
   if (!it.serverName) return '';
-  const [typeName, ic, letter] = SERVER_TYPES[it.serverType] || [it.serverType, '', '?'];
-  return `<span class="q-srv" title="${esc(typeName)}"><span class="srv-mini ${ic}">${letter}</span>${esc(it.serverName)}</span>`;
+  return `<span class="q-srv">${srvLogo(it.serverType, 'srv-logo mini')}${esc(it.serverName)}</span>`;
 }
 
 /** Server icon + name for the top right of a rail tile (only sent when several servers are set up). */
 function srvTag(x) {
   if (!x.server) return '';
-  const [typeName, ic, letter] = SERVER_TYPES[x.server.type] || [x.server.type, '', '?'];
-  return `<span class="r-srv" title="${esc(typeName)}"><span class="srv-mini ${ic}">${letter}</span>${esc(x.server.name || typeName)}</span>`;
+  return `<span class="r-srv">${srvLogo(x.server.type, 'srv-logo mini')}${esc(x.server.name || SERVER_TYPES[x.server.type] || '')}</span>`;
 }
 /** A rail tile's title row: the title (trimmed to fit) with the server on the right. */
 const titleRow = (cls, inner, x, tip = '') => (x.server

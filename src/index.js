@@ -14,3 +14,5 @@ startServer();
 // Connections page instead of stopping the container.
 startBot().catch((e) => console.error('Discord bots:', e.message));
 if (!conn.isConfigured()) logSetupCode(true);
+// Use each media server's own name (e.g. an imported "Plex" becomes "VAULT").
+setTimeout(() => import('./sources.js').then((s) => s.refreshNames()).catch(() => {}), 3000);

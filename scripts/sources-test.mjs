@@ -230,6 +230,13 @@ await check('old settings keep Live TV on', async () => {
   assert.equal(st.liveInSections, true);
 });
 
+await check('server names come from the servers themselves', async () => {
+  conn.update((d) => { d.mediaServers.find((x) => x.id === 'jellyfin-aa').name = 'Jellyfin'; });
+  await sources.refreshNames();
+  assert.equal(conn.server('jellyfin-aa').name, 'MockJF');
+  assert.equal(conn.server('plex1').name, 'VAULT'); // unreachable: keeps its saved name
+});
+
 console.log('Server order');
 await check('libraries grouped by server in the admin order', async () => {
   settings.update({ serverOrder: ['emby-bb', 'jellyfin-aa'], libraryOrder: [] });

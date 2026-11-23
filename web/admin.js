@@ -58,7 +58,7 @@ function render() {
     const el = document.createElement('div');
     el.className = 'li';
     el.innerHTML = `<div class="grow"><div><b>${esc(st.title)}</b> ${st.playing ? '' : '(paused)'}</div>
-      <div class="sub">🔊 ${esc(st.voiceChannel)}${st.guildName && (state.guilds || []).length > 1 ? ` (${esc(st.guildName)})` : ''} · ${st.viewers} watching · started by ${esc(st.startedBy)} · ${esc(st.qualityLabel)} · ${st.duration ? `${fmt(st.position)} / ${fmt(st.duration)}` : 'LIVE'}</div></div>
+      <div class="sub">${st.server ? `${srvLogo(st.server.type, 'srv-logo mini')} ${esc(st.server.name)} · ` : ''}🔊 ${esc(st.voiceChannel)}${st.guildName && (state.guilds || []).length > 1 ? ` (${esc(st.guildName)})` : ''} · ${st.viewers} watching · started by ${esc(st.startedBy)} · ${esc(st.qualityLabel)} · ${st.duration ? `${fmt(st.position)} / ${fmt(st.duration)}` : 'LIVE'}</div></div>
       <button class="btn sm danger">Stop</button>`;
     $('button', el).onclick = async () => { await api('/api/admin/stop', { method: 'POST', body: JSON.stringify({ voiceChannelId: st.voiceChannelId }) }); load(); };
     streams.append(el);
@@ -112,7 +112,9 @@ function render() {
 }
 
 // ---------- libraries: one panel per media server ----------
-const SERVER_ICON = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
+const SERVER_TYPES = { plex: 'Plex', jellyfin: 'Jellyfin', emby: 'Emby' };
+/** The media server's real logo (web/img), scaled by the class. */
+const srvLogo = (type, cls) => (SERVER_TYPES[type] ? `<img class="${cls}" src="/browse/img/${type}.svg" alt="${SERVER_TYPES[type]}" title="${SERVER_TYPES[type]}">` : '');
 function renderLibraries() {
   const { settings: s, valid } = state;
   const sortNames = { title: 'A–Z', added: 'Recently added', released: 'Release date' };
@@ -128,10 +130,10 @@ function renderLibraries() {
   const checked = () => [...box.querySelectorAll('input[data-lib]:checked')].map((i) => i.dataset.lib);
   const liveFor = (serverId) => (state.live || []).find((x) => x.server === serverId);
   groups.forEach((g) => {
-    const [typeName, cls, letter] = SERVER_ICON[g.type] || [g.type, '', '?'];
+    const typeName = SERVER_TYPES[g.type] || g.type;
     const panel = document.createElement('section');
     panel.className = 'panel';
-    panel.innerHTML = `<h2 class="h-srv"><span class="srv-ic sm ${cls}">${letter}</span>Libraries${groups.length > 1 ? ` · ${esc(g.name || typeName)}` : ''}</h2>
+    panel.innerHTML = `<h2 class="h-srv">${srvLogo(g.type, 'srv-logo h')}Libraries · ${esc(g.name || typeName)}</h2>
       <p class="desc">Tick the libraries${g.libs.some((l) => l.type === 'live') ? ' (and Live TV)' : ''} to show on the Browse page (none ticked anywhere = show all), pick each one's default sort, and use ↑ ↓ to set their order. The top one opens first.</p>
       <div class="list"></div>`;
     const list = $('.list', panel);
@@ -220,17 +222,16 @@ function renderConnections() {
   });
   const media = $('#media');
   media.innerHTML = conns.mediaServers.length ? '' : '<p class="muted">No media server connected.</p>';
-  const TYPE = { plex: ['Plex', 'plex', '▶'], jellyfin: ['Jellyfin', 'jf', 'J'], emby: ['Emby', 'emby', 'E'] };
   // Browse order: the first server is selected by default on the Browse page.
   const order = state.settings.serverOrder || [];
   const pos = (id) => { const i = order.indexOf(id); return i === -1 ? 1e6 : i; };
   const sorted = conns.mediaServers.map((x, i) => ({ x, i })).sort((a, b) => pos(a.x.id) - pos(b.x.id) || a.i - b.i).map((o) => o.x);
   sorted.forEach((p, idx) => {
-    const [typeName, cls, letter] = TYPE[p.type] || [p.type, '', '?'];
+    const typeName = SERVER_TYPES[p.type] || p.type;
     const el = document.createElement('div');
     el.className = 'li';
     const h = plexHealth[p.id];
-    el.innerHTML = `<span class="ic ${cls}">${letter}</span>
+    el.innerHTML = `${srvLogo(p.type, 'srv-logo')}
       <div class="grow"><div><b>${esc(p.name)}</b> <span class="muted small">${typeName}</span> ${h ? (h.ok ? '<span class="pill">Online</span>' : '<span class="pill off">Offline</span>') : '<span class="pill wait">Checking</span>'}</div>
         <div class="sub">${esc(p.url)}${p.username ? ` · as ${esc(p.username)}` : ''}${h?.ok ? ` · ${h.libraries} movie/TV ${h.libraries === 1 ? 'library' : 'libraries'} · ${h.ms} ms` : h?.error ? ` · <span class="error">${esc(h.error)}</span>` : ''}</div></div>
       <div class="acts">

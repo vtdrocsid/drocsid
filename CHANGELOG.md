@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.2 — 2026-11-23
+- **Real Plex, Jellyfin and Emby logos** (from the open-source dashboard-icons project, Apache-2.0; see web/img/NOTICE.md) replace the letter badges everywhere: Browse server tiles, rail tiles, search results, the TV guide, Admin (Connections, Libraries panels, Active streams) and the setup wizard.
+- **Media servers are named by the servers themselves**: Plex's friendly name, Jellyfin/Emby's server name. Set when connecting (the wizard no longer asks for a name), and kept in sync at startup and on every check, so an imported "Plex" becomes its real name.
+- Libraries panels always show the server's name; Active streams show which media server each stream is from.
+
 ## 0.5.1 — 2026-11-23
 - Access by server: **Approved users** first, then **Approved roles**, then **Admins**. The wording now says plainly that approved users and roles can browse the libraries and play content in that server.
 - **Libraries: one panel per media server**, headed by the server's icon and name. Each server's Live TV is a row in its panel with an On/Off tag and **Reload channels & guide**; the separate Live TV panel is gone.

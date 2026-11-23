@@ -48,7 +48,7 @@ export function claimOwner(req, user) {
 }
 
 // Paths that work before setup is finished.
-const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/];
+const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/, /^\/browse\/img\//];
 
 /** Until setup is finished, send everything else to the wizard. */
 export function setupGate(req, res, next) {
@@ -232,7 +232,8 @@ export function setupRoutes(app, { wrap, tokenOf }) {
     const b = req.body || {};
     const t = await tryServer(b);
     if (!t.ok) return res.status(400).json({ error: t.error });
-    const name = String(b.name || t.name || b.type).trim().slice(0, 60);
+    // The name is the server's own (Plex "friendly name", Jellyfin/Emby "server name").
+    const name = String(t.name || conn.server(b.serverId)?.name || b.type).trim().slice(0, 60);
     conn.update((d) => {
       const rec = {
         type: b.type, name, url: t.url, token: conn.seal(t.token), userId: t.userId || '',
@@ -268,6 +269,7 @@ export function setupRoutes(app, { wrap, tokenOf }) {
   app.get('/api/connections/media/:id/health', needManage, wrap(async (req, res) => {
     const srv = conn.server(req.params.id);
     if (!srv) return res.status(404).json({ error: 'Not found' });
+    await sources.refreshNames([srv]).catch(() => {});
     res.json(await sources.health(srv));
   }));
 

@@ -549,6 +549,7 @@ app.get('/api/admin/state', needSession, needAdmin, wrap(async (req, res) => {
       voiceChannelId: r.id,
       voiceChannel: auth.voiceChannels().find((c) => c.id === r.id)?.name || r.id,
       guildName: auth.guildList().find((g) => g.id === r.guildId)?.name || '',
+      server: sources.serverTag(r.item),
       viewers: r.viewers,
       ...rooms.publicState(r),
       qualityLabel: QUALITY_PRESETS.find((q) => q.id === r.quality)?.label || '',

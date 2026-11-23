@@ -66,7 +66,7 @@ export async function libraries({ all = false } = {}) {
     .filter((l) => all || !allowed.length || allowed.includes(l.id))
     .map((l) => ({ ...l, defaultSort: sorts[l.id] || 'title' }))
     .sort((a, b) => Math.floor(a.rank / 1000) - Math.floor(b.rank / 1000) || (a.type === 'live') - (b.type === 'live') || pos(a.id) - pos(b.id) || a.rank - b.rank)
-    .map(({ rank, multi: m, ...l }) => (m ? l : { ...l, serverName: undefined }));
+    .map(({ rank, multi: m, ...l }) => l);
 }
 
 function checkAllowed(libKey) {
@@ -221,7 +221,7 @@ async function liveServers() {
 }
 
 const tagChannel = (srv, c, multi) => ({
-  ...c, id: prefix(srv, c.id), server: srv.id, serverName: multi ? srv.name : undefined,
+  ...c, id: prefix(srv, c.id), server: srv.id, serverType: srv.type, serverName: multi ? srv.name : undefined,
   thumb: c.thumb ? (srv.type === 'plex' ? prefix(srv, c.thumb) : `${srv.id}~${c.thumb}`) : '',
 });
 const tagProgramme = (srv, p) => ({ ...p, thumb: p.thumb ? (srv.type === 'plex' ? prefix(srv, p.thumb) : `${srv.id}~${p.thumb}`) : '' });
@@ -294,4 +294,28 @@ export function serverTag(entry) {
   if (!key) return undefined;
   const { srv } = parseKey(key);
   return srv ? { id: srv.id, name: srv.name, type: srv.type } : undefined;
+}
+
+/**
+ * Keep each server's name the same as the server's own name (Plex friendly name, Jellyfin/Emby
+ * server name), so renaming it on the server shows up here. Runs at startup and on each check.
+ */
+export async function refreshNames(list = conn.servers()) {
+  for (const srv of list) {
+    let name = '';
+    try {
+      if (srv.type === 'plex') {
+        const r = await fetch(`${srv.url}/`, { headers: { Accept: 'application/json', 'X-Plex-Token': srv.token }, signal: AbortSignal.timeout(6000) });
+        if (r.ok) name = (await r.json()).MediaContainer?.friendlyName || '';
+      } else {
+        const r = await fetch(`${srv.url}/System/Info/Public`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(6000) });
+        if (r.ok) name = (await r.json()).ServerName || '';
+      }
+    } catch { /* offline: keep the saved name */ }
+    name = name.trim().slice(0, 60);
+    if (name && name !== srv.name) {
+      conn.update((d) => { const s = d.mediaServers.find((x) => x.id === srv.id); if (s) s.name = name; });
+      console.log(`[sources] ${srv.type} server "${srv.name}" is now named "${name}" (its own name)`);
+    }
+  }
 }

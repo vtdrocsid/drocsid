@@ -138,9 +138,9 @@ const render = {
 
   mtype() {
     const cards = [
-      ['plex', 'Plex', 'Sign in with Plex, or address + token', '<div class="logo" style="background:#1f1f1f;color:#e5a00d">▶</div>'],
-      ['jellyfin', 'Jellyfin', 'Address + username and password, or an API key', '<div class="logo" style="background:linear-gradient(135deg,#aa5cc3,#00a4dc);color:#fff">J</div>'],
-      ['emby', 'Emby', 'Address + username and password, or an API key', '<div class="logo" style="background:#52b54b;color:#fff">E</div>'],
+      ['plex', 'Plex', 'Sign in with Plex, or address + token', '<img class="logo" src="/browse/img/plex.svg" alt="">'],
+      ['jellyfin', 'Jellyfin', 'Address + username and password, or an API key', '<img class="logo" src="/browse/img/jellyfin.svg" alt="">'],
+      ['emby', 'Emby', 'Address + username and password, or an API key', '<img class="logo" src="/browse/img/emby.svg" alt="">'],
     ];
     $('#body').innerHTML = `<h2>What kind of server?</h2>
       <p class="lead">${mode ? 'Add as many as you like.' : 'You can add more later from Admin → Connections.'} Each one's libraries show up on the Browse page.</p>
@@ -156,7 +156,6 @@ const render = {
       return go('mtype');
     }
     const ex = editServer ? st.mediaServers?.find((x) => x.id === editServer) : null;
-    const nameField = `<div class="field"><label>Name <span class="hint">(optional, shown on Browse)</span></label><input id="srvName" value="${esc(ex?.name || '')}" placeholder="e.g. VAULT"></div>`;
     if (mediaType === 'plex') {
       $('#body').innerHTML = `<h2>${ex ? `Edit ${esc(ex.name)}` : 'Connect Plex'}</h2>
         <p class="lead">Sign in with Plex to pick a server, or enter its address and token yourself.</p>
@@ -167,10 +166,9 @@ const render = {
           <div class="field"><label>Server address</label><input id="plexUrl" value="${esc(ex?.url || '')}" placeholder="http://192.168.1.10:32400"><div class="hint">As reached from the drocsid container.</div></div>
           <div class="field"><label>Plex token</label><input id="plexToken" type="password" autocomplete="off" placeholder="${ex?.hasToken ? 'Saved (leave blank to keep)' : ''}"><div class="hint"><a href="https://support.plex.tv/articles/204059436" target="_blank" rel="noopener">Finding your token</a></div></div>
         </div>
-        ${nameField}
         <button class="btn" id="plexManual">Test &amp; save</button> <span id="manualMsg"></span>`;
       $('#plexSignin').onclick = plexSignin;
-      $('#plexManual').onclick = () => saveServer({ url: $('#plexUrl').value, token: $('#plexToken').value, name: $('#srvName').value }, $('#manualMsg'));
+      $('#plexManual').onclick = () => saveServer({ url: $('#plexUrl').value, token: $('#plexToken').value }, $('#manualMsg'));
       $('#next').disabled = !mediaSaved && !(ex && mode);
       return;
     }
@@ -183,7 +181,6 @@ const render = {
         <div class="field"><label>Password</label><input id="jfPass" type="password" autocomplete="off"></div>
       </div>
       <div class="field"><label>Or an API key</label><input id="jfKey" type="password" autocomplete="off"><div class="hint">${brand} → Dashboard → API Keys. ${ex ? 'Leave all three blank to keep the saved sign-in. ' : ''}A dedicated user that can see only the libraries you want to share is best.</div></div>
-      ${nameField}
       <button class="btn" id="jfTest">Test</button> <span id="jfMsg"></span>`;
     $('#jfTest').onclick = testServer;
   },
@@ -265,7 +262,7 @@ function showServers(pinId, servers) {
   const rank = (c) => (c.relay ? 9 : 0) + (c.local ? 0 : 2) + (c.protocol === 'http' ? 0 : 1);
   $('#servers').innerHTML = servers.map((s, i) => {
     const conns = [...s.connections].sort((a, b) => rank(a) - rank(b));
-    return `<div class="srv"><span class="ic plex">▶</span><div class="grow"><div class="n">${esc(s.name)}</div><div class="m">${s.owned ? 'Your server' : 'Shared with you'} · Plex ${esc(s.version || '')}</div></div>
+    return `<div class="srv"><img class="ic" src="/browse/img/plex.svg" alt="Plex"><div class="grow"><div class="n">${esc(s.name)}</div><div class="m">${s.owned ? 'Your server' : 'Shared with you'} · Plex ${esc(s.version || '')}</div></div>
       <button class="btn primary sm" data-use="${i}">Test &amp; use</button></div>
       <div class="conns">${conns.map((c, j) => `<label><input type="radio" name="conn${i}" value="${esc(c.uri)}" ${j === 0 ? 'checked' : ''}> ${esc(c.uri)} <span class="tag">${c.relay ? 'relay' : c.local ? 'local' : 'remote'}</span></label>`).join('')}
         <label><input type="radio" name="conn${i}" value="custom"> other: <input class="custom" data-for="${i}" placeholder="http://plex:32400" style="font:12px monospace;padding:2px 4px"></label>
@@ -276,7 +273,7 @@ function showServers(pinId, servers) {
       const i = Number(b.dataset.use);
       let url = document.querySelector(`input[name=conn${i}]:checked`)?.value;
       if (url === 'custom') url = document.querySelector(`.custom[data-for="${i}"]`).value;
-      savePlex({ url, pinId, machineId: servers[i].machineId, name: $('#srvName')?.value || servers[i].name }, $(`#useMsg${i}`));
+      savePlex({ url, pinId, machineId: servers[i].machineId, name: servers[i].name }, $(`#useMsg${i}`));
     };
   });
 }
@@ -295,7 +292,7 @@ async function saveServer(body, msgEl) {
   } catch (e) { msgEl.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
 }
 
-const jfFields = () => ({ url: $('#jfUrl').value.trim(), username: $('#jfUser').value.trim(), password: $('#jfPass').value, apiKey: $('#jfKey').value.trim(), name: $('#srvName').value.trim() });
+const jfFields = () => ({ url: $('#jfUrl').value.trim(), username: $('#jfUser').value.trim(), password: $('#jfPass').value, apiKey: $('#jfKey').value.trim() });
 async function testServer() {
   err();
   $('#jfMsg').innerHTML = '<span class="wait">Checking…</span>';

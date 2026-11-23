@@ -449,3 +449,9 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .lib-panels { display: contents; }
 .panel h2.h-srv { display: flex; align-items: center; gap: 7px; }
 .srv-ic.sm { width: 17px; height: 17px; border-radius: 4px; font-size: 9px; }
+
+/* Real media server logos (web/img) */
+.srv-logo { width: 32px; height: 32px; flex: none; object-fit: contain; }
+.srv-logo.mini { width: 14px; height: 14px; }
+.srv-logo.h { width: 17px; height: 17px; }
+.li .srv-logo { width: 32px; height: 32px; border: 0; }
