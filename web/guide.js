@@ -11,15 +11,15 @@ const CSS = `
 .codebox pre { margin: 0; padding: 8px 70px 8px 10px; background: #0f1d2b; color: #d7e6f5; font: 12px/1.6 Consolas, monospace; border-radius: 3px; overflow-x: auto; }
 .codebox .btn { position: absolute; top: 6px; right: 6px; }`;
 
-/** The guide's HTML. `host` is shown in the examples (e.g. the address being set up). */
-export function npmGuide(host = 'tv.yourdomain.com', open = false) {
+/** The guide's HTML. Examples always use example.domain.com (never the real address). */
+export function npmGuide(open = false) {
+  const host = 'example.domain.com';
   if (!document.getElementById('setupGuideCss')) {
     const st = document.createElement('style');
     st.id = 'setupGuideCss';
     st.textContent = CSS;
     document.head.append(st);
   }
-  host = String(host).replace(/[<>&"]/g, '');
   return `        <details class="setup-guide"${open ? ' open' : ''}>
           <summary>How to set up the public address in Nginx Proxy Manager</summary>
           <ol>

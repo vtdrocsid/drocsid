@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.8 — 2026-11-24
+- Set-up instructions and examples always use `example.domain.com`; the guide no longer fills in your own domain.
+
 ## 0.5.7 — 2026-11-24
 - **Public address is explained as required**: Admin → Connections says it must be a public https address with a valid certificate, because Discord loads the player from it and returns people there after signing in.
 - **How to set it up in Nginx Proxy Manager**: step-by-step guide (DNS and ports, proxy host details, Websockets on, Cache Assets off, SSL, the Advanced streaming settings with a Copy button and what each does, checking it, and the Discord Developer Portal entries). Shown in Admin and in the wizard.

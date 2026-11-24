@@ -111,7 +111,7 @@ export function setupRoutes(app, { wrap, tokenOf }) {
 
   app.put('/api/connections/public-url', needManage, (req, res) => {
     let url = String(req.body?.publicUrl || '').trim().replace(/\/+$/, '');
-    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) return res.status(400).json({ error: 'Use the https:// address people open, with no path (e.g. https://tv.example.com)' });
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) return res.status(400).json({ error: 'Use the https:// address people open, with no path (e.g. https://example.domain.com)' });
     conn.update((d) => { d.publicUrl = url.toLowerCase(); });
     res.json(connectionsView());
   });

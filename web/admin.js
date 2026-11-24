@@ -205,7 +205,7 @@ function renderConnections() {
   $('#pubEdit').classList.toggle('primary', !conns.publicUrl);
   if (!$('#npmGuide').dataset.host || $('#npmGuide').dataset.host !== (conns.publicUrl || '')) {
     $('#npmGuide').dataset.host = conns.publicUrl || '';
-    $('#npmGuide').innerHTML = npmGuide(conns.publicUrl ? conns.publicUrl.replace(/^https:\/\//, '') : undefined, !conns.publicUrl);
+    $('#npmGuide').innerHTML = npmGuide(!conns.publicUrl);
   }
   const icon = (g) => (g.icon ? `<img src="${esc(g.icon)}" alt="">` : `<span class="gi">${esc((g.name || '?')[0])}</span>`);
   const apps = $('#apps');

@@ -88,7 +88,7 @@ const render = {
     const https = st.suggestedUrl?.startsWith('https://') ? st.suggestedUrl : '';
     $('#body').innerHTML = `<h2>Your public address</h2>
       <p class="lead">The https address people use to reach drocsid (through your reverse proxy). Discord loads the player from here.</p>
-      <div class="field"><label>Public URL</label><input id="url" value="${esc(st.publicUrl || https)}" placeholder="https://tv.example.com"><div class="hint">No path or trailing slash. It must be reachable from the internet with a valid certificate.</div></div>`;
+      <div class="field"><label>Public URL</label><input id="url" value="${esc(st.publicUrl || https)}" placeholder="https://example.domain.com"><div class="hint">No path or trailing slash. It must be reachable from the internet with a valid certificate.</div></div>`;
   },
 
   discord() {
@@ -146,13 +146,11 @@ const render = {
     const cur = st.publicUrl || '';
     $('#body').innerHTML = `<h2>${cur ? 'Change the public address' : 'Add the public address'}</h2>
       <p class="lead"><b>Required:</b> a public <b>https</b> address with a valid certificate that anyone on the internet can reach. Discord loads the player from it and sends people back to it after <b>Sign in with Discord</b>, so creating a bot and signing in only work with a real public address.</p>
-      <div class="field"><label>Public address</label><input id="pubUrl" value="${esc(cur || (st.suggestedUrl?.startsWith('https://') ? st.suggestedUrl : ''))}" placeholder="https://tv.example.com" autocomplete="off"><div class="hint">No path or trailing slash.</div></div>
+      <div class="field"><label>Public address</label><input id="pubUrl" value="${esc(cur || (st.suggestedUrl?.startsWith('https://') ? st.suggestedUrl : ''))}" placeholder="https://example.domain.com" autocomplete="off"><div class="hint">No path or trailing slash.</div></div>
       <div><button class="btn" id="urlTest">Test</button> <span id="urlMsg"></span></div>
       <ul class="checks" id="urlChecks"></ul>
       <div id="urlGuide" style="margin-top:12px"></div>`;
-    const host = () => { try { return new URL($('#pubUrl').value).host || 'tv.yourdomain.com'; } catch { return 'tv.yourdomain.com'; } };
-    $('#urlGuide').innerHTML = npmGuide(host(), !cur);
-    $('#pubUrl').onchange = () => { $('#urlGuide').innerHTML = npmGuide(host(), true); };
+    $('#urlGuide').innerHTML = npmGuide(!cur);
     $('#urlTest').onclick = () => testAddress();
   },
 
@@ -319,7 +317,7 @@ async function testAddress() {
   $('#urlMsg').innerHTML = '<span class="wait">Checking…</span>';
   $('#urlChecks').innerHTML = '';
   if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) {
-    add(false, 'https address', 'Use the https:// address people open, with no path (e.g. https://tv.example.com).');
+    add(false, 'https address', 'Use the https:// address people open, with no path (e.g. https://example.domain.com).');
     draw(); $('#urlMsg').textContent = ''; return false;
   }
   add(true, 'https address');
