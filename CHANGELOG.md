@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.9 — 2026-11-24
+- Browsers always check for a newer copy of the website's pages, scripts and styles, so changes show up right after an update (0.5.8's example domain didn't appear until a hard refresh because an old cached script was reused).
+
 ## 0.5.8 — 2026-11-24
 - Set-up instructions and examples always use `example.domain.com`; the guide no longer fills in your own domain.
 

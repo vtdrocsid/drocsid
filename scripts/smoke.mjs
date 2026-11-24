@@ -51,6 +51,10 @@ console.log('Fresh install');
     assert.match((await r.json()).instance, /^[0-9a-f]{12}$/);
   });
   await check('/ goes to the wizard', async () => assert.match((await get(base, '/')).headers.get('location') || '', /\/setup\/$/));
+  await check('page scripts are always re-checked (no stale copies after an update)', async () => {
+    const r = await get(base, '/browse/style.css');
+    assert.equal(r.headers.get('cache-control'), 'no-cache');
+  });
   await check('wizard page loads', async () => assert.match(await (await get(base, '/setup/')).text(), /drocsid/));
   await check('portal API is closed', async () => assert.equal((await json(base, '/api/libraries')).status, 503));
   await check('setup code is in the log', async () => assert.match(s.log(), /setup code:\s+[A-Z0-9]{4}-[A-Z0-9]{4}/));

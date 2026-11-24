@@ -138,7 +138,11 @@ app.get(['/activity', '/activity/', '/activity/index.html'], (req, res) => {
   res.set('Cache-Control', 'no-store').type('html').send(html);
 });
 app.use('/activity', express.static(path.join(root, 'public/activity'), { setHeaders: (r) => r.set('Cache-Control', 'no-cache') }));
-app.use('/browse', express.static(path.join(root, 'web')));
+// Pages, scripts and styles: browsers must check for a newer copy on every load (cheap: an unchanged
+// file answers 304), so an update shows up straight away instead of an old cached script.
+app.use('/browse', express.static(path.join(root, 'web'), {
+  setHeaders: (res, file) => { if (/\.(html|js|css)$/.test(file)) res.set('Cache-Control', 'no-cache'); },
+}));
 
 // ---------- web login (Discord OAuth2) ----------
 app.get('/auth/login', (req, res) => {
