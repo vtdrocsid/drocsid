@@ -454,3 +454,5 @@ dialog::backdrop { background: rgba(10,25,45,.55); }
 .srv-logo.mini { width: 14px; height: 14px; }
 .srv-logo.h { width: 17px; height: 17px; }
 .li .srv-logo { width: 32px; height: 32px; border: 0; }
+/* Admin: panels stacked in one grid column (Poster cache, then Super admins) */
+.panel-stack { display: flex; flex-direction: column; gap: 14px; }
