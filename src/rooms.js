@@ -121,6 +121,8 @@ async function loadPlex(room, seconds) {
     room.plexRatingKey = nativeKey;
     const preset = findPreset(room.quality);
     const mediaIndex = await plex.pickMediaIndex(nativeKey, preset);
+    room.mediaIndex = mediaIndex;
+    room.previewInfo = undefined; // the version may have changed
     room.masterPlaylist = await plex.startTranscode({ path: room.plexKey, offset: seconds, mediaIndex, sessionId, preset });
     // Plex's playlist always spans the whole title (EXT-X-START marks where this transcode begins),
     // so stream time == title time; the player seeks straight to the position.
@@ -270,3 +272,31 @@ setInterval(() => {
     if (!room.hadViewers && room.idleSince && now() - room.idleSince > 10 * 60_000) stop(room.id, true, 'nobody opened the player for 10 minutes');
   }
 }, 20_000).unref();
+
+/**
+ * Scrub previews for what a room is playing, if the media server made them:
+ *   { kind: 'frames', step }  Plex: one still per request, at any time
+ *   { kind: 'tiles', width, height, cols, rows, count, interval }  Jellyfin Trickplay sheets
+ *   { kind: 'none' }
+ * Worked out once per title (and version).
+ */
+export async function previews(room) {
+  if (!room || room.item.source === 'live') return { kind: 'none' };
+  if (room.previewInfo) return room.previewInfo;
+  let info = { kind: 'none' };
+  try {
+    const srv = room.srv || serverOf(room);
+    const id = parseKey(room.item.ratingKey).id;
+    if (srv.type === 'plex') {
+      const part = await plex.withServer(srv, () => plex.previewPart(id, room.mediaIndex || 0));
+      if (part) info = { kind: 'frames', step: 5, part };
+    } else {
+      const t = await jf.trickplay(srv, id, room.jfSession?.mediaSourceId);
+      if (t) info = { kind: 'tiles', ...t };
+    }
+  } catch (e) {
+    console.warn(`[previews] ${room.item.title}: ${e.message}`);
+  }
+  room.previewInfo = info;
+  return info;
+}

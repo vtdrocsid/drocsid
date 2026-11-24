@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.6 — 2026-11-23
+- **Scrub previews in the player.** Hovering over or dragging the timeline shows a still from that moment, with the time, when the media server has made preview thumbnails: Plex "video preview thumbnails" (one still per request, nearest 5 s) or Jellyfin "Trickplay" (tile sheets). Titles without them, and Live TV, show no preview. Stills go through drocsid; no server address or token reaches the player.
+
 ## 0.5.5 — 2026-11-23
 - Admin: the Super admins list sits directly below the Poster cache panel, in the right-hand column.
 - Wizards opened from Admin (add/edit a media server or Discord app) have a **Cancel** button on every step that goes back to Admin → Connections.

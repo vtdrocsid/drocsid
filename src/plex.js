@@ -449,3 +449,19 @@ export function plexProxyUrl(pathAndQuery) {
   url.searchParams.set('X-Plex-Client-Identifier', clientId());
   return url;
 }
+
+// ---------------- scrub previews ----------------
+/** The part (file) with generated preview thumbnails (indexes="sd"), or null. Uses the version being played. */
+export async function previewPart(ratingKey, mediaIndex = 0) {
+  const data = await plexGet(`/library/metadata/${ratingKey}`);
+  const media = data.MediaContainer?.Metadata?.[0]?.Media || [];
+  const parts = [media[mediaIndex], ...media].filter(Boolean).flatMap((m) => m.Part || []);
+  const p = parts.find((x) => x.indexes === 'sd');
+  return p ? String(p.id) : null;
+}
+/** One preview still (320×180 JPEG, the nearest to the offset). */
+export function previewUrl(partId, ms) {
+  const url = new URL(`${cur().url}/library/parts/${encodeURIComponent(partId)}/indexes/sd/${Math.max(0, Math.floor(ms))}`);
+  url.searchParams.set('X-Plex-Token', cur().token);
+  return url;
+}

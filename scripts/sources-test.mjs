@@ -169,6 +169,16 @@ await check('stream starts and playlists carry no token', async () => {
   const seg = Buffer.from(await (await jf.streamFetch(srv, '/videos/m1/hls1/main/0.ts')).arrayBuffer());
   assert.equal(seg[0], 0x47);
 });
+await check('scrub previews: Jellyfin Trickplay tiles', async () => {
+  const info = await rooms.previews(rooms.get('room1'));
+  assert.equal(info.kind, 'tiles');
+  assert.equal(info.width, 320); // the size closest to 320 px
+  assert.deepEqual([info.cols, info.rows, info.count, info.interval], [10, 10, 360, 10000]);
+  const tile = await jf.trickplayTile(conn.server('jellyfin-aa'), 'm1', info.width, 2, info.mediaSourceId);
+  assert.equal(await tile.text(), 'TILE320-2');
+  const none = await rooms.previews({ item: { source: 'live' } });
+  assert.equal(none.kind, 'none');
+});
 await check('seek and stop report to the server', async () => {
   const infos = () => jfMock.log.filter((x) => x.includes('/PlaybackInfo')).length;
   const before = infos();

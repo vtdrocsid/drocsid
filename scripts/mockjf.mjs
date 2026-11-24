@@ -7,7 +7,8 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
   const stats = { imgActive: 0, imgMaxActive: 0, imgRequests: 0 };
   const items = {
     m1: { Id: 'm1', Name: 'Alpha Movie', Type: 'Movie', ProductionYear: 2001, RunTimeTicks: 60 * 60 * 1e7, ImageTags: { Primary: 'x' }, CriticRating: 91, OfficialRating: 'PG',
-      People: [{ Id: 'p1', Name: 'Ann Actor', Role: 'Hero', Type: 'Actor', PrimaryImageTag: 't' }, { Id: 'p2', Name: 'Dee Director', Type: 'Director' }], Genres: ['Drama'], Taglines: ['A tagline'] },
+      People: [{ Id: 'p1', Name: 'Ann Actor', Role: 'Hero', Type: 'Actor', PrimaryImageTag: 't' }, { Id: 'p2', Name: 'Dee Director', Type: 'Director' }], Genres: ['Drama'], Taglines: ['A tagline'],
+      Trickplay: { m1: { 160: { Width: 160, Height: 90, TileWidth: 10, TileHeight: 10, ThumbnailCount: 360, Interval: 10000 }, 320: { Width: 320, Height: 180, TileWidth: 10, TileHeight: 10, ThumbnailCount: 360, Interval: 10000 } } } },
     m2: { Id: 'm2', Name: 'Beta Movie', Type: 'Movie', ProductionYear: 2005, RunTimeTicks: 90 * 60 * 1e7 },
     s1: { Id: 's1', Name: 'Some Show', Type: 'Series', ProductionYear: 2010, ChildCount: 1, ImageTags: { Primary: 'y' } },
     se1: { Id: 'se1', Name: 'Season 1', Type: 'Season', SeriesName: 'Some Show', SeriesId: 's1', SeriesPrimaryImageTag: 'y', IndexNumber: 1, ParentId: 's1' },
@@ -74,6 +75,8 @@ export function startMockJellyfin(port, { product = 'Jellyfin Server', token = '
     if (m) { res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' }); return res.end(`#EXTM3U\n#EXT-X-TARGETDURATION:6\n#EXTINF:6,\nhls1/main/0.ts?PlaySessionId=ps1&api_key=${token}\n#EXT-X-ENDLIST\n`); }
     m = p.match(/^\/videos\/(\w+)\/hls1\/main\/(\d+)\.ts$/);
     if (m) { const b = Buffer.alloc(188 * 4, 0); for (let i = 0; i < 4; i++) b[i * 188] = 0x47; res.writeHead(200, { 'Content-Type': 'video/mp2t' }); return res.end(b); }
+    m = p.match(/^\/Videos\/(\w+)\/Trickplay\/(\d+)\/(\d+)\.jpg$/);
+    if (m) { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); return res.end(Buffer.from(`TILE${m[2]}-${m[3]}`)); }
     if (p === '/LiveTv/Channels') return json({ Items: [{ Id: 'ch2', Name: 'News', ChannelNumber: '12', ImageTags: { Primary: 'z' } }, { Id: 'ch1', Name: 'Sports', ChannelNumber: '5' }] });
     if (p === '/LiveTv/Programs') {
       const now = Date.now(), hr = 3600_000;

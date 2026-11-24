@@ -223,6 +223,7 @@ function applyState(s) {
   $('#liveTag').hidden = !isLive(); // takes the progress bar's place so the controls line up the same
   if (!isLive()) $('#seek').max = Math.floor(s.duration);
 
+  loadPreviews();
   // Reload whenever the stream changes: new title, seek, quality change or live retune.
   if (loadedVersion !== `${s.source}:${s.playlistVersion}`) return loadStream();
   sync(wasPlaying !== s.playing);
@@ -331,8 +332,66 @@ document.addEventListener('click', (e) => {
 // ---------- controls ----------
 $('#playPause').onclick = () => control(state.playing ? 'pause' : 'resume');
 $('#stop').onclick = () => control('stop');
-$('#seek').oninput = () => { seeking = true; $('#time').textContent = `${fmt($('#seek').value)} / ${fmt(state.duration)}`; };
-$('#seek').onchange = () => { seeking = false; control('seek', Number($('#seek').value)); };
+$('#seek').oninput = () => {
+  seeking = true;
+  $('#time').textContent = `${fmt($('#seek').value)} / ${fmt(state.duration)}`;
+  // Keyboard or a drag that doesn't report the pointer: place the preview at the knob.
+  const bar = $('#seek').getBoundingClientRect();
+  if (!seekDrag) showPreview(bar.left + (Number($('#seek').value) / (Number($('#seek').max) || 1)) * bar.width);
+};
+$('#seek').onchange = () => { seeking = false; seekDrag = false; hidePreview(); control('seek', Number($('#seek').value)); };
+
+// ---------- scrub previews ----------
+// Stills from the media server's preview thumbnails (Plex video preview thumbnails, Jellyfin
+// Trickplay), shown above the timeline while hovering or dragging. Nothing shows if the server
+// hasn't made them for this title.
+let pv = { kind: 'none' }, pvKey = null, seekDrag = false;
+const PV_W = 240;
+async function loadPreviews() {
+  const roomId = (state.playlist || '').split('/')[1];
+  const key = `${roomId}|${state.title}|${state.source}`;
+  if (key === pvKey) return;
+  pvKey = key;
+  pv = { kind: 'none' };
+  if (isLive() || !roomId || !token) return;
+  try {
+    const r = await fetch(`/media/t/${encodeURIComponent(token)}/room/${roomId}/previews.json`);
+    if (r.ok && pvKey === key) pv = { ...(await r.json()), room: roomId };
+  } catch {}
+}
+function hidePreview() { $('#pv').hidden = true; }
+function showPreview(clientX) {
+  if (pv.kind === 'none' || isLive() || !state.duration) return hidePreview();
+  const bar = $('#seek').getBoundingClientRect();
+  const t = Math.min(1, Math.max(0, (clientX - bar.left) / bar.width)) * state.duration;
+  const img = $('#pvImg');
+  const base = `/media/t/${encodeURIComponent(token)}/room/${pv.room}`;
+  if (pv.kind === 'frames') {
+    const sec = Math.round(t / pv.step) * pv.step;
+    img.style.height = `${(PV_W * 9) / 16}px`;
+    img.style.backgroundImage = `url("${base}/preview/${sec}.jpg")`;
+    img.style.backgroundSize = 'cover';
+    img.style.backgroundPosition = 'center';
+  } else {
+    // A tile sheet holds cols × rows stills; show the one for this moment.
+    const n = Math.min(Math.max(0, Math.floor((t * 1000) / pv.interval)), Math.max(0, (pv.count || 1) - 1));
+    const per = pv.cols * pv.rows, i = n % per, h = (PV_W * pv.height) / pv.width;
+    img.style.height = `${h}px`;
+    img.style.backgroundImage = `url("${base}/tile/${Math.floor(n / per)}.jpg")`;
+    img.style.backgroundSize = `${pv.cols * PV_W}px ${pv.rows * h}px`;
+    img.style.backgroundPosition = `-${(i % pv.cols) * PV_W}px -${Math.floor(i / pv.cols) * h}px`;
+  }
+  $('#pvTime').textContent = fmt(t);
+  const box = $('#pv');
+  box.style.left = `${Math.min(Math.max(clientX - PV_W / 2, 8), window.innerWidth - PV_W - 8)}px`;
+  box.style.bottom = `${window.innerHeight - bar.top + 10}px`;
+  box.hidden = false;
+}
+$('#seek').addEventListener('pointermove', (e) => showPreview(e.clientX));
+$('#seek').addEventListener('pointerdown', (e) => { seekDrag = true; showPreview(e.clientX); });
+$('#seek').addEventListener('pointerleave', () => { if (!seekDrag) hidePreview(); });
+document.addEventListener('pointermove', (e) => { if (seekDrag) showPreview(e.clientX); });
+document.addEventListener('pointerup', () => { if (seekDrag) { seekDrag = false; hidePreview(); } });
 $('#tapToPlay').onclick = () => { $('#tapToPlay').hidden = true; video.muted = false; tryPlay(); };
 // Any click or tap in the Activity counts as the "start watching" gesture browsers require.
 document.addEventListener('pointerdown', () => {

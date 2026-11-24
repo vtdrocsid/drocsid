@@ -623,6 +623,36 @@ app.get('/media/t/:token/room/:id/master.m3u8', pathSession, needViewer, (req, r
   res.type('application/vnd.apple.mpegurl').set('Cache-Control', 'no-store').send(body);
 });
 
+// ---------- scrub previews (thumbnails above the timeline) ----------
+app.get('/media/t/:token/room/:id/previews.json', pathSession, needViewer, wrap(async (req, res) => {
+  const { part, mediaSourceId, ...info } = await rooms.previews(rooms.get(req.params.id));
+  res.set('Cache-Control', 'no-store').json(info);
+}));
+const previewImage = (res, upstream) => {
+  if (!upstream?.ok) return res.status(upstream?.status === 404 ? 404 : 502).end();
+  res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
+  res.set('Cache-Control', 'private, max-age=86400');
+  sendBody(upstream, res);
+};
+// Plex: one still at a time (seconds, rounded by the player).
+app.get('/media/t/:token/room/:id/preview/:sec.jpg', pathSession, needViewer, wrap(async (req, res) => {
+  const room = rooms.get(req.params.id);
+  const info = await rooms.previews(room);
+  if (info.kind !== 'frames') return res.status(404).end();
+  const srv = room.srv;
+  const url = plex.withServer(srv, () => plex.previewUrl(info.part, Number(req.params.sec) * 1000));
+  previewImage(res, await fetch(url).catch(() => null));
+}));
+// Jellyfin: a tile sheet (a grid of stills); the player shows the right one.
+app.get('/media/t/:token/room/:id/tile/:n.jpg', pathSession, needViewer, wrap(async (req, res) => {
+  const room = rooms.get(req.params.id);
+  const info = await rooms.previews(room);
+  const n = Number(req.params.n);
+  if (info.kind !== 'tiles' || !Number.isInteger(n) || n < 0 || n > 10000) return res.status(404).end();
+  const id = sources.parseKey(room.item.ratingKey).id;
+  previewImage(res, await jf.trickplayTile(room.srv, id, info.width, n, info.mediaSourceId).catch(() => null));
+}));
+
 const seenSegments = new Set();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

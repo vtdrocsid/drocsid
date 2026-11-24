@@ -44,3 +44,10 @@ body.idle, body.idle * { cursor: none !important; }
 .ico-pause { width: 36px; height: 44px; border-left: 12px solid #fff; border-right: 12px solid #fff; }
 .note { position: fixed; top: 50%; left: 50%; transform: translate(-50%, 70px); z-index: 6; background: rgba(0,0,0,.8); color: #fff;
   padding: 8px 14px; border-radius: 8px; font-size: 14px; pointer-events: none; }
+
+/* Scrub preview above the timeline */
+.pv { position: fixed; z-index: 5; width: 240px; pointer-events: none; background: #000; border: 2px solid rgba(255,255,255,.85);
+  border-radius: 6px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.6); }
+.pv-img { width: 240px; height: 135px; background-repeat: no-repeat; background-color: #111; }
+.pv-t { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font: 600 12px system-ui, sans-serif; color: #fff;
+  text-shadow: 0 1px 3px #000, 0 0 2px #000; font-variant-numeric: tabular-nums; }

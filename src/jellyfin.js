@@ -436,3 +436,25 @@ export async function closeLive(srv, liveStreamId) {
   if (!liveStreamId) return;
   await call(srv, '/LiveStreams/Close', { method: 'POST', params: { LiveStreamId: liveStreamId } }).catch(() => {});
 }
+
+// ---------------- scrub previews (Trickplay) ----------------
+/**
+ * Trickplay info for an item: tile sheets, each a grid of thumbnails. Returns
+ * { width, height, cols, rows, count, interval } for the size closest to 320 px wide, or null.
+ */
+export async function trickplay(srv, id, mediaSourceId) {
+  const m = await call(srv, `/Users/${srv.userId}/Items/${encodeURIComponent(id)}`, { params: { Fields: 'Trickplay' } });
+  const all = m.Trickplay || {};
+  const norm = (s) => String(s || '').replace(/-/g, '').toLowerCase();
+  const key = Object.keys(all).find((k) => norm(k) === norm(mediaSourceId)) || Object.keys(all)[0];
+  const sizes = key ? Object.values(all[key] || {}) : [];
+  if (!sizes.length) return null;
+  const t = sizes.sort((a, b) => Math.abs((a.Width || 0) - 320) - Math.abs((b.Width || 0) - 320))[0];
+  if (!t.Width || !t.TileWidth || !t.TileHeight || !t.Interval) return null;
+  return { width: t.Width, height: t.Height || Math.round(t.Width * 9 / 16), cols: t.TileWidth, rows: t.TileHeight, count: t.ThumbnailCount || 0, interval: t.Interval, mediaSourceId: key };
+}
+/** One tile sheet image. */
+export function trickplayTile(srv, id, width, index, mediaSourceId) {
+  const q = mediaSourceId ? `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` : '';
+  return streamFetch(srv, `/Videos/${encodeURIComponent(id)}/Trickplay/${Number(width)}/${Number(index)}.jpg${q}`);
+}
