@@ -1,5 +1,6 @@
 // Setup wizard. Also used after setup by super admins (from Admin → Connections) to add or
 // change a Discord app (?add=discord[&app=<id>]) or add/edit a media server (?add=media[&server=<id>]).
+import { npmGuide } from '/browse/guide.js';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function api(path, opts = {}) {
@@ -25,13 +26,15 @@ const STEPS = {
   discord: { label: 'Discord app' },
   invite: { label: 'Add to server' },
   signin: { label: 'Sign in' },
+  url: { label: 'Public address' },
   mtype: { label: 'Server type' },
   media: { label: 'Connect' },
   done: { label: 'Done' },
 };
-const order = mode === 'discord' ? ['discord', 'invite', 'done']
+const order = mode === 'url' ? ['url', 'done']
+  : mode === 'discord' ? ['discord', 'invite', 'done']
   : mode === 'media' ? (editServer ? ['media', 'done'] : ['mtype', 'media', 'done'])
-  : Object.keys(STEPS);
+  : ['welcome', 'discord', 'invite', 'signin', 'mtype', 'media', 'done'];
 let step = order[0];
 
 const currentApp = () => st.discordApps?.find((a) => a.id === appId) || (mode ? null : st.discordApps?.find((a) => a.primary)) || null;
@@ -40,6 +43,7 @@ const doneFor = {
   discord: () => !!currentApp(),
   invite: () => (currentApp()?.guilds || []).length > 0,
   signin: () => (st.ownerIds || []).length > 0,
+  url: () => mode === 'url' && step === 'done',
   mtype: () => !!mediaType || (!mode && (st.mediaServers || []).length > 0),
   media: () => mediaSaved || (!mode && (st.mediaServers || []).length > 0),
   done: () => !mode && st.configured,
@@ -56,7 +60,7 @@ function drawSteps() {
   $('#back').style.visibility = order.indexOf(step) > 0 ? 'visible' : 'hidden';
   // Opened from Admin (add or edit): Cancel goes back there, on every step except the last.
   $('#cancel').hidden = !mode || step === 'done';
-  $('#mode').textContent = mode === 'discord' ? 'Add a Discord app' : mode === 'media' ? (editServer ? 'Edit media server' : 'Add a media server') : 'Setup';
+  $('#mode').textContent = mode === 'url' ? 'Public address' : mode === 'discord' ? 'Add a Discord app' : mode === 'media' ? (editServer ? 'Edit media server' : 'Add a media server') : 'Setup';
 }
 
 function go(k) {
@@ -138,6 +142,20 @@ const render = {
     $('#next').disabled = !(st.ownerIds || []).length;
   },
 
+  url() {
+    const cur = st.publicUrl || '';
+    $('#body').innerHTML = `<h2>${cur ? 'Change the public address' : 'Add the public address'}</h2>
+      <p class="lead"><b>Required:</b> a public <b>https</b> address with a valid certificate that anyone on the internet can reach. Discord loads the player from it and sends people back to it after <b>Sign in with Discord</b>, so creating a bot and signing in only work with a real public address.</p>
+      <div class="field"><label>Public address</label><input id="pubUrl" value="${esc(cur || (st.suggestedUrl?.startsWith('https://') ? st.suggestedUrl : ''))}" placeholder="https://tv.example.com" autocomplete="off"><div class="hint">No path or trailing slash.</div></div>
+      <div><button class="btn" id="urlTest">Test</button> <span id="urlMsg"></span></div>
+      <ul class="checks" id="urlChecks"></ul>
+      <div id="urlGuide" style="margin-top:12px"></div>`;
+    const host = () => { try { return new URL($('#pubUrl').value).host || 'tv.yourdomain.com'; } catch { return 'tv.yourdomain.com'; } };
+    $('#urlGuide').innerHTML = npmGuide(host(), !cur);
+    $('#pubUrl').onchange = () => { $('#urlGuide').innerHTML = npmGuide(host(), true); };
+    $('#urlTest').onclick = () => testAddress();
+  },
+
   mtype() {
     const cards = [
       ['plex', 'Plex', 'Sign in with Plex, or address + token', '<img class="logo" src="/browse/img/plex.svg" alt="">'],
@@ -189,6 +207,12 @@ const render = {
 
   done() {
     if (mode) {
+      if (mode === 'url') {
+        $('#body').innerHTML = `<h2>All set</h2><p class="lead">The public address is saved: <b>${esc(st.publicUrl)}</b></p>
+          <p>If it changed, update each Discord app in the Developer Portal: OAuth2 → Redirects <code>${esc(st.publicUrl)}/auth/callback</code>, and Activities → URL Mappings <code>/</code> → <code>${esc(st.publicUrl.replace(/^https:\/\//, ''))}</code>.</p>`;
+        $('#next').textContent = 'Back to Admin';
+        return;
+      }
       $('#body').innerHTML = mode === 'media'
         ? `<h2>All set</h2><p class="lead">The media server is saved.</p><p>Choose which of its libraries appear on the Browse page, and their order, under <b>Admin → Libraries</b>.</p>`
         : `<h2>All set</h2><p class="lead">The Discord app is saved. Invite it to more servers from Admin → Connections any time.</p>
@@ -280,6 +304,57 @@ function showServers(pinId, servers) {
   });
 }
 
+/**
+ * Check a public address from this browser: right format, reachable with a valid certificate,
+ * it's this drocsid, and WebSockets get through. Also asks the drocsid server (informational).
+ */
+async function testAddress() {
+  err();
+  const url = $('#pubUrl').value.trim().replace(/\/+$/, '');
+  const list = [];
+  const add = (ok, label, hint = '', warn = false) => list.push({ ok, label, hint, warn });
+  const draw = () => {
+    $('#urlChecks').innerHTML = list.map((c) => `<li>${c.ok ? '<span class="ok">✓</span>' : c.warn ? '<span class="wait">!</span>' : '<span class="bad">✗</span>'} ${esc(c.label)}${c.hint ? `<div class="hint">${c.hint}</div>` : ''}</li>`).join('');
+  };
+  $('#urlMsg').innerHTML = '<span class="wait">Checking…</span>';
+  $('#urlChecks').innerHTML = '';
+  if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) {
+    add(false, 'https address', 'Use the https:// address people open, with no path (e.g. https://tv.example.com).');
+    draw(); $('#urlMsg').textContent = ''; return false;
+  }
+  add(true, 'https address');
+  const mine = await fetch('/api/config').then((r) => r.json()).catch(() => ({}));
+  let theirs = null;
+  try {
+    const r = await fetch(`${url}/api/config`, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    theirs = r.ok ? await r.json() : null;
+    add(!!theirs, 'Reachable with a valid certificate', theirs ? '' : `It answered ${r.status}. Check the proxy host's forward hostname and port.`);
+  } catch {
+    add(false, 'Reachable with a valid certificate', "No answer from this browser, or the certificate isn't valid. Check the DNS record, port forwarding (80/443) and the SSL tab in Nginx Proxy Manager.");
+  }
+  if (theirs) add(theirs.instance && theirs.instance === mine.instance, 'Reaches this drocsid', theirs.instance === mine.instance ? '' : 'Another server answered at this address. Check the proxy host points at the drocsid container (port 3000).');
+  if (theirs) {
+    const wsOk = await new Promise((resolve) => {
+      let done = false;
+      const end = (v) => { if (!done) { done = true; resolve(v); } };
+      try {
+        const ws = new WebSocket(`${url.replace(/^https:/, 'wss:')}/ws`);
+        ws.onclose = (e) => end(e.code === 4001); // drocsid answers a sign-in-less connection with 4001
+        ws.onerror = () => {};
+        setTimeout(() => { try { ws.close(); } catch {} end(false); }, 8000);
+      } catch { end(false); }
+    });
+    add(wsOk, 'WebSockets get through (keeps the player in sync)', wsOk ? '' : 'Turn on <b>Websockets Support</b> on the proxy host.');
+  }
+  const fromServer = await api('/api/connections/public-url/test', { method: 'POST', body: JSON.stringify({ publicUrl: url }) }).catch(() => null);
+  if (fromServer) add(fromServer.ok && fromServer.instance === mine.instance, 'Reachable from the drocsid server too',
+    fromServer.ok ? '' : `From inside your network: ${esc(fromServer.error || 'no answer')}. This is only a warning: some routers don't loop back to their own public address. The checks above are what matter.`, true);
+  draw();
+  const ok = list.filter((c) => !c.warn).every((c) => c.ok);
+  $('#urlMsg').innerHTML = ok ? '<span class="ok">✓ Working</span>' : '<span class="bad">Not working yet</span>';
+  return ok;
+}
+
 const savePlex = (body, msgEl) => saveServer(body, msgEl);
 
 /** Save the server (add, or update when editing), then move on. */
@@ -330,6 +405,11 @@ const next = {
   },
   async invite() { await refresh(); return true; },
   async signin() { return (st.ownerIds || []).length > 0; },
+  async url() {
+    if (!(await testAddress())) throw new Error('Fix the address first: it has to work before it can be saved.');
+    st = { ...st, ...(await api('/api/connections/public-url', { method: 'PUT', body: JSON.stringify({ publicUrl: $('#pubUrl').value }) })) };
+    return true;
+  },
   async mtype() {
     if (!mediaType && !mode && (st.mediaServers || []).length) { go('done'); return false; }
     if (!mediaType) throw new Error('Pick a server type');

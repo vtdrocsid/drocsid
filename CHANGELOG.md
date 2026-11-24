@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.7 — 2026-11-24
+- **Public address is explained as required**: Admin → Connections says it must be a public https address with a valid certificate, because Discord loads the player from it and returns people there after signing in.
+- **How to set it up in Nginx Proxy Manager**: step-by-step guide (DNS and ports, proxy host details, Websockets on, Cache Assets off, SSL, the Advanced streaming settings with a Copy button and what each does, checking it, and the Discord Developer Portal entries). Shown in Admin and in the wizard.
+- **Add / Change open a wizard that checks the address before saving**: https format, reachable with a valid certificate from your browser, it's this drocsid answering, and WebSockets get through. A check from the drocsid server itself is shown as a warning only (some routers don't loop back).
+
 ## 0.5.6 — 2026-11-23
 - **Scrub previews in the player.** Hovering over or dragging the timeline shows a still from that moment, with the time, when the media server has made preview thumbnails: Plex "video preview thumbnails" (one still per request, nearest 5 s) or Jellyfin "Trickplay" (tile sheets). Titles without them, and Live TV, show no preview. Stills go through drocsid; no server address or token reaches the player.
 

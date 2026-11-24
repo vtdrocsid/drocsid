@@ -46,6 +46,7 @@ app.use((req, res, next) => {
 });
 
 const COOKIE = 'pc_session';
+const instanceId = () => crypto.createHash('sha1').update(`instance:${conn.get().plexClientId}`).digest('hex').slice(0, 12);
 const redirectUri = () => `${config.publicUrl}/auth/callback`;
 
 // ---------- helpers ----------
@@ -170,7 +171,12 @@ app.post('/auth/logout', (req, res) => {
 // The Activity runs at <application id>.discordsays.com, so each Discord app's Activity
 // says which app it is and signs in with that app's credentials.
 const appFor = (id) => (id && conn.app(String(id))) || conn.primaryApp();
-app.get('/api/config', (req, res) => res.json({ clientId: appFor(req.query.app)?.id || '', publicUrl: config.publicUrl, configured: conn.isConfigured() }));
+// Readable from other origins: the public address wizard checks an address from the browser.
+// `instance` says which drocsid answered (it isn't secret).
+app.get('/api/config', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.json({ clientId: appFor(req.query.app)?.id || '', publicUrl: config.publicUrl, configured: conn.isConfigured(), instance: instanceId() });
+});
 
 app.post('/api/token', wrap(async (req, res) => {
   const { access_token, user } = await auth.exchangeCode(String(req.body.code || ''), null, appFor(req.body.clientId)?.id);

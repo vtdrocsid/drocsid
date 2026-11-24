@@ -48,7 +48,7 @@ export function claimOwner(req, user) {
 }
 
 // Paths that work before setup is finished.
-const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/, /^\/browse\/img\//];
+const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/, /^\/browse\/img\//, /^\/browse\/guide\.js$/];
 
 /** Until setup is finished, send everything else to the wizard. */
 export function setupGate(req, res, next) {
@@ -115,6 +115,20 @@ export function setupRoutes(app, { wrap, tokenOf }) {
     conn.update((d) => { d.publicUrl = url.toLowerCase(); });
     res.json(connectionsView());
   });
+
+  /** Check an address from the drocsid server too (informational: some routers don't loop back). */
+  app.post('/api/connections/public-url/test', needManage, wrap(async (req, res) => {
+    const url = String(req.body?.publicUrl || '').trim().replace(/\/+$/, '');
+    if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(url)) return res.json({ ok: false, error: 'Not an https address' });
+    try {
+      const r = await fetch(`${url}/api/config`, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return res.json({ ok: false, error: `Answered ${r.status}` });
+      const j = await r.json().catch(() => null);
+      res.json({ ok: !!j, instance: j?.instance || null });
+    } catch (e) {
+      res.json({ ok: false, error: e.name === 'TimeoutError' ? 'No answer within 8 s' : (e.cause?.code || e.message) });
+    }
+  }));
 
   // ---- Discord apps ----
   const appInput = (b) => {

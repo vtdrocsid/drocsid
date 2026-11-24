@@ -45,6 +45,11 @@ console.log('Fresh install');
   const { base } = s;
   await check('server is up', async () => assert.equal(s.proc.exitCode, null, s.log()));
   await check('config says not configured', async () => assert.equal((await json(base, '/api/config')).body.configured, false));
+  await check('config readable from other origins, says which drocsid', async () => {
+    const r = await fetch(base + '/api/config');
+    assert.equal(r.headers.get('access-control-allow-origin'), '*');
+    assert.match((await r.json()).instance, /^[0-9a-f]{12}$/);
+  });
   await check('/ goes to the wizard', async () => assert.match((await get(base, '/')).headers.get('location') || '', /\/setup\/$/));
   await check('wizard page loads', async () => assert.match(await (await get(base, '/setup/')).text(), /drocsid/));
   await check('portal API is closed', async () => assert.equal((await json(base, '/api/libraries')).status, 503));
@@ -62,6 +67,11 @@ console.log('Fresh install');
     const st = (await json(base, '/api/setup/status', 'GET', null, cookie)).body;
     assert.equal(st.unlocked, true);
     assert.deepEqual(st.discordApps, []);
+  });
+  await check('address check from the server reports failures', async () => {
+    const r = await json(base, '/api/connections/public-url/test', 'POST', { publicUrl: 'https://nonexistent.invalid' }, cookie);
+    assert.equal(r.status, 200);
+    assert.equal(r.body.ok, false);
   });
   await check('public URL must be https', async () => assert.equal((await json(base, '/api/connections/public-url', 'PUT', { publicUrl: 'http://x' }, cookie)).status, 400));
   await check('public URL saved', async () => {

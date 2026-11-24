@@ -59,7 +59,9 @@
         <h2>Connections</h2>
         <p class="desc">Discord apps (bots), the servers they're in, and your media servers. Only super admins see this.</p>
         <h3 class="sub-h">Public address</h3>
-        <div class="li"><div class="grow"><div id="pubUrl"></div><div class="sub">Where people and Discord reach drocsid</div></div><button class="btn sm" id="pubEdit">Change</button></div>
+        <p class="desc"><b>Required:</b> a public <b>https</b> address with a valid certificate that anyone on the internet can reach. Discord loads the player from it (each Discord app's Activity URL Mapping) and sends people back to it after <b>Sign in with Discord</b> (the OAuth2 redirect), so creating a bot and signing in only work with a real public address. A LAN address, an IP or plain http won't work.</p>
+        <div class="li"><div class="grow"><div id="pubUrl"></div><div class="sub">Where people and Discord reach drocsid</div></div><a class="btn sm" id="pubEdit" href="/setup/?add=url">Change</a></div>
+        <div id="npmGuide"></div>
         <h3 class="sub-h">Discord apps</h3>
         <div id="apps" class="list"></div>
         <a class="btn" href="/setup/?add=discord">+ Add Discord app</a>

@@ -1,3 +1,4 @@
+import { npmGuide } from './guide.js';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (s) => {
@@ -198,7 +199,14 @@ $('#userAddBtn').onclick = () => {
 function renderConnections() {
   if (!conns) return;
   const firstPlex = conns.mediaServers.find((x) => x.type === 'plex')?.id;
-  $('#pubUrl').textContent = conns.publicUrl || 'Not set';
+  $('#pubUrl').innerHTML = conns.publicUrl ? esc(conns.publicUrl) : '<span class="error">Not set</span>';
+  // Add when there's no address yet, Change when there is: both open the wizard, which checks it works.
+  $('#pubEdit').textContent = conns.publicUrl ? 'Change' : 'Add';
+  $('#pubEdit').classList.toggle('primary', !conns.publicUrl);
+  if (!$('#npmGuide').dataset.host || $('#npmGuide').dataset.host !== (conns.publicUrl || '')) {
+    $('#npmGuide').dataset.host = conns.publicUrl || '';
+    $('#npmGuide').innerHTML = npmGuide(conns.publicUrl ? conns.publicUrl.replace(/^https:\/\//, '') : undefined, !conns.publicUrl);
+  }
   const icon = (g) => (g.icon ? `<img src="${esc(g.icon)}" alt="">` : `<span class="gi">${esc((g.name || '?')[0])}</span>`);
   const apps = $('#apps');
   apps.innerHTML = conns.discordApps.length ? '' : '<p class="muted">No Discord apps.</p>';
@@ -290,10 +298,6 @@ async function connAct(url, method, body) {
   try { conns = { ...conns, ...(await api(url, { method, body: body ? JSON.stringify(body) : undefined })) }; toast('Saved'); load(); }
   catch (e) { toast(e.message); }
 }
-$('#pubEdit').onclick = () => {
-  const url = prompt('Public https address (no path):', conns?.publicUrl || '');
-  if (url) connAct('/api/connections/public-url', 'PUT', { publicUrl: url });
-};
 const curGuild = () => (state.guilds || []).find((x) => x.id === selGuild);
 $('#gAdminAddBtn').onclick = () => {
   const g = curGuild();
