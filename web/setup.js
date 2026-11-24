@@ -54,6 +54,8 @@ async function refresh() {
 function drawSteps() {
   $('#steps').innerHTML = order.map((k) => `<div class="${k === step ? 'on' : doneFor[k]() ? 'done' : ''}">${STEPS[k].label}</div>`).join('');
   $('#back').style.visibility = order.indexOf(step) > 0 ? 'visible' : 'hidden';
+  // Opened from Admin (add or edit): Cancel goes back there, on every step except the last.
+  $('#cancel').hidden = !mode || step === 'done';
   $('#mode').textContent = mode === 'discord' ? 'Add a Discord app' : mode === 'media' ? (editServer ? 'Edit media server' : 'Add a media server') : 'Setup';
 }
 

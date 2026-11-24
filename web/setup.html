@@ -33,6 +33,7 @@
     .btn.primary { background: linear-gradient(#2a8fe0, #135ea8); border-color: #0b3663; color: #fff; }
     .btn.discord { background: #5865f2; border-color: #3c45a5; color: #fff; } .btn.plex { background: #e5a00d; border-color: #a87400; color: #1b1b1b; }
     .btn.sm { padding: 3px 9px; font-size: 10px; }
+    .foot-l { display: flex; gap: 8px; }
     .foot { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; border-top: 1px solid #e3e6ea; background: #f6f7f8; }
     ol.g { margin: 6px 0 0 18px; padding: 0; } ol.g li { margin: 5px 0; }
     .checks { list-style: none; margin: 10px 0 0; padding: 0; } .checks li { margin: 4px 0; } .checks .hint { margin-left: 18px; }
@@ -61,7 +62,7 @@
     <div class="head"><span class="wm">drocsid</span><span class="sub" id="mode">Setup</span></div>
     <div class="steps" id="steps"></div>
     <div class="body" id="body"><p class="lead">Loading…</p></div>
-    <div class="foot"><button class="btn" id="back">← Back</button><span class="err" id="err"></span><button class="btn primary" id="next">Continue →</button></div>
+    <div class="foot"><span class="foot-l"><a class="btn" id="cancel" href="/browse/admin.html#connections" hidden>Cancel</a><button class="btn" id="back">← Back</button></span><span class="err" id="err"></span><button class="btn primary" id="next">Continue →</button></div>
   </div>
   <script type="module" src="/setup/setup.js"></script>
 </body>

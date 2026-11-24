@@ -2,6 +2,7 @@
 
 ## 0.5.5 — 2026-11-23
 - Admin: the Super admins list sits directly below the Poster cache panel, in the right-hand column.
+- Wizards opened from Admin (add/edit a media server or Discord app) have a **Cancel** button on every step that goes back to Admin → Connections.
 
 ## 0.5.4 — 2026-11-23
 - **Fixed the whole site going down while scrubbing a Jellyfin/Emby stream.** A 60-second limit covered the entire download of a video piece; when it ran out mid-download the error wasn't handled and Node exited. The limit now only covers the server starting to answer, every proxied download ends just its own response on error, and any unexpected error is logged instead of stopping the server.
