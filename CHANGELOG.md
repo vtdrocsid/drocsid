@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.19 — 2026-11-25
+- README: the Unraid install command creates the templates folder first (it doesn't exist on a fresh server). No change to the app.
+
 ## 0.5.18 — 2026-11-25
 - Browse: Play History shows the last 11 plays.
 
