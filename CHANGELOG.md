@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.10 — 2026-11-25
+- New drocsid logo in the website banner (Browse, Admin, Setup), with an SVG master and a white version for dark backgrounds.
+- Browser tab icon on every page (SVG, PNG and .ico), plus `/favicon.ico`.
+- Unraid template icon served from `/browse/img/unraid-icon.png`; Discord app icon PNG in `brand/`.
+
 ## 0.5.9 — 2026-11-24
 - Browsers always check for a newer copy of the website's pages, scripts and styles, so changes show up right after an update (0.5.8's example domain didn't appear until a hard refresh because an old cached script was reused).
 
