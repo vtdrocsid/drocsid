@@ -37,7 +37,7 @@ Throughout this guide, `example.domain.com` stands for your own address. Replace
 3. Check the settings:
    - **Network Type:** leave it on Unraid's default `bridge` for now. If Nginx Proxy Manager runs on its own Docker network (for example `proxynet`), you can switch drocsid to that network later so the proxy reaches it by name (see step 2).
    - **Web port:** `3005` unless something else already uses it.
-   - **WebUI:** leave it as `http://[IP]:[PORT:3000]/`. Unraid's **WebUI** menu item then opens drocsid on your server's IP and port, which is how you reach it during setup. You can point it at your public address once that works (step 5).
+   - **WebUI:** leave it as `http://[IP]:[PORT:3005]/`. Unraid's **WebUI** menu item then opens drocsid on your server's IP and port, which is how you reach it during setup. You can point it at your public address once that works (step 5).
    - **App data:** `/mnt/user/appdata/drocsid` holds all settings.
 4. Click **Apply**. The container starts and waits for setup. You can check it now: Docker tab → drocsid icon → **WebUI** opens the setup wizard.
 
@@ -53,7 +53,7 @@ services:
     container_name: drocsid
     restart: unless-stopped
     ports:
-      - "3005:3000"
+      - "3005:3005"
     volumes:
       - ./drocsid-data:/data
 ```
@@ -74,7 +74,7 @@ Discord loads the player from your server and sends people back to it after they
    - **Domain Names:** `example.domain.com`
    - **Scheme:** `http`
    - **Forward Hostname / IP:** your Unraid server's LAN IP (with drocsid on `bridge`), or `drocsid` if you moved drocsid onto the same Docker network as Nginx Proxy Manager
-   - **Forward Port:** `3005` (the Web port from step 1) with your server's LAN IP, or `3000` when forwarding to `drocsid` on a shared Docker network (that's the port inside the container)
+   - **Forward Port:** `3005` (the Web port from step 1)
    - **Websockets Support:** **on** (required: the player stays in sync over a WebSocket)
    - **Cache Assets:** **off** (video pieces and playlists change constantly and must never be cached)
    - **Block Common Exploits:** either way
@@ -184,9 +184,9 @@ Your settings live in the app data folder (`/data` in the container) and survive
 
 ```sh
 npm install
-npm run build && npm start      # builds the Activity bundle and starts the server on :3000
+npm run build && npm start      # builds the Activity bundle and starts the server on :3005
 ```
 
-Discord Activities need HTTPS, so use a tunnel (for example `cloudflared tunnel --url http://localhost:3000`) and a separate "dev" Discord app whose redirect and URL mapping point at it. Tests: `node scripts/smoke.mjs` and `node scripts/sources-test.mjs`.
+Discord Activities need HTTPS, so use a tunnel (for example `cloudflared tunnel --url http://localhost:3005`) and a separate "dev" Discord app whose redirect and URL mapping point at it. Tests: `node scripts/smoke.mjs` and `node scripts/sources-test.mjs`.
 
 Media server logos in `web/img` are from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) (Apache-2.0); see `web/img/NOTICE.md`.

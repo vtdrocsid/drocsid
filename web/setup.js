@@ -333,7 +333,7 @@ async function testAddress() {
   } catch {
     add(false, 'Reachable with a valid certificate', "No answer from this browser, or the certificate isn't valid. Check the DNS record, port forwarding (80/443) and the SSL tab in Nginx Proxy Manager.");
   }
-  if (theirs) add(theirs.instance && theirs.instance === mine.instance, 'Reaches this drocsid', theirs.instance === mine.instance ? '' : 'Another server answered at this address. Check the proxy host points at drocsid: the server’s LAN IP and drocsid’s Web port (3005 by default), or drocsid:3000 on a shared Docker network.');
+  if (theirs) add(theirs.instance && theirs.instance === mine.instance, 'Reaches this drocsid', theirs.instance === mine.instance ? '' : 'Another server answered at this address. Check the proxy host points at drocsid (port 3005 by default).');
   if (theirs) {
     const wsOk = await new Promise((resolve) => {
       let done = false;

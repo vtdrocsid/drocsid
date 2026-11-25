@@ -16,5 +16,5 @@ export const config = {
   get plexToken() { return conn.plexServer()?.token || ''; },
   get plexClientId() { return conn.get().plexClientId; },
   dataDir: conn.dataDir,
-  port: Number(process.env.PORT || 3000),
+  port: Number(process.env.PORT || 3005),
 };

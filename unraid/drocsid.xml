@@ -14,7 +14,7 @@
   <Overview>drocsid flips movie night right-side up. Stream movies, shows and live TV from your Plex, Jellyfin or Emby server into a Discord voice channel, synced to the frame for the whole crew. Friends browse and hit play from a web portal without ever touching your media server, and you run it all from a self-hosted admin panel. Setup: see the Project page.</Overview>
   <Icon>https://raw.githubusercontent.com/vtdrocsid/drocsid/main/web/img/unraid-icon.png</Icon>
   <Category>MediaServer:Video</Category>
-  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
-  <Config Name="Web port" Target="3000" Default="3005" Mode="tcp" Type="Port" Display="always" Required="true" Description="Port on your server for the web portal and setup wizard (default 3005). Point your reverse proxy (e.g. Nginx Proxy Manager) at this port for the public https address. Inside the container drocsid always listens on 3000.">3005</Config>
+  <WebUI>http://[IP]:[PORT:3005]/</WebUI>
+  <Config Name="Web port" Target="3005" Default="3005" Mode="tcp" Type="Port" Display="always" Required="true" Description="Port on your server for the web portal and setup wizard (default 3005). Point your reverse proxy (e.g. Nginx Proxy Manager) at this port for the public https address.">3005</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/drocsid" Mode="rw" Type="Path" Display="always" Required="true" Description="Settings, play history, lineup and watch progress">/mnt/user/appdata/drocsid</Config>
 </Container>
