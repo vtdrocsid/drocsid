@@ -1,13 +1,13 @@
 <p align="center"><img src="web/img/drocsid-logo.svg" alt="drocsid" width="420"></p>
 
-<p align="center"><b>Watch movies, shows and live TV together in Discord voice channels, from your own Plex, Jellyfin or Emby server.</b></p>
+<p align="center"><b>Watch movies and shows together in Discord voice channels, from your own Plex, Jellyfin or Emby server.</b></p>
 
 drocsid runs as a Docker container on your server. It gives you your own Discord app (bot plus Activity) and a web portal:
 
 - **Discord Activity:** everyone in a voice channel opens the Activity (🚀) and watches one shared stream, kept in sync to the frame. Approved users get play/pause, seek (with preview thumbnails when the server has them) and stop.
-- **Browse portal:** people sign in with Discord to browse and search your libraries, see the live TV guide, Watching Now, the lineup and history, and start something in any voice channel.
+- **Browse portal:** people sign in with Discord to browse and search your libraries, see Watching Now, the lineup and history, and start something in any voice channel.
 - **Admin page:** per Discord server, choose who can browse and play (users and roles) and who admins it; pick which libraries show and in what order; connect more Discord apps and media servers.
-- **Plex, Jellyfin and Emby**, several servers at once, including their Live TV. Your media server does the transcoding; drocsid only passes the stream through, so server addresses and tokens never reach anyone's browser.
+- **Plex, Jellyfin and Emby**, several servers at once. Your media server does the transcoding; drocsid only passes the stream through, so server addresses and tokens never reach anyone's browser.
 
 There are no slash commands. The bot posts "now playing" notices, reads roles and voice channels, and stops a stream when its channel empties.
 
@@ -137,7 +137,7 @@ Paste the Client ID, Client Secret and Bot Token into the wizard. **Test** check
 On the **Admin** page (`https://example.domain.com/admin`):
 
 - **Access** (per Discord server): add **Approved users** and **Approved roles** (they can browse the libraries and play content) and **Admins** (they manage access for that server).
-- **Libraries:** turn libraries and Live TV on or off for each media server, and set their order and sort.
+- **Libraries:** turn libraries on or off for each media server, and set their order and sort.
 - **Connections** (super admins only): add more Discord apps or media servers, re-order servers (the first is the default on Browse), test, edit, or change the public address.
 
 ---
