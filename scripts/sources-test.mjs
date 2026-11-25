@@ -310,6 +310,61 @@ await check('calls go to the chosen Plex server', async () => {
   assert.equal(sources.parseKey('plex-cc~55').srv.id, 'plex-cc');
 });
 
+console.log('Discord app icon');
+const discord = await import('../src/discord.js');
+{
+  conn.update((d) => { d.discordApps.push({ id: '111111111111111111', name: 'Test app', botUser: '', primary: true, clientSecret: conn.seal('s'), botToken: conn.seal('bot-tok') }); });
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  let have = { icon: 'abc', avatar: null }, avatarStatus = 200;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    if (!u.startsWith('https://discord.com/api/')) return realFetch(url, opts);
+    calls.push({ u, method: opts.method || 'GET', auth: opts.headers?.Authorization, body: opts.body ? JSON.parse(opts.body) : null });
+    const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json' } });
+    if (u.endsWith('/applications/@me')) return opts.method === 'PATCH' ? json({ id: '111111111111111111', icon: 'new' }) : json({ icon: have.icon });
+    if (u.endsWith('/users/@me')) {
+      if (opts.method !== 'PATCH') return json({ avatar: have.avatar });
+      return avatarStatus === 200 ? json({ id: '222', avatar: 'newava' }) : json({ message: 'You are changing your avatar too fast. Try again later.' }, avatarStatus);
+    }
+    return json({}, 404);
+  };
+  try {
+    await check('the drocsid icon ships with the app', async () => assert.equal(discord.defaultIcon().subarray(1, 4).toString(), 'PNG'));
+    await check('a new app keeps an icon it already has, gets the avatar', async () => {
+      const r = await discord.setIcon('111111111111111111', discord.defaultIcon(), { onlyIfEmpty: true });
+      assert.equal(r.app.kept, true);
+      assert.equal(r.avatar.ok, true);
+      assert.ok(!calls.some((c) => c.method === 'PATCH' && c.u.endsWith('/applications/@me')));
+      const p = calls.find((c) => c.method === 'PATCH' && c.u.endsWith('/users/@me'));
+      assert.match(p.body.avatar, /^data:image\/png;base64,/);
+      assert.equal(p.auth, 'Bot bot-tok');
+    });
+    await check('Change icon replaces both', async () => {
+      calls.length = 0;
+      const r = await discord.setIcon('111111111111111111', discord.defaultIcon());
+      assert.ok(r.app.ok && !r.app.kept && r.avatar.ok);
+      assert.equal(calls.filter((c) => c.method === 'GET').length, 0);
+    });
+    await check('only the app icon when asked', async () => {
+      calls.length = 0;
+      const r = await discord.setIcon('111111111111111111', discord.defaultIcon(), { avatar: false });
+      assert.equal(r.avatar, null);
+      assert.ok(!calls.some((c) => c.u.endsWith('/users/@me')));
+    });
+    await check('avatar rate limit is explained', async () => {
+      avatarStatus = 429;
+      const r = await discord.setIcon('111111111111111111', discord.defaultIcon());
+      assert.equal(r.app.ok, true);
+      assert.equal(r.avatar.ok, false);
+      assert.match(r.avatar.message, /Try again later/);
+    });
+    await check('non-images are refused', async () => {
+      await assert.rejects(discord.setIcon('111111111111111111', Buffer.from('hello')), /PNG, JPG/);
+    });
+  } finally { globalThis.fetch = realFetch; }
+}
+
 jfMock.close();
 embyMock.close();
 console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');

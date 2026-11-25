@@ -220,9 +220,11 @@ function renderConnections() {
         <div class="gchips">${a.guilds.length ? a.guilds.map((g) => `<span class="gchip">${icon(g)}${esc(g.name)}</span>`).join('') : '<span class="sub">Not in any server yet</span>'}</div></div>
       <div class="acts">
         <a class="btn sm" href="${esc(a.invite)}" target="_blank" rel="noopener">Invite to server</a>
+        <button class="btn sm" data-act="icon">Change icon</button>
         <a class="btn sm" href="/setup/?add=discord&app=${encodeURIComponent(a.id)}">Edit</a>
         <button class="btn sm danger" data-act="remove">Remove</button>
       </div>`;
+    el.querySelector('[data-act=icon]').onclick = () => openIconDlg(a);
     el.querySelector('[data-act=remove]').onclick = () => {
       if (confirm(`Remove ${a.name}? Its bot goes offline and streams in its servers stop working.`)) connAct(`/api/connections/discord/${a.id}`, 'DELETE');
     };
@@ -258,6 +260,7 @@ function renderConnections() {
         save({ serverOrder: ids });
       };
     });
+    el.querySelector('[data-act=icon]').onclick = () => openIconDlg(a);
     el.querySelector('[data-act=remove]').onclick = () => {
       if (confirm(`Remove ${p.name}? Its libraries disappear from Browse, and anything playing from it stops working.`)) connAct(`/api/connections/media/${encodeURIComponent(p.id)}`, 'DELETE');
     };
@@ -337,3 +340,76 @@ async function load() {
 }
 load().then(() => { if (location.hash === '#connections') $('#connections')?.scrollIntoView(); });
 setInterval(() => { if (!document.hidden) load(); }, 10_000);
+
+// ---------- Change icon (app icon + bot avatar) ----------
+let iconFor = null, iconBlob = null;
+const iconImgs = ['#ipBig', '#ipMid', '#ipSmall', '#ipMem'];
+function showIcon(url) {
+  iconImgs.forEach((id) => { $(id).src = url || ''; });
+  $('#iconPrev').hidden = !url;
+}
+function openIconDlg(a) {
+  iconFor = a; iconBlob = null;
+  $('#iconApp').textContent = a.name;
+  $('#ipName').textContent = a.user?.tag?.split('#')[0] || a.name;
+  $('#iconResult').innerHTML = '';
+  $('#iconFile').value = '';
+  showIcon(a.user?.avatar ? a.user.avatar.replace(/size=\d+/, 'size=256') : '');
+  $('#iconSave').disabled = true;
+  $('#iconDlg').showModal();
+}
+/** Crop to a centred square, 1024 px, PNG: what Discord expects for icons. */
+async function squareIcon(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error("That file isn't an image this browser can read")); i.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const size = Math.min(1024, side);
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+    return await new Promise((ok) => c.toBlob(ok, 'image/png'));
+  } finally { URL.revokeObjectURL(url); }
+}
+async function pickIcon(file) {
+  $('#iconResult').innerHTML = '';
+  try {
+    iconBlob = await squareIcon(file);
+    showIcon(URL.createObjectURL(iconBlob));
+    $('#iconSave').disabled = false;
+  } catch (e) { toast(e.message); }
+}
+$('#iconFile').onchange = () => $('#iconFile').files[0] && pickIcon($('#iconFile').files[0]);
+$('#iconDefault').onclick = async () => {
+  const b = await (await fetch('/browse/img/discord-icon.png')).blob();
+  iconBlob = b;
+  showIcon(URL.createObjectURL(b));
+  $('#iconSave').disabled = false;
+};
+const drop = $('#iconDrop');
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) pickIcon(f); };
+$('#iconCancel').onclick = () => $('#iconDlg').close();
+$('#iconSave').onclick = async () => {
+  if (!iconBlob || !iconFor) return;
+  const appOn = $('#iconApp1').checked, avaOn = $('#iconAva1').checked;
+  if (!appOn && !avaOn) return toast('Pick the app icon, the bot avatar, or both');
+  $('#iconSave').disabled = true;
+  $('#iconSave').textContent = 'Saving…';
+  try {
+    const r = await fetch(`/api/connections/discord/${encodeURIComponent(iconFor.id)}/icon?app=${appOn ? 1 : 0}&avatar=${avaOn ? 1 : 0}`, { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: iconBlob });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || r.statusText);
+    const line = (label, x) => (x ? `<li>${x.ok ? '<span class="ok">✓</span>' : '<span class="error">✗</span>'} ${label}: ${esc(x.message)}</li>` : '');
+    $('#iconResult').innerHTML = line('App icon', data.result.app) + line('Bot avatar', data.result.avatar);
+    conns = { ...conns, ...data };
+    renderConnections();
+    if ([data.result.app, data.result.avatar].every((x) => !x || x.ok)) { toast('Saved to Discord'); setTimeout(() => $('#iconDlg').close(), 900); }
+  } catch (e) {
+    $('#iconResult').innerHTML = `<li><span class="error">✗</span> ${esc(e.message)}</li>`;
+  } finally {
+    $('#iconSave').textContent = 'Save to Discord';
+    $('#iconSave').disabled = false;
+  }
+};
