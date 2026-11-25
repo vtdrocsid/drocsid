@@ -404,11 +404,11 @@ $('#iconSave').onclick = async () => {
     $('#iconResult').innerHTML = line('App icon', data.result.app) + line('Bot avatar', data.result.avatar);
     conns = { ...conns, ...data };
     renderConnections();
-    if ([data.result.app, data.result.avatar].every((x) => !x || x.ok)) { toast('Saved to Discord'); setTimeout(() => $('#iconDlg').close(), 900); }
+    if ([data.result.app, data.result.avatar].every((x) => !x || x.ok)) { toast('Saved'); setTimeout(() => $('#iconDlg').close(), 900); }
   } catch (e) {
     $('#iconResult').innerHTML = `<li><span class="error">✗</span> ${esc(e.message)}</li>`;
   } finally {
-    $('#iconSave').textContent = 'Save to Discord';
+    $('#iconSave').textContent = 'Save';
     $('#iconSave').disabled = false;
   }
 };
