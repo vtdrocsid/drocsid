@@ -33,7 +33,7 @@ function code() {
 export function logSetupCode(force = false) {
   if (conn.isConfigured() || (!force && Date.now() - lastLogged < 60_000)) return;
   lastLogged = Date.now();
-  console.log('\n' + '='.repeat(52) + `\n  drocsid setup code:  ${code()}\n  Open ${config.publicUrl || 'http://<this server>:' + config.port}/setup/ to finish setup.\n` + '='.repeat(52) + '\n');
+  console.log('\n' + '='.repeat(52) + `\n  drocsid setup code:  ${code()}\n  Open ${config.publicUrl ? config.publicUrl + '/setup/' : 'the WebUI (http://<this server>:<Web port, 3005 by default>/)'} to finish setup.\n` + '='.repeat(52) + '\n');
 }
 
 const cookieOf = (req, name) => (req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).find(([k]) => k === name)?.[1];
