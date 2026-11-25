@@ -15,6 +15,6 @@
   <Icon>https://raw.githubusercontent.com/vtdrocsid/drocsid/main/web/img/unraid-icon.png</Icon>
   <Category>MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>
-  <Config Name="Web port" Target="3000" Default="3000" Mode="tcp" Type="Port" Display="always" Required="true" Description="Web portal and setup wizard. Point your reverse proxy (e.g. Nginx Proxy Manager) at this port for the public https address.">3000</Config>
+  <Config Name="Web port" Target="3000" Default="3005" Mode="tcp" Type="Port" Display="always" Required="true" Description="Port on your server for the web portal and setup wizard (default 3005). Point your reverse proxy (e.g. Nginx Proxy Manager) at this port for the public https address. Inside the container drocsid always listens on 3000.">3005</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/drocsid" Mode="rw" Type="Path" Display="always" Required="true" Description="Settings, play history, lineup and watch progress">/mnt/user/appdata/drocsid</Config>
 </Container>

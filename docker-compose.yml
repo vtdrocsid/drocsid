@@ -5,6 +5,6 @@ services:
     container_name: drocsid
     restart: unless-stopped
     ports:
-      - "3000:3000"   # or drop this and join your reverse proxy's Docker network instead
+      - "3005:3000"   # your server's port 3005 → drocsid (3000 inside); or drop this and join your reverse proxy's Docker network instead
     volumes:
       - /mnt/user/appdata/drocsid:/data

@@ -29,7 +29,7 @@ export function npmGuide(open = false) {
                 <li>Domain Names: <code>${host}</code></li>
                 <li>Scheme: <code>http</code></li>
                 <li>Forward Hostname / IP: <code>drocsid</code> (the container name, when drocsid and Nginx Proxy Manager share a Docker network such as <code>proxynet</code>), otherwise the server's LAN IP</li>
-                <li>Forward Port: <code>3000</code></li>
+                <li>Forward Port: <code>3005</code> (drocsid's Web port) with the server's LAN IP, or <code>3000</code> when forwarding to <code>drocsid</code> on a shared Docker network (the port inside the container)</li>
                 <li><b>Websockets Support: on</b> (required: the player stays in sync over a WebSocket)</li>
                 <li><b>Cache Assets: off</b> (video pieces and playlists change constantly and must never be cached)</li>
               </ul></li>
