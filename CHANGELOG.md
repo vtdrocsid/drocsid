@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.18 — 2026-11-25
+- Browse: Play History shows the last 11 plays.
+
 ## 0.5.17 — 2026-11-25
 - README: Live TV is no longer mentioned. No change to the app.
 
