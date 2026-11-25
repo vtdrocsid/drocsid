@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.14 — 2026-11-25
+- Fixed: after Change icon, Admin → Connections stopped with "Cannot set properties of null" and the media server list was cut short (its Remove buttons didn't work). The icon dialog now shows its result.
+- Change icon: the button just says Save.
+
 ## 0.5.13 — 2026-11-25
 - **Change a Discord app's icon from Admin**: Connections → Change icon. Upload an image (cropped to a square) or use the drocsid icon, preview it in Discord's round crop, and set the app icon (Activity tile, profile), the bot avatar (member list, messages), or both. No Developer Portal needed. Discord's limit on avatar changes is explained when it applies.
 - New Discord apps get the drocsid icon as app icon and bot avatar, unless they already have their own.
