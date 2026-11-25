@@ -134,6 +134,14 @@ const render = {
 
   signin() {
     const me = st.signedIn;
+    // Discord sends people back to the public address, so the setup code has to be entered there too.
+    if (st.publicUrl && location.origin !== st.publicUrl) {
+      $('#body').innerHTML = `<h2>Continue at your public address</h2>
+        <p class="lead">Discord sign-in returns to <b>${esc(st.publicUrl)}</b>, so finish setup there. Your settings so far are saved; you'll enter the setup code once more.</p>
+        <a class="btn primary" href="${esc(st.publicUrl)}/setup/">Open ${esc(st.publicUrl)}/setup/</a>`;
+      $('#next').disabled = true;
+      return;
+    }
     $('#body').innerHTML = `<h2>Sign in as the owner</h2>
       <p class="lead">Sign in with your Discord account. You become an <b>owner</b>: a super admin who can always change everything, including these connections.</p>
       ${me?.owner ? `<p class="ok">✓ Signed in as ${esc(me.name)} (owner)</p>`
