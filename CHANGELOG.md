@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.13 — 2026-11-25
+- **Change a Discord app's icon from Admin**: Connections → Change icon. Upload an image (cropped to a square) or use the drocsid icon, preview it in Discord's round crop, and set the app icon (Activity tile, profile), the bot avatar (member list, messages), or both. No Developer Portal needed. Discord's limit on avatar changes is explained when it applies.
+- New Discord apps get the drocsid icon as app icon and bot avatar, unless they already have their own.
+
 ## 0.5.12 — 2026-11-25
 - **Setup works from http://<ip>:<port>**: the wizard can be opened from Unraid's WebUI link. The owner sign-in carries the setup code through Discord (which always returns to the public address), and setup continues there.
 - Wizard shows the Nginx Proxy Manager guide when you enter the public address, and explains the sign-in step needs it working.
