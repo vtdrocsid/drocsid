@@ -48,7 +48,7 @@ export function claimOwner(req, user) {
 }
 
 // Paths that work before setup is finished.
-const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/, /^\/browse\/img\//, /^\/browse\/guide\.js$/];
+const OPEN = [/^\/setup(\/|$)/, /^\/api\/setup\//, /^\/api\/connections(\/|$)/, /^\/auth\//, /^\/api\/config$/, /^\/api\/me$/, /^\/browse\/style\.css$/, /^\/browse\/img\//, /^\/browse\/guide\.js$/, /^\/favicon\.ico$/];
 
 /** Until setup is finished, send everything else to the wizard. */
 export function setupGate(req, res, next) {
