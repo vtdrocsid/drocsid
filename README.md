@@ -29,6 +29,7 @@ Throughout this guide, `example.domain.com` stands for your own address. Replace
 1. Open the Unraid terminal (top right `>_` icon) and download the template:
 
    ```sh
+   mkdir -p /boot/config/plugins/dockerMan/templates-user
    wget -O /boot/config/plugins/dockerMan/templates-user/my-drocsid.xml \
      https://raw.githubusercontent.com/vtdrocsid/drocsid/main/unraid/drocsid.xml
    ```
