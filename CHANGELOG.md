@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.16 — 2026-11-25
+- Browse: Play History shows the last 14 plays (was 8).
+
 ## 0.5.15 — 2026-11-25
 - **drocsid listens on port 3005** (was 3000), inside the container and as the default Web port in the Unraid template and Compose file. **Existing installs:** change the proxy host's Forward Port to 3005, and any Unraid port mapping's container port to 3005. A `PORT` variable still overrides it.
 - Install guide, in-app Nginx Proxy Manager guide and the address check use 3005; the setup code message points to the WebUI.
