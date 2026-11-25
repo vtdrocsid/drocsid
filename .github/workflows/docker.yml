@@ -32,6 +32,9 @@ jobs:
           node scripts/smoke.mjs
           node scripts/sources-test.mjs
 
+      - name: Docker image test (fresh install permissions, setup saves)
+        run: sh scripts/docker-test.sh
+
       # Other branches are tested only; images are published from main.
       - name: Stop here unless main
         id: gate
