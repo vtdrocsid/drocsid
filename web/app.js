@@ -816,7 +816,7 @@ async function loadLineup() {
 }
 
 async function loadHistory() {
-  const items = await api('/api/history?limit=14');
+  const items = await api('/api/history?limit=11');
   const box = $('#history');
   box.innerHTML = items.length ? '' : '<div class="rail-empty">Nothing has been played yet.</div>';
   items.forEach((x) => {
