@@ -21,7 +21,7 @@ import * as history from './history.js';
 import * as progress from './progress.js';
 import * as schedule from './schedule.js';
 import * as conn from './connections.js';
-import { setupRoutes, setupGate, claimOwner } from './setup.js';
+import { setupRoutes, setupGate, claimOwner, setupUnlocked } from './setup.js';
 import { readFileSync } from 'node:fs';
 
 const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -146,9 +146,15 @@ app.use('/browse', express.static(path.join(root, 'web'), {
 }));
 
 // ---------- web login (Discord OAuth2) ----------
+// Sign-ins in progress: state → { exp, setup }. Kept on the server (not only in a cookie) because the
+// setup wizard may run on http://<ip>:<port> while Discord always returns to the public address.
+const pendingLogins = new Map();
 app.get('/auth/login', (req, res) => {
   if (!config.clientId) return res.redirect('/setup/');
   const state = crypto.randomBytes(16).toString('hex');
+  const now = Date.now();
+  for (const [k, v] of pendingLogins) if (v.exp < now) pendingLogins.delete(k);
+  pendingLogins.set(state, { exp: now + 600_000, setup: setupUnlocked(req) });
   res.cookie('pc_state', state, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 600_000 });
   const url = new URL('https://discord.com/oauth2/authorize');
   url.search = new URLSearchParams({ client_id: config.clientId, response_type: 'code', scope: 'identify', redirect_uri: redirectUri(), state, prompt: 'none' });
@@ -156,13 +162,19 @@ app.get('/auth/login', (req, res) => {
 });
 
 app.get('/auth/callback', wrap(async (req, res) => {
-  if (!req.query.code || req.query.state !== cookies(req).pc_state) return res.status(400).send('Login failed, please try again.');
+  const state = String(req.query.state || '');
+  const pending = pendingLogins.get(state);
+  pendingLogins.delete(state);
+  const fresh = pending && pending.exp > Date.now();
+  // Same browser (state cookie), or a setup sign-in started on another address by someone holding the setup code.
+  const ok = req.query.code && fresh && (state === cookies(req).pc_state || pending.setup);
+  if (!ok) return res.status(400).send('Login failed, please try again.');
   const { user } = await auth.exchangeCode(String(req.query.code), redirectUri());
   const token = auth.createSession(user);
   res.clearCookie('pc_state');
   res.cookie(COOKIE, token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 12 * 3600_000 });
   // During setup, whoever signs in with the setup code unlocked becomes an owner.
-  if (!conn.isConfigured()) { claimOwner(req, user); return res.redirect('/setup/'); }
+  if (!conn.isConfigured()) { claimOwner(pending.setup || setupUnlocked(req), user); return res.redirect('/setup/'); }
   res.redirect('/browse/');
 }));
 

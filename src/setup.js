@@ -37,10 +37,14 @@ export function logSetupCode(force = false) {
 
 const cookieOf = (req, name) => (req.headers.cookie || '').split(';').map((c) => c.trim().split('=')).find(([k]) => k === name)?.[1];
 const isUnlocked = (req) => unlocked.has(cookieOf(req, SETUP_COOKIE) || '');
+/** Whether this browser entered the setup code (setup not finished yet). */
+export const setupUnlocked = (req) => !conn.isConfigured() && isUnlocked(req);
 
-/** During setup, whoever signs in with the setup code unlocked becomes an owner. */
-export function claimOwner(req, user) {
-  if (conn.isConfigured() || !isUnlocked(req)) return;
+/** During setup, whoever signs in with the setup code unlocked becomes an owner. `wasUnlocked` is
+ *  decided when the sign-in starts, since the wizard may run on http://<ip>:<port> while Discord
+ *  returns to the public address, where the setup cookie doesn't exist. */
+export function claimOwner(wasUnlocked, user) {
+  if (conn.isConfigured() || !wasUnlocked) return;
   if (!conn.get().ownerIds.includes(user.id)) {
     conn.update((d) => { d.ownerIds.push(user.id); });
     console.log(`[setup] ${user.username} (${user.id}) is now an owner`);

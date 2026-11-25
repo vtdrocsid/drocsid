@@ -35,10 +35,13 @@ Throughout this guide, `example.domain.com` stands for your own address. Replace
 
 2. Go to **Docker → Add Container**, choose **drocsid** from the **Template** list.
 3. Check the settings:
-   - **Network Type:** `bridge` is fine. If Nginx Proxy Manager runs on its own Docker network (for example `proxynet`), choose that network instead so the proxy can reach drocsid by name.
+   - **Network Type:** leave it on Unraid's default `bridge` for now. If Nginx Proxy Manager runs on its own Docker network (for example `proxynet`), you can switch drocsid to that network later so the proxy reaches it by name (see step 2).
    - **Web port:** `3000` unless something else already uses it.
+   - **WebUI:** leave it as `http://[IP]:[PORT:3000]/`. Unraid's **WebUI** menu item then opens drocsid on your server's IP and port, which is how you reach it during setup. You can point it at your public address once that works (step 5).
    - **App data:** `/mnt/user/appdata/drocsid` holds all settings.
-4. Click **Apply**. The container starts and waits for setup.
+4. Click **Apply**. The container starts and waits for setup. You can check it now: Docker tab → drocsid icon → **WebUI** opens the setup wizard.
+
+> On another network than `bridge`, Unraid's WebUI link uses the container's own IP, which may not be reachable from your PC. If it doesn't open, use `http://<unraid-ip>:3000/` with the port published, or the public address once step 2 is done.
 
 <details>
 <summary>Not on Unraid? Docker Compose</summary>
@@ -70,8 +73,8 @@ Discord loads the player from your server and sends people back to it after they
 3. In Nginx Proxy Manager, go to **Hosts → Proxy Hosts → Add Proxy Host**. On the **Details** tab:
    - **Domain Names:** `example.domain.com`
    - **Scheme:** `http`
-   - **Forward Hostname / IP:** `drocsid` if drocsid and Nginx Proxy Manager share a Docker network, otherwise your Unraid server's LAN IP
-   - **Forward Port:** `3000`
+   - **Forward Hostname / IP:** your Unraid server's LAN IP (with drocsid on `bridge`), or `drocsid` if you moved drocsid onto the same Docker network as Nginx Proxy Manager
+   - **Forward Port:** `3000` (the Web port from step 1)
    - **Websockets Support:** **on** (required: the player stays in sync over a WebSocket)
    - **Cache Assets:** **off** (video pieces and playlists change constantly and must never be cached)
    - **Block Common Exploits:** either way
@@ -101,9 +104,8 @@ Discord loads the player from your server and sends people back to it after they
    drocsid setup code:  ABCD-EFGH
    ```
 
-2. Open **`https://example.domain.com/setup/`**.
-   Use the public address, not the LAN IP: you'll sign in with Discord during setup, and that only works on the public address.
-3. Enter the setup code, then confirm your public address (`https://example.domain.com`, no trailing slash).
+2. Open the wizard: **Docker** tab → drocsid icon → **WebUI** (or `http://<unraid-ip>:3000/` in your browser). The public address works too once step 2 is done.
+3. Enter the setup code, then your public address (`https://example.domain.com`, no trailing slash).
 
 ### Create your Discord app
 
@@ -122,6 +124,7 @@ Paste the Client ID, Client Secret and Bot Token into the wizard. **Test** check
 
 4. **Add to server:** click **Add to a Discord server** and pick the server(s) to watch in. The wizard updates when the bot joins.
 5. **Sign in:** sign in with Discord. You become the **owner**, a super admin who can always change everything.
+   Discord always sends you back to your **public address**, so it must work by now (step 2), and the wizard carries on there.
 6. **Connect your media server:**
    - **Plex:** **Sign in with Plex** and pick the server and address, or enter the address (as the container reaches it, for example `http://192.168.1.10:32400`) and a [Plex token](https://support.plex.tv/articles/204059436).
    - **Jellyfin / Emby:** the address (for example `http://192.168.1.10:8096`) and either a username and password or an API key (Dashboard → API Keys). A dedicated user that can only see the libraries you want to share is best.
@@ -136,6 +139,12 @@ On the **Admin** page (`https://example.domain.com/admin`):
 - **Access** (per Discord server): add **Approved users** and **Approved roles** (they can browse the libraries and play content) and **Admins** (they manage access for that server).
 - **Libraries:** turn libraries and Live TV on or off for each media server, and set their order and sort.
 - **Connections** (super admins only): add more Discord apps or media servers, re-order servers (the first is the default on Browse), test, edit, or change the public address.
+
+---
+
+## Step 5 · Point Unraid's WebUI at your address (optional)
+
+Once everything works, you can make Unraid's **WebUI** menu item open the public address: Docker tab → drocsid → **Edit** → set **WebUI** to `https://example.domain.com/admin` → **Apply**. Signing in only works on the public address, so this saves a step. The IP and port keep working for the setup wizard.
 
 ---
 
@@ -166,6 +175,7 @@ Your settings live in the app data folder (`/data` in the container) and survive
 - **The Activity shows a blank screen:** check **Activities → URL Mappings** `/` → `example.domain.com`.
 - **The admin page's member picker is empty:** turn on **Server Members Intent** for the bot.
 - **Lost the setup code:** restart the container. It prints the code again until setup is finished.
+- **Discord sign-in during setup doesn't come back:** the public address isn't working yet. Finish step 2, then open the WebUI again and sign in.
 - **Changed your address later:** update both Discord Developer Portal entries (redirect and URL mapping) for every Discord app.
 
 ---
