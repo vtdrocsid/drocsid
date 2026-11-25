@@ -2,7 +2,7 @@
 <!-- Unraid Docker template for drocsid.
      Install: save as /boot/config/plugins/dockerMan/templates-user/my-drocsid.xml,
      then Docker → Add Container → Template: drocsid → Apply.
-     Then open the WebUI to run the setup wizard (Discord apps, media servers, public address). -->
+     Full step-by-step setup (public address, Nginx Proxy Manager, Discord app): see README.md. -->
 <Container version="2">
   <Name>drocsid</Name>
   <Repository>ghcr.io/vtdrocsid/drocsid:latest</Repository>
@@ -11,7 +11,7 @@
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Project>https://github.com/vtdrocsid/drocsid</Project>
-  <Overview>drocsid flips movie night right-side up. Stream your Plex library into a Discord voice channel, synced to the frame for the whole crew. Friends can browse and hit play without ever touching your Plex server, and you run it all from a self-hosted web panel.</Overview>
+  <Overview>drocsid flips movie night right-side up. Stream movies, shows and live TV from your Plex, Jellyfin or Emby server into a Discord voice channel, synced to the frame for the whole crew. Friends browse and hit play from a web portal without ever touching your media server, and you run it all from a self-hosted admin panel. Setup: see the Project page.</Overview>
   <Icon>https://raw.githubusercontent.com/vtdrocsid/drocsid/main/web/img/unraid-icon.png</Icon>
   <Category>MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:3000]/</WebUI>

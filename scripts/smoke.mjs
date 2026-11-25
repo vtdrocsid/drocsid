@@ -83,6 +83,10 @@ console.log('Fresh install');
     assert.equal(r.status, 200);
     assert.equal(r.body.redirectUri, 'https://tv.example.com/auth/callback');
   });
+  await check('sign-in callback refuses an unknown state', async () => {
+    assert.equal((await get(base, '/auth/callback?code=x&state=bogus')).status, 400);
+    assert.equal((await get(base, '/auth/callback?code=x')).status, 400);
+  });
   await check('Discord test reports bad values', async () => {
     const r = await json(base, '/api/connections/discord/test', 'POST', { clientId: '123456789012345678', clientSecret: 'nope', botToken: 'nope' }, cookie);
     assert.equal(r.status, 200);

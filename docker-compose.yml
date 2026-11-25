@@ -1,17 +1,10 @@
-# For Unraid's Compose Manager plugin, or any Docker host.
+# For Unraid's Compose Manager plugin, or any Docker host. Then open https://<your address>/setup/ (see README).
 services:
   drocsid:
-    image: ghcr.io/GITHUB_OWNER/drocsid:latest
+    image: ghcr.io/vtdrocsid/drocsid:latest
     container_name: drocsid
     restart: unless-stopped
-    env_file: .env
+    ports:
+      - "3000:3000"   # or drop this and join your reverse proxy's Docker network instead
     volumes:
       - /mnt/user/appdata/drocsid:/data
-    networks:
-      - proxy-net   # same network as Nginx Proxy Manager / cloudflared
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
-
-networks:
-  proxy-net:
-    external: true
