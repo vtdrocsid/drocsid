@@ -20,7 +20,7 @@ run_case() { # name dir expected_uid extra-docker-args...
   jar=$(mktemp)
   curl -s -c "$jar" -H 'Content-Type: application/json' -d "{\"code\":\"$code\"}" http://127.0.0.1:3999/api/setup/unlock >/dev/null
   status=$(curl -s -o /tmp/put.json -w '%{http_code}' -b "$jar" -X PUT -H 'Content-Type: application/json' -d '{"publicUrl":"https://example.domain.com"}' http://127.0.0.1:3999/api/connections/public-url)
-  owner=$(stat -c %u "$dir/connections.json" 2>/dev/null || echo none)
+  owner=$(sudo stat -c %u "$dir/connections.json" 2>/dev/null || echo none)
   proc=$(docker exec "$cid" sh -c 'cat /proc/1/status | awk "/^Uid:/{print \$2}"')
   if [ "$status" = 200 ] && [ "$owner" = "$want" ] && [ "$proc" = "$want" ]; then
     echo "  ✓ $name (runs as $proc, settings saved, owned by $owner)"
