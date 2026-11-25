@@ -16,5 +16,7 @@
   <Category>MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:3005]/</WebUI>
   <Config Name="Web port" Target="3005" Default="3005" Mode="tcp" Type="Port" Display="always" Required="true" Description="Port on your server for the web portal and setup wizard (default 3005). Point your reverse proxy (e.g. Nginx Proxy Manager) at this port for the public https address.">3005</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Type="Variable" Display="advanced" Required="false" Description="User drocsid runs as and owns its App data folder with (99 = nobody on Unraid)">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Type="Variable" Display="advanced" Required="false" Description="Group for the same (100 = users on Unraid)">100</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/drocsid" Mode="rw" Type="Path" Display="always" Required="true" Description="Settings, play history, lineup and watch progress">/mnt/user/appdata/drocsid</Config>
 </Container>
