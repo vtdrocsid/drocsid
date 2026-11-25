@@ -260,7 +260,6 @@ function renderConnections() {
         save({ serverOrder: ids });
       };
     });
-    el.querySelector('[data-act=icon]').onclick = () => openIconDlg(a);
     el.querySelector('[data-act=remove]').onclick = () => {
       if (confirm(`Remove ${p.name}? Its libraries disappear from Browse, and anything playing from it stops working.`)) connAct(`/api/connections/media/${encodeURIComponent(p.id)}`, 'DELETE');
     };
