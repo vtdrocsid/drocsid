@@ -34,7 +34,8 @@ a { color: var(--link); }
 .banner { display: flex; align-items: center; gap: 22px; padding: 16px 22px; min-height: 104px; flex-wrap: wrap;
   background: linear-gradient(#ffffff, #eef0f2); border-bottom: 1px solid var(--line2); }
 .wordmark { text-decoration: none; display: inline-flex; align-items: center; user-select: none; }
-.wm-main, .wm-tv { font-family: Arial, Helvetica, sans-serif; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; line-height: 1; }
+.wm-main, .wm-logo { height: 56px; width: auto; display: block; }
+.wm-tv { font-family: Arial, Helvetica, sans-serif; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; line-height: 1; }
 .wm-main { font-size: 50px; color: var(--azure);
   /* dark header-bar navy at the top fading to the azure at the bottom */
   background: linear-gradient(180deg, var(--navy) 0%, var(--azure) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; padding: 0 2px; }
