@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.20 — 2026-11-25
+- **Fixed: a fresh install couldn't save its settings** ("EACCES: permission denied … connections.json.tmp"). Docker creates a new App data folder owned by root, and drocsid ran as a restricted user from the start. It now starts as root only to give `/data` to the right user, then runs as that user.
+- Unraid template: PUID 99 / PGID 100 (nobody:users) under advanced settings. Without them, drocsid keeps the folder's current owner, so existing installs don't change.
+- Every build now tests the Docker image itself: fresh, default and existing installs, saving settings through the setup API.
+
 ## 0.5.19 — 2026-11-25
 - README: the Unraid install command creates the templates folder first (it doesn't exist on a fresh server). No change to the app.
 
