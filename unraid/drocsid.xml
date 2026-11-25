@@ -2,19 +2,19 @@
 <!-- Unraid Docker template for drocsid.
      Install: save as /boot/config/plugins/dockerMan/templates-user/my-drocsid.xml,
      then Docker → Add Container → Template: drocsid → Apply.
-     Settings (Discord/Plex IDs and tokens) are read from the .env file named in Extra Parameters. -->
+     Then open the WebUI to run the setup wizard (Discord apps, media servers, public address). -->
 <Container version="2">
   <Name>drocsid</Name>
   <Repository>ghcr.io/vtdrocsid/drocsid:latest</Repository>
   <Registry>https://github.com/vtdrocsid/drocsid/pkgs/container/drocsid</Registry>
-  <Network>proxynet</Network>
+  <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Project>https://github.com/vtdrocsid/drocsid</Project>
   <Overview>drocsid flips movie night right-side up. Stream your Plex library into a Discord voice channel, synced to the frame for the whole crew. Friends can browse and hit play without ever touching your Plex server, and you run it all from a self-hosted web panel.</Overview>
-  <Icon>https://discordtv.plunkett.cloud/browse/img/unraid-icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/vtdrocsid/drocsid/main/web/img/unraid-icon.png</Icon>
   <Category>MediaServer:Video</Category>
-  <WebUI>https://discordtv.plunkett.cloud/admin</WebUI>
-  <ExtraParams>--env-file /mnt/user/appdata/drocsid-src/.env</ExtraParams>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <Config Name="Web port" Target="3000" Default="3000" Mode="tcp" Type="Port" Display="always" Required="true" Description="Web portal and setup wizard. Point your reverse proxy (e.g. Nginx Proxy Manager) at this port for the public https address.">3000</Config>
   <Config Name="App data" Target="/data" Default="/mnt/user/appdata/drocsid" Mode="rw" Type="Path" Display="always" Required="true" Description="Settings, play history, lineup and watch progress">/mnt/user/appdata/drocsid</Config>
 </Container>
