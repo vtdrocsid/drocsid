@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.11 — 2026-11-25
+- Unraid template works for anyone: icon loads from the GitHub repo, WebUI opens the container on its own port (setup wizard on a fresh install), bridge network with a Web port setting (3000), and no `--env-file` to a personal path. Existing containers keep their own settings.
+
 ## 0.5.10 — 2026-11-25
 - New drocsid logo in the website banner (Browse, Admin, Setup), with an SVG master and a white version for dark backgrounds.
 - Browser tab icon on every page (SVG, PNG and .ico), plus `/favicon.ico`.
