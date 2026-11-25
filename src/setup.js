@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import express from 'express';
 import * as conn from './connections.js';
 import * as discord from './discord.js';
 import * as plexSetup from './plexsetup.js';
@@ -164,6 +165,13 @@ export function setupRoutes(app, { wrap, tokenOf }) {
     });
     console.log(`[connections] Discord app ${test.app?.name || clientId} ${existing ? 'updated' : 'added'}`);
     await discord.sync();
+    // A new app gets drocsid's icon as its app icon and bot avatar, unless it already has its own.
+    // Runs in the background so the wizard doesn't wait on Discord; change it later in Admin → Connections.
+    if (!existing) {
+      discord.setIcon(clientId, discord.defaultIcon(), { onlyIfEmpty: true })
+        .then((r) => console.log(`[connections] ${test.app?.name || clientId} icon: app ${r.app?.message}, bot avatar ${r.avatar?.message}`))
+        .catch((e) => console.warn(`[connections] default icon not set: ${e.message}`));
+    }
     res.json({ ...connectionsView(), test });
   }));
 
@@ -174,6 +182,19 @@ export function setupRoutes(app, { wrap, tokenOf }) {
     await discord.enableMembersIntent(token);
     if (a) await discord.restart(a.id); // the running bot reconnects to receive member data
     res.json({ ok: true });
+  }));
+
+  // Change the app icon and/or bot avatar. Body: the image itself (sent as image/*), resized in the browser.
+  app.post('/api/connections/discord/:id/icon', needManage, express.raw({ type: ['image/*', 'application/octet-stream'], limit: '10mb' }), wrap(async (req, res) => {
+    if (!conn.app(req.params.id)) return res.status(404).json({ error: 'Not found' });
+    const img = req.query.default === '1' ? discord.defaultIcon() : req.body;
+    if (!Buffer.isBuffer(img) || !img.length) return res.status(400).json({ error: 'Choose an image first' });
+    const appIcon = req.query.app !== '0', avatar = req.query.avatar !== '0';
+    if (!appIcon && !avatar) return res.status(400).json({ error: 'Pick the app icon, the bot avatar, or both' });
+    const result = await discord.setIcon(req.params.id, img, { appIcon, avatar }).catch((e) => { res.status(400).json({ error: e.message }); return null; });
+    if (!result) return;
+    console.log(`[connections] ${conn.app(req.params.id).name} icon: app ${result.app?.message || 'not changed'}, bot avatar ${result.avatar?.message || 'not changed'}`);
+    res.json({ ...connectionsView(), result });
   }));
 
   app.post('/api/connections/discord/:id/primary', needManage, (req, res) => {

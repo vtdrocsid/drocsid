@@ -2,6 +2,7 @@
 // server (guild) it has been invited to. Apps can be added, changed or removed at runtime.
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as conn from './connections.js';
 
 const bots = new Map(); // app id -> { client, tokenHash, status: 'starting'|'online'|'error', error, user }
@@ -188,3 +189,59 @@ export const inviteUrl = (clientId, guildId) => {
   u.search = new URLSearchParams({ client_id: clientId, scope: 'bot', permissions: '117760', integration_type: '0', ...(guildId ? { guild_id: guildId } : {}) });
   return u.toString();
 };
+
+// ---------- app icon and bot avatar ----------
+/** drocsid's own icon (square; Discord rounds it), used by default for new apps. */
+export const defaultIcon = () => readFileSync(new URL('../web/img/discord-icon.png', import.meta.url));
+
+const mimeOf = (b) =>
+  b[0] === 0x89 && b[1] === 0x50 ? 'image/png'
+    : b[0] === 0xff && b[1] === 0xd8 ? 'image/jpeg'
+      : b.slice(0, 3).toString() === 'GIF' ? 'image/gif'
+        : b.slice(8, 12).toString() === 'WEBP' ? 'image/webp' : '';
+
+const discordError = async (r) => {
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 429 || /too fast|rate limit/i.test(JSON.stringify(body))) return 'Discord limits how often this can change. Try again later (usually within the hour).';
+  if (r.status === 401) return 'Discord rejected the bot token. Edit the app and paste a new token.';
+  return body.errors ? `Discord refused the image (${JSON.stringify(body.errors).slice(0, 120)})` : body.message || `Discord answered ${r.status}`;
+};
+
+/**
+ * Set a Discord app's icon and/or its bot's avatar from an image (Buffer).
+ * onlyIfEmpty: leave whatever is already set (used when an app is first added).
+ * Returns { app, avatar }: each { ok, message } or null when not requested.
+ */
+export async function setIcon(appId, img, { appIcon = true, avatar = true, onlyIfEmpty = false } = {}) {
+  const token = conn.appToken(conn.app(appId));
+  if (!token) throw new Error('No bot token saved for this app');
+  const mime = mimeOf(img);
+  if (!mime) throw new Error('Use a PNG, JPG, GIF or WebP image');
+  const data = `data:${mime};base64,${img.toString('base64')}`;
+  const headers = { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' };
+  const out = { app: null, avatar: null };
+
+  const one = async (path, field) => {
+    try {
+      if (onlyIfEmpty) {
+        const cur = await fetch(`${API}${path}`, { headers });
+        if (cur.ok && (await cur.json())[field]) return { ok: true, kept: true, message: 'Already set; left as is' };
+      }
+      const r = await fetch(`${API}${path}`, { method: 'PATCH', headers, body: JSON.stringify({ [field]: data }) });
+      if (!r.ok) return { ok: false, message: await discordError(r) };
+      return { ok: true, message: 'Updated', json: await r.json() };
+    } catch {
+      return { ok: false, message: 'Could not reach Discord' };
+    }
+  };
+
+  if (appIcon) out.app = await one('/applications/@me', 'icon');
+  if (avatar) {
+    out.avatar = await one('/users/@me', 'avatar');
+    const u = out.avatar.json;
+    const b = bots.get(appId);
+    if (u && b?.user) b.user.avatar = u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64` : b.user.avatar;
+  }
+  for (const k of ['app', 'avatar']) if (out[k]) delete out[k].json;
+  return out;
+}

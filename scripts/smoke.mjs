@@ -93,6 +93,18 @@ console.log('Fresh install');
     assert.equal(r.body.ok, false);
     assert.ok(r.body.checks.some((c) => c.id === 'token' && !c.ok));
   });
+  await check('icon change refuses an unknown app', async () => {
+    const r = await fetch(base + '/api/connections/discord/123456789012345678/icon', { method: 'POST', headers: { 'Content-Type': 'image/png', cookie }, body: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
+    assert.equal(r.status, 404);
+  });
+  await check('icon change needs the setup code or a super admin', async () => {
+    const r = await fetch(base + '/api/connections/discord/123456789012345678/icon', { method: 'POST', headers: { 'Content-Type': 'image/png' }, body: new Uint8Array([1]) });
+    assert.equal(r.status, 403);
+  });
+  await check('drocsid icon is served for the admin page', async () => {
+    const r = await get(base, '/browse/img/discord-icon.png');
+    assert.equal(r.status, 200);
+  });
   await check('bad Discord app not saved', async () => assert.equal((await json(base, '/api/connections/discord', 'POST', { clientId: '123456789012345678', clientSecret: 'x', botToken: 'y' }, cookie)).status, 400));
   await check('Plex test rejects bad address', async () => assert.equal((await json(base, '/api/connections/media/test', 'POST', { type: 'plex', url: 'nope', token: 't' }, cookie)).body.ok, false));
   const mock = await startMockJellyfin(3913);

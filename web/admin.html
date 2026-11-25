@@ -96,6 +96,26 @@
     </div>
   </main>
   </div>
+  <dialog id="iconDlg">
+    <div class="dlg-head">Change icon · <span id="iconApp"></span></div>
+    <div class="dlg-body">
+      <div class="ip-drop" id="iconDrop">Drop an image here or <label class="btn sm">Choose file…<input type="file" id="iconFile" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label>
+        <div class="sub">PNG, JPG, GIF or WebP. Square works best (at least 512×512). It's cropped to a square and shown round in Discord.</div>
+        <div style="margin-top:8px">or <button class="btn sm" type="button" id="iconDefault">Use the drocsid icon</button></div></div>
+      <div class="ip-row" id="iconPrev">
+        <div class="ip-prev"><img id="ipBig" width="96" height="96" alt="">Activity / profile</div>
+        <div class="ip-prev"><img id="ipMid" width="40" height="40" alt="">40 px</div>
+        <div class="ip-prev"><img id="ipSmall" width="20" height="20" alt="">20 px</div>
+        <div class="ip-prev"><div class="ip-member"><img id="ipMem" alt=""><b id="ipName"></b><span class="tag">APP</span></div>Member list</div>
+      </div>
+      <div class="ip-opts">
+        <label><input type="checkbox" id="iconApp1" checked> <span><b>App icon</b><br><small>The Activity tile in the 🚀 menu and the app's profile</small></span></label>
+        <label><input type="checkbox" id="iconAva1" checked> <span><b>Bot avatar</b><br><small>The bot in the member list and on its "now playing" messages. Discord limits how often this can change.</small></span></label>
+      </div>
+      <ul class="checks" id="iconResult"></ul>
+    </div>
+    <div class="ip-foot"><button class="btn" type="button" id="iconCancel">Cancel</button><button class="btn primary" type="button" id="iconSave">Save to Discord</button></div>
+  </dialog>
   <datalist id="memberList"></datalist>
   <datalist id="guildMemberList"></datalist>
   <script type="module" src="admin.js"></script>
