@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.12 — 2026-11-25
+- **Setup works from http://<ip>:<port>**: the wizard can be opened from Unraid's WebUI link. The owner sign-in carries the setup code through Discord (which always returns to the public address), and setup continues there.
+- Wizard shows the Nginx Proxy Manager guide when you enter the public address, and explains the sign-in step needs it working.
+- New step-by-step install guide in the README (Unraid or Compose, DNS, Nginx Proxy Manager with the streaming settings, Discord Developer Portal, access, updating, troubleshooting).
+- Example files and the Unraid template hold example values only; template description mentions Jellyfin and Emby.
+
 ## 0.5.11 — 2026-11-25
 - Unraid template works for anyone: icon loads from the GitHub repo, WebUI opens the container on its own port (setup wizard on a fresh install), bridge network with a Web port setting (3000), and no `--env-file` to a personal path. Existing containers keep their own settings.
 
