@@ -47,7 +47,7 @@ Point `discordtv.plunkett.cloud` at the container's port 3000 in Nginx Proxy Man
 
 Images are built by GitHub Actions and published to `ghcr.io/<you>/drocsid`.
 
-**Template:** copy `unraid/drocsid.xml` to `/boot/config/plugins/dockerMan/templates-user/my-drocsid.xml`. Replace `GITHUB_OWNER`, then go to Docker → Add Container → drocsid and fill in the variables.
+**Template:** copy `unraid/drocsid.xml` to `/boot/config/plugins/dockerMan/templates-user/my-drocsid.xml`, then go to Docker → Add Container → drocsid and Apply. Open the WebUI (`http://<unraid-ip>:3000/`) to run the setup wizard. If your reverse proxy is on its own Docker network, you can switch the container to that network instead of publishing the port.
 
 **Compose (Compose Manager plugin):** use `docker-compose.yml` with a `.env` built from `.env.example`.
 
