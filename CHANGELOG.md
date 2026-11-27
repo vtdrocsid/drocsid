@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.21 — 2026-11-27
+- README: install on any Linux with Docker (Compose or a single `docker run`), alongside Unraid. Setup code, wizard address, updating and troubleshooting cover both.
+- Example `docker-compose.yml`: `./data` folder and PUID/PGID. No change to the app.
+
 ## 0.5.20 — 2026-11-25
 - **Fixed: a fresh install couldn't save its settings** ("EACCES: permission denied … connections.json.tmp"). Docker creates a new App data folder owned by root, and drocsid ran as a restricted user from the start. It now starts as root only to give `/data` to the right user, then runs as that user.
 - Unraid template: PUID 99 / PGID 100 (nobody:users) under advanced settings. Without them, drocsid keeps the folder's current owner, so existing installs don't change.
