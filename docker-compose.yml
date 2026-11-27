@@ -1,4 +1,5 @@
-# For Unraid's Compose Manager plugin, or any Docker host. Then open https://<your address>/setup/ (see README).
+# drocsid on any Docker host (or Unraid's Compose Manager). See README, step 1, option B.
+# PUID/PGID: your user's IDs (`id -u` / `id -g`); drocsid saves its files as that user.
 services:
   drocsid:
     image: ghcr.io/vtdrocsid/drocsid:latest
@@ -6,5 +7,8 @@ services:
     restart: unless-stopped
     ports:
       - "3005:3005"   # or drop this and join your reverse proxy's Docker network instead
+    environment:
+      PUID: "1000"
+      PGID: "1000"
     volumes:
-      - /mnt/user/appdata/drocsid:/data
+      - ./data:/data

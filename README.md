@@ -15,7 +15,7 @@ There are no slash commands. The bot posts "now playing" notices, reads roles an
 
 ## What you need
 
-- An **Unraid** server (or any Docker host) that can reach your Plex, Jellyfin or Emby server.
+- An **Unraid** server, or **any Linux machine with Docker**, that can reach your Plex, Jellyfin or Emby server.
 - A **domain name** you control, for a subdomain such as `example.domain.com`.
 - **Nginx Proxy Manager** (or another reverse proxy) with ports **80** and **443** forwarded to it from your router.
 - A **Discord account** with **Manage Server** permission on the Discord server(s) you want to watch in.
@@ -24,7 +24,11 @@ Throughout this guide, `example.domain.com` stands for your own address. Replace
 
 ---
 
-## Step 1 · Install the container (Unraid)
+## Step 1 · Install the container
+
+Pick the one that matches your server: [Unraid](#option-a--unraid) or [Docker on any Linux](#option-b--docker-on-any-linux).
+
+### Option A · Unraid
 
 1. Open the Unraid terminal (top right `>_` icon) and download the template:
 
@@ -44,22 +48,64 @@ Throughout this guide, `example.domain.com` stands for your own address. Replace
 
 > On another network than `bridge`, Unraid's WebUI link uses the container's own IP, which may not be reachable from your PC. If it doesn't open, use `http://<unraid-ip>:3005/` with the port published, or the public address once step 2 is done.
 
+### Option B · Docker on any Linux
+
+For Ubuntu, Debian, Fedora or any other distribution with Docker installed.
+
+1. **Install Docker** if it isn't already, with the Compose plugin: follow [Docker's install guide](https://docs.docker.com/engine/install/) for your distribution. Check it works:
+
+   ```sh
+   docker --version
+   docker compose version
+   ```
+
+   If Docker commands only work with `sudo`, either put `sudo` in front of the `docker` commands below, or add your user to the `docker` group (`sudo usermod -aG docker $USER`, then log out and back in).
+
+2. **Create a folder for drocsid** and its `docker-compose.yml`. Paste this as it is: it fills in your own user and group IDs (`PUID`/`PGID`), so drocsid's files belong to you and you can read and back them up:
+
+   ```sh
+   mkdir -p ~/drocsid && cd ~/drocsid
+   cat > docker-compose.yml <<YAML
+   services:
+     drocsid:
+       image: ghcr.io/vtdrocsid/drocsid:latest
+       container_name: drocsid
+       restart: unless-stopped
+       ports:
+         - "3005:3005"
+       environment:
+         PUID: "$(id -u)"
+         PGID: "$(id -g)"
+       volumes:
+         - ./data:/data
+   YAML
+   ```
+
+3. **Start it:**
+
+   ```sh
+   docker compose up -d
+   ```
+
+   It downloads the image, starts drocsid and waits for setup. All settings are saved in `~/drocsid/data`.
+
+4. **Firewall:** if the server runs a firewall, allow port 3005 from your network so you can open the setup wizard. With `ufw`:
+
+   ```sh
+   sudo ufw allow 3005/tcp
+   ```
+
 <details>
-<summary>Not on Unraid? Docker Compose</summary>
+<summary>Prefer a single <code>docker run</code> command?</summary>
 
-```yaml
-services:
-  drocsid:
-    image: ghcr.io/vtdrocsid/drocsid:latest
-    container_name: drocsid
-    restart: unless-stopped
-    ports:
-      - "3005:3005"
-    volumes:
-      - ./drocsid-data:/data
+```sh
+mkdir -p ~/drocsid/data
+docker run -d --name drocsid --restart unless-stopped \
+  -p 3005:3005 \
+  -e PUID=$(id -u) -e PGID=$(id -g) \
+  -v ~/drocsid/data:/data \
+  ghcr.io/vtdrocsid/drocsid:latest
 ```
-
-`docker compose up -d`, then carry on with step 2.
 </details>
 
 ---
@@ -68,13 +114,15 @@ services:
 
 Discord loads the player from your server and sends people back to it after they sign in, so drocsid needs a public **https** address with a valid certificate. These steps use Nginx Proxy Manager.
 
+> **On Linux without Nginx Proxy Manager?** It runs as a Docker container too: see its [quick setup guide](https://nginxproxymanager.com/guide/#quick-setup). Ports 80 and 443 on the server must be free for it. Any other reverse proxy works as well, as long as it passes WebSockets and uses the settings in step 5 below.
+
 1. **DNS:** at your DNS provider, create an **A record** for `example.domain.com` pointing at your public IP (or a CNAME to your dynamic-DNS name).
    - On **Cloudflare**, use **DNS only** (grey cloud). Cloudflare's terms restrict proxying video on free plans, and its proxy also breaks long streams.
 2. **Router:** forward ports **80** and **443** to Nginx Proxy Manager, if you haven't already.
 3. In Nginx Proxy Manager, go to **Hosts → Proxy Hosts → Add Proxy Host**. On the **Details** tab:
    - **Domain Names:** `example.domain.com`
    - **Scheme:** `http`
-   - **Forward Hostname / IP:** your Unraid server's LAN IP (with drocsid on `bridge`), or `drocsid` if you moved drocsid onto the same Docker network as Nginx Proxy Manager
+   - **Forward Hostname / IP:** your server's LAN IP (with drocsid on Docker's default `bridge` network), or `drocsid` if drocsid is on the same Docker network as Nginx Proxy Manager
    - **Forward Port:** `3005` (the Web port from step 1)
    - **Websockets Support:** **on** (required: the player stays in sync over a WebSocket)
    - **Cache Assets:** **off** (video pieces and playlists change constantly and must never be cached)
@@ -99,13 +147,21 @@ Discord loads the player from your server and sends people back to it after they
 
 ## Step 3 · Run the setup wizard
 
-1. Get the **setup code**: **Docker** tab → click the drocsid icon → **Logs**. Look for:
+1. Get the **setup code** from drocsid's log:
+   - **Unraid:** **Docker** tab → click the drocsid icon → **Logs**.
+   - **Linux:** `docker logs drocsid`
+
+   Look for:
 
    ```
    drocsid setup code:  ABCD-EFGH
    ```
 
-2. Open the wizard: **Docker** tab → drocsid icon → **WebUI** (or `http://<unraid-ip>:3005/` in your browser). The public address works too once step 2 is done.
+2. Open the wizard:
+   - **Unraid:** **Docker** tab → drocsid icon → **WebUI**.
+   - **Linux:** `http://<server-ip>:3005/` in your browser.
+
+   The public address works too once step 2 is done.
 3. Enter the setup code, then your public address (`https://example.domain.com`, no trailing slash).
 
 ### Create your Discord app
@@ -160,11 +216,12 @@ Once everything works, you can make Unraid's **WebUI** menu item open the public
 ## Updating
 
 - **Unraid:** Docker tab → **Check for Updates** → **apply update** on drocsid.
-- **Compose:** `docker compose pull && docker compose up -d`
+- **Linux (Compose):** in `~/drocsid`, run `docker compose pull && docker compose up -d`
+- **Linux (`docker run`):** `docker pull ghcr.io/vtdrocsid/drocsid:latest`, then `docker rm -f drocsid` and run the same `docker run` command again. Your settings stay in `~/drocsid/data`.
 
 Every release is also published with its version number (see [CHANGELOG.md](CHANGELOG.md)). To roll back, set the repository to a version, for example `ghcr.io/vtdrocsid/drocsid:0.5.10`.
 
-Your settings live in the app data folder (`/data` in the container) and survive updates. Back up that folder to keep your setup.
+Your settings live in the app data folder (`/data` in the container: `/mnt/user/appdata/drocsid` on Unraid, `~/drocsid/data` on Linux) and survive updates. Back up that folder to keep your setup.
 
 ---
 
@@ -175,7 +232,8 @@ Your settings live in the app data folder (`/data` in the container) and survive
 - **"Invalid OAuth2 redirect_uri" when signing in:** the redirect in the Developer Portal must be exactly `https://example.domain.com/auth/callback`.
 - **The Activity shows a blank screen:** check **Activities → URL Mappings** `/` → `example.domain.com`.
 - **The admin page's member picker is empty:** turn on **Server Members Intent** for the bot.
-- **Lost the setup code:** restart the container. It prints the code again until setup is finished.
+- **Lost the setup code:** restart the container (on Linux: `docker restart drocsid`). It prints the code again until setup is finished.
+- **"permission denied" when saving in the wizard:** set `PUID`/`PGID` to your user's IDs (`id -u` / `id -g`) and restart the container. drocsid fixes the data folder's ownership when it starts.
 - **Discord sign-in during setup doesn't come back:** the public address isn't working yet. Finish step 2, then open the WebUI again and sign in.
 - **Changed your address later:** update both Discord Developer Portal entries (redirect and URL mapping) for every Discord app.
 
